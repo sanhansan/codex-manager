@@ -1,8 +1,10 @@
 # Codex Manager — Codex 工作台插件用量管理与工作流程图工具
 
-![Image 1: License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Image 2: Platform](https://img.shields.io/badge/platform-ZCode%20Plugin-green.svg)
-![Image 3: Runtime](https://img.shields.io/badge/runtime-Node.js%20%7C%20Python%203.x-yellow.svg)
+[English](README.en.md) | 简体中文
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-ZCode%20Plugin-green.svg)
+![Runtime](https://img.shields.io/badge/runtime-Node.js%20%7C%20Python%203.x-yellow.svg)
 
 本插件面向 Codex 式 AI 编程智能体工作台（基于 ZCode 插件生态构建），旨在回答两个高频问题："我装的这些插件，到底哪个用得多？"以及"这次任务，AI 到底是怎么一步步干完的？"。通过后台钩子自动采集、命令一键出结果的无感设计，降低使用门槛，让插件用量与工作过程一目了然。
 
