@@ -10,6 +10,8 @@ English | [简体中文](README.zh-CN.md)
 
 This plugin targets Codex-style AI coding agent workbenches (built on the ZCode plugin ecosystem) and answers two questions that come up all the time: "Of all the plugins I've installed, which ones do I actually use?" and "How exactly did the AI get this task done, step by step?" With silent background hooks and one-command results, it keeps plugin usage and your working process fully visible — no extra effort required.
 
+**Why it matters: a flowchart is not a picture, it is a review instrument.** When every session becomes a diagram, detours, repeated steps and wasted effort become visible at a glance — so you can audit the process, revise it, and make the next run faster. Codex Manager turns "see the flow → review it → improve it" into a habit, and the usage stats tell you whether each change actually helped.
+
 > **Maintenance** — Actively maintained by [@sanhansan](https://github.com/sanhansan), last updated 2026-10-06. For bug reports or adaptation requests, please open an [Issue](https://github.com/sanhansan/codex-manager/issues).
 
 ## Download & Use the Release Packages

@@ -4,7 +4,7 @@ ZCode 插件 · ZCode plugin · v0.3.0
 
 [English](#english) | [简体中文](#中文)
 
-一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图。当前版本 **v0.3.0**，由 [@sanhansan](https://github.com/sanhansan) 维护。
+一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.3.0**，由 [@sanhansan](https://github.com/sanhansan) 维护。
 
 ---
 
@@ -45,7 +45,7 @@ ZCode 插件 · ZCode plugin · v0.3.0
 
 ## English
 
-A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart. Current version **v0.3.0**, maintained by [@sanhansan](https://github.com/sanhansan).
+A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.3.0**, maintained by [@sanhansan](https://github.com/sanhansan).
 
 ### How to use the zip package
 
