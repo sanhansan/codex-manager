@@ -58,3 +58,5 @@ print("SAVED:", fp, "| versions:", len(data["versions"]), "| stages:", len(data[
 ## 第四步：呈现
 
 回复：本次存入的阶段清单、项目框架当前累计状态（versions 数、stages 总数）、flow.json 路径（**提示：该 JSON 可手工编辑修改与扩展，下次搭建会基于修改后的版本**）、图片路径（如已渲染）。
+
+**询问打开编辑器**：呈现后**询问用户**「要在浏览器里打开可视化编辑器查看/继续编辑吗？」——同意则按 `/codex-flow-edit` 的流程，把本次存入的 mermaid 注入编辑器副本并打开，并提示可在编辑器里点「🔗 连接文件」选中本项目的 mermaid 文件实现 code↔网页双向同步。

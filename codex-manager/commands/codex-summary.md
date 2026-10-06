@@ -29,6 +29,7 @@ argument-hint: "项目名 [--render 渲染图片]"
 - 报告存入 `projects\<项目名>\summaries\`，总流程图同时保存 `.md` 与 mermaid 源；
 - 参数含 `--render` 时按 `/codex-flow-save` 第三步的渲染链（kroki → mmdc → AI 生图 → 手动）输出 PNG；
 - 回复中内嵌总流程图 mermaid 与报告要点，给出全部文件路径。
+- **询问打开编辑器**：最后**询问用户**「要在浏览器里打开可视化编辑器查看总流程图吗？」——同意则按 `/codex-flow-edit` 的流程注入并打开（mermaid 用本次生成的总流程图）。
 
 ## 诚实原则
 

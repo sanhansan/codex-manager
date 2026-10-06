@@ -20,8 +20,9 @@ All versions are published on the [Releases](https://github.com/sanhansan/codex-
 
 | Version | Date | Contents | For whom |
 | --- | --- | --- | --- |
-| **v0.4.0 (latest, recommended)** | 2026-10-06 | Full: process review & improvement loop + ZCode plugin + OpenAI Codex CLI adapter | Everything in one package |
-| **v0.3.0** | 2026-10-06 | Full: ZCode plugin (0.3.0) + OpenAI Codex CLI adapter + bilingual docs | No review loop needed |
+| **v0.9.0 (latest, recommended)** | 2026-10-06 | Full: visual flowchart editor v2 (left taskbar · 3 views · multi-workflow · logic gates · file two-way sync · habits & skill summary dashboard) + review loop + Codex CLI adapter | Everything in one package |
+| v0.5.0 | 2026-10-06 | First visual flowchart editor + review loop + Codex CLI adapter | Try the canvas editor |
+| v0.4.0 | 2026-10-06 | Full: process review & improvement loop + ZCode plugin + OpenAI Codex CLI adapter | Headless / no editor needed |
 | v0.2.0 | 2026-10-06 | ZCode plugin + structured bilingual docs | ZCode only |
 | v0.1.0 | 2026-10-06 | Initial ZCode plugin | Basic usage tracking only |
 
@@ -85,6 +86,17 @@ Turns "seeing the process" into "improving the process":
 - __Continuous flow framework__ (`/codex-flow-save`): merges each session into a project-level framework `flow.json` (human-editable, endlessly modifiable and extensible), with flowchart image rendering (kroki.io / mermaid-cli / AI image generation, in fallback order);
 - __Multi-agent review__ (`/codex-agents-review`): efficiency / quality / prompt sub-agents review in parallel; the master agent deduplicates, arbitrates and aggregates; findings accumulate across sessions and agents (`agent_summaries`);
 - __Final aggregation__ (`/codex-summary`): rolls the continuously built framework into a master flowchart and a closed-loop review report.
+
+### 6. Visual Flowchart Editor (v0.5.0–v0.9.0)
+
+`/codex-flow-edit` opens `assets/flow-editor.html` — a dependency-free, single-file canvas editor (works offline):
+
+- __Left taskbar, three views__ (v0.9.0): 🖼 canvas / 🛰 distributed workspaces (one card per workflow) / 🧭 master-control relation map & table (dotted arrows = subflow references; click a node to enter that workspace);
+- __Multi-workflow workbench__ with subflow nodes (`▸→name`, double-click to jump) and 8 logic gates (IF/AND/OR/NOT/NAND/NOR/XOR/XNOR) with rule validation (NOT takes one input, IF at most two branches);
+- __Text is the single source of truth__: Mermaid / Markdown / JSON tabs stay two-way synced with the canvas; gates and subflows ride along as `⚙GATE` / `▸→flow` label suffixes;
+- __Two-way file sync__ (v0.8.0, File System Access API): edit the file in your IDE and the canvas redraws within ~1.5s; edit the canvas and it writes back (debounced, loop-protected);
+- __Comfortable editing__: undo/redo (60 steps), wheel pan + Ctrl+wheel zoom, duplicate/self-loop edge rejection, reverse-edge routing, serpentine folding for >8-level linear chains, white theme by default with dark mode toggle;
+- __📊 Habits & skills dashboard__: pick `usage.jsonl` to see KPIs, skill/MCP rankings, plugin distribution, 14-day activity trend, peak hours, habit candidates and a per-skill summary — one click copies a Markdown report for `/codex-habit`.
 
 ## Deployment & Usage Guide
 
