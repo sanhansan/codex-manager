@@ -1,0 +1,18 @@
+{
+  "name": "dev-default-34bc06f2",
+  "plugins": [
+    {
+      "name": "codex-manager",
+      "source": "./codex-manager",
+      "version": "0.2.0",
+      "description": "Codex 管家：自动记录各插件/技能/MCP 的使用量，一键导出 Excel 用量报表，并把每次工作会话转化为 Mermaid 流程图。",
+      "displayName": "Codex Manager",
+      "displayName_i18n": {
+        "zh-CN": "Codex 管家"
+      },
+      "description_i18n": {
+        "zh-CN": "自动统计各插件/技能/MCP 的使用量，一键导出 Excel 报表，并把每次工作会话转化为 Mermaid 流程图"
+      }
+    }
+  ]
+}

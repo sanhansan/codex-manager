@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^Skill$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/log-usage.mjs\" skill",
+            "timeout": 10,
+            "statusMessage": "codex-manager：记录技能用量"
+          }
+        ]
+      },
+      {
+        "matcher": "^mcp__",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/log-usage.mjs\" mcp",
+            "timeout": 10,
+            "statusMessage": "codex-manager：记录 MCP 用量"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/log-usage.mjs\" session",
+            "timeout": 10,
+            "statusMessage": "codex-manager：记录会话开始"
+          }
+        ]
+      }
+    ]
+  }
+}
