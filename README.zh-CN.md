@@ -20,7 +20,8 @@ Codex 工作台的插件用量管理与工作流程图工具。
 
 | 版本 | 发布日期 | 包内容 | 适合谁 |
 | --- | --- | --- | --- |
-| **v0.3.0（最新，推荐）** | 2026-10-06 | 完整版：ZCode 插件（0.3.0）+ OpenAI Codex CLI 适配 + 中英双语文档 | 想一次拿全所有功能 |
+| **v0.4.0（最新，推荐）** | 2026-10-06 | 全功能：流程审查与改进闭环 + ZCode 插件 + OpenAI Codex CLI 适配 | 想一次拿全所有功能 |
+| **v0.3.0** | 2026-10-06 | 完整版：ZCode 插件（0.3.0）+ OpenAI Codex CLI 适配 + 中英双语文档 | 不需要审查闭环 |
 | v0.2.0 | 2026-10-06 | ZCode 插件 + 结构化中英双语文档 | 只使用 ZCode |
 | v0.1.0 | 2026-10-06 | ZCode 插件初版 | 只需基础用量统计 |
 
@@ -74,6 +75,17 @@ powershell -ExecutionPolicy Bypass -File codex-cli-adapter/install.ps1   # Windo
 
 详见 [codex-cli-adapter/README.md](./codex-cli-adapter/README.md)。
 
+### 五、 流程审查与改进闭环（v0.4.0）
+
+把"看清流程"升级为"改进流程"：
+
+- __自我流程提问审查__（`/codex-review`）：7 类审查问题逐条自问自答，输出【可省 / 可优化 / 保留 / 习惯】类型化推荐，每条附事件依据与量化收益；
+- __项目结束总结__（`/codex-optimize`）：复盘报告 + 优化提示词推荐——吸收本项目踩坑教训、可直接复制使用的提示词模板；
+- __个人习惯成 skill__（`/codex-habit`）：从用量日志与审查记录提炼习惯，自主编写 SKILL.md 草稿，确认后装进插件；
+- __流程框架持续搭建__（`/codex-flow-save`）：把每次会话合并进项目级流程框架 `flow.json`（人可编辑、支持不断修改与扩展），并支持调用生图渲染流程图（kroki.io / mermaid-cli / AI 生图工具按序降级）；
+- __多子智能体审查__（`/codex-agents-review`）：效率 / 质量 / 提示词三个子智能体并行审查，总智能体去重、裁决、汇总，结论跨智能体沉淀（`agent_summaries` 跨会话累积）；
+- __最后汇总__（`/codex-summary`）：把持续搭建的框架汇成总流程图与审查闭环报告。
+
 ## 部署与使用指南
 
 ### 系统要求
@@ -101,6 +113,12 @@ git clone https://github.com/sanhansan/codex-manager.git
 | --- | --- | --- |
 | `/codex-usage` | `[N]`（可选，统计最近 N 天） | 输出用量明细表并导出 Excel |
 | `/codex-flow` | 不填 / `recent` / 会话 ID 片段 | 当前会话 / 最近会话 / 指定会话生成流程图 |
+| `/codex-review` | `[项目名]` | 提问式流程审查，输出可省/可优化/保留推荐 |
+| `/codex-optimize` | `[项目名]` | 项目结束总结 + 优化提示词推荐 |
+| `/codex-habit` | `[主题] [install]` | 个人习惯 → 自主编写 skill（可装进插件） |
+| `/codex-flow-save` | `项目名 [render]` | 会话流程存入项目框架，可渲染流程图图片 |
+| `/codex-agents-review` | `[项目名]` | 三子智能体并行审查 + 跨智能体汇总 |
+| `/codex-summary` | `项目名 [--render]` | 项目最终汇总（总流程图 + 审查闭环报告） |
 
 ## 注意事项
 

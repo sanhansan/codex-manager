@@ -20,7 +20,8 @@ All versions are published on the [Releases](https://github.com/sanhansan/codex-
 
 | Version | Date | Contents | For whom |
 | --- | --- | --- | --- |
-| **v0.3.0 (latest, recommended)** | 2026-10-06 | Full: ZCode plugin (0.3.0) + OpenAI Codex CLI adapter + bilingual docs | Everything in one package |
+| **v0.4.0 (latest, recommended)** | 2026-10-06 | Full: process review & improvement loop + ZCode plugin + OpenAI Codex CLI adapter | Everything in one package |
+| **v0.3.0** | 2026-10-06 | Full: ZCode plugin (0.3.0) + OpenAI Codex CLI adapter + bilingual docs | No review loop needed |
 | v0.2.0 | 2026-10-06 | ZCode plugin + structured bilingual docs | ZCode only |
 | v0.1.0 | 2026-10-06 | Initial ZCode plugin | Basic usage tracking only |
 
@@ -74,6 +75,17 @@ powershell -ExecutionPolicy Bypass -File codex-cli-adapter/install.ps1   # Windo
 
 See [codex-cli-adapter/README.md](./codex-cli-adapter/README.md) for details.
 
+### 5. Process Review & Improvement Loop (v0.4.0)
+
+Turns "seeing the process" into "improving the process":
+
+- __Self-questioning process review__ (`/codex-review`): 7 classes of review questions answered one by one, producing typed recommendations (omit / optimize / keep / habit), each backed by event evidence and quantified benefit;
+- __End-of-project retrospective__ (`/codex-optimize`): a retrospective report plus optimized prompt recommendations — ready-to-paste prompt templates that absorb the pitfalls of the project;
+- __Habits into skills__ (`/codex-habit`): distills personal habits from usage logs and review records, autonomously writes SKILL.md drafts, and installs them on confirmation;
+- __Continuous flow framework__ (`/codex-flow-save`): merges each session into a project-level framework `flow.json` (human-editable, endlessly modifiable and extensible), with flowchart image rendering (kroki.io / mermaid-cli / AI image generation, in fallback order);
+- __Multi-agent review__ (`/codex-agents-review`): efficiency / quality / prompt sub-agents review in parallel; the master agent deduplicates, arbitrates and aggregates; findings accumulate across sessions and agents (`agent_summaries`);
+- __Final aggregation__ (`/codex-summary`): rolls the continuously built framework into a master flowchart and a closed-loop review report.
+
 ## Deployment & Usage Guide
 
 ### System Requirements
@@ -101,6 +113,12 @@ After installing, start a fresh task, trigger a few plugin skills, then run `/co
 | --- | --- | --- |
 | `/codex-usage` | `[N]` (optional, last N days) | Print the usage breakdown and export an Excel report |
 | `/codex-flow` | empty / `recent` / session-ID fragment | Flowchart for the current / latest / specified session |
+| `/codex-review` | `[project]` | Question-driven process review; typed omit/optimize/keep recommendations |
+| `/codex-optimize` | `[project]` | End-of-project retrospective + optimized prompt recommendations |
+| `/codex-habit` | `[theme] [install]` | Personal habits → autonomously written skill (installable) |
+| `/codex-flow-save` | `project [render]` | Save the session flow into the project framework; render images |
+| `/codex-agents-review` | `[project]` | Three sub-agents review in parallel + cross-agent aggregation |
+| `/codex-summary` | `project [--render]` | Final project aggregation (master flowchart + closed-loop report) |
 
 ## Important Notes
 

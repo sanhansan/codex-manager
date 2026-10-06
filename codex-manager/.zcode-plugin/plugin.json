@@ -1,6 +1,6 @@
 {
   "name": "codex-manager",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Codex 管家：自动记录各插件/技能/MCP 的使用量，一键导出 Excel 用量报表，并把每次工作会话转化为 Mermaid 流程图。",
   "author": { "name": "litaizhe" },
   "skills": "./skills",
