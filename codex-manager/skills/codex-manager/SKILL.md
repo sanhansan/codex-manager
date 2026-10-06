@@ -1,6 +1,6 @@
 ---
 name: codex-manager
-description: Use when the user asks about plugin/skill/MCP usage statistics (插件使用量、使用统计、使用报表、哪个插件用得多、MCP 调用次数), wants to export a usage spreadsheet (导出表格、Excel 报表), wants a work session turned into a flowchart (工作流程图、会话复盘、把这次工作画成流程图), wants to review or improve a work process (流程审查、流程提问、哪些可以省、哪些可以优化、流程改进), wants an end-of-project retrospective with prompt recommendations (项目总结、优化提示词), wants personal habits turned into a skill (个人习惯成 skill、总结成技能), wants a project flow framework built up or aggregated (流程框架、持续搭建、最后汇总), or wants multi-agent / cross-agent review (子智能体审查、跨智能体总结). Backed by automatic usage-logging hooks and the /codex-* commands.
+description: Use when the user asks about plugin/skill/MCP usage statistics (插件使用量、使用统计、使用报表、哪个插件用得多、MCP 调用次数), wants to export a usage spreadsheet (导出表格、Excel 报表), wants a work session turned into a flowchart (工作流程图、会话复盘、把这次工作画成流程图), wants to visually edit a flowchart on a canvas (可视化编辑流程图、拖拽改图、画布上改流程图、浏览器里修改流程图), wants to review or improve a work process (流程审查、流程提问、哪些可以省、哪些可以优化、流程改进), wants an end-of-project retrospective with prompt recommendations (项目总结、优化提示词), wants personal habits turned into a skill (个人习惯成 skill、总结成技能), wants a project flow framework built up or aggregated (流程框架、持续搭建、最后汇总), or wants multi-agent / cross-agent review (子智能体审查、跨智能体总结). Backed by automatic usage-logging hooks and the /codex-* commands.
 ---
 
 # Codex Manager：用量统计、流程审查与持续改进
@@ -15,6 +15,7 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 | --- | --- |
 | 使用量 / 统计 / 报表 / 表格 | `/codex-usage`（读日志 → 聚合 → Markdown 表格 + xlsx） |
 | 流程图 / 把这次工作画出来 | `/codex-flow`（当前会话直接梳理；历史会话解析 rollout） |
+| 可视化编辑 / 拖拽改图 | `/codex-flow-edit`（浏览器画布编辑 → 导出 .mmd → 可用 `/codex-flow-save` 回写框架） |
 | 流程审查 / 提问 / 哪些可省可优化 | `/codex-review`（提问式审查 → 类型化推荐表） |
 | 项目结束 / 总结 / 优化提示词 | `/codex-optimize`（复盘报告 + 可复用提示词模板） |
 | 个人习惯 / 总结成 skill | `/codex-habit`（数据驱动提炼 → 自主编写 SKILL.md） |

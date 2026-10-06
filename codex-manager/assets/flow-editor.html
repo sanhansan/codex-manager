@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex 管家 · 流程图可视化编辑器</title>
+<style>
+  :root { --line:#d8dee9; --ink:#1f2937; --accent:#2563eb; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; margin:0; font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif; color:var(--ink); }
+  header { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; background:#f8fafc; }
+  header b { font-size:15px; margin-right:6px; }
+  header .src { color:#64748b; font-size:12px; margin-right:auto; max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  button, select { font:inherit; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary:hover { opacity:.9; color:#fff; }
+  main { display:flex; height:calc(100% - 49px); }
+  #cvwrap { flex:1; position:relative; overflow:hidden; background:#fbfcfe; }
+  svg#cv { width:100%; height:100%; display:block; cursor:grab; }
+  svg#cv.panning { cursor:grabbing; }
+  aside { width:230px; border-left:1px solid var(--line); padding:10px; overflow:auto; background:#fff; }
+  aside h4 { margin:4px 0 8px; font-size:13px; color:#64748b; }
+  aside label { display:block; font-size:12px; color:#64748b; margin:8px 0 2px; }
+  aside input[type=text], aside textarea, aside select { width:100%; font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:6px; }
+  aside textarea { height:52px; resize:vertical; }
+  #code { position:absolute; right:0; bottom:0; left:0; height:34%; border-top:1px solid var(--line); background:#0f172a; color:#e2e8f0; display:flex; flex-direction:column; transition:height .15s; }
+  #code.hidden { height:0; overflow:hidden; border-top:none; }
+  #code .bar { display:flex; align-items:center; gap:8px; padding:3px 10px; background:#1e293b; font-size:12px; color:#94a3b8; }
+  #code textarea { flex:1; border:0; outline:0; resize:none; background:transparent; color:inherit; font:12.5px/1.55 Consolas,Menlo,monospace; padding:8px 12px; white-space:pre; }
+  #codeErr { color:#fca5a5; font-size:12px; padding:2px 12px; min-height:18px; }
+  dialog { border:1px solid var(--line); border-radius:10px; max-width:560px; padding:16px 20px; }
+  dialog h3 { margin-top:0; }
+  dialog li, dialog p { font-size:13px; }
+  #overlay { position:absolute; inset:0; background:#f1f5f9ee; display:flex; align-items:center; justify-content:center; }
+  #overlay .box { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 24px; width:min(560px, 90%); }
+  #overlay textarea { width:100%; height:180px; font:12.5px Consolas,monospace; border:1px solid var(--line); border-radius:8px; padding:8px; }
+  .hint { color:#64748b; font-size:12px; }
+  .toast { position:absolute; left:50%; top:14px; transform:translateX(-50%); background:#1e293b; color:#fff; padding:6px 14px; border-radius:8px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s; }
+</style>
+</head>
+<body>
+<header>
+  <b>Codex 管家 · 流程图编辑器</b>
+  <span class="src" id="srcInfo"></span>
+  <button id="btnAdd">＋节点</button>
+  <button id="btnLayout">自动重排</button>
+  <select id="dirSel" title="整体方向"><option value="TD">上下（TD）</option><option value="LR">左右（LR）</option></select>
+  <button id="btnFit">适应视图</button>
+  <button id="btnPaste">粘贴导入</button>
+  <button id="btnCopy">复制 mermaid</button>
+  <button id="btnSave" class="primary">导出 .mmd (Ctrl+S)</button>
+  <button id="btnHelp">?</button>
+</header>
+<main>
+  <div id="cvwrap">
+    <svg id="cv"><defs id="defs"></defs><g id="world"></g></svg>
+    <div id="code">
+      <div class="bar"><span>mermaid 源码（双向同步：画布改动写回这里，改这里也会重画）</span>
+        <button id="btnCodeToggle" style="margin-left:auto">收起</button></div>
+      <textarea id="codeTA" spellcheck="false"></textarea>
+      <div id="codeErr"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div id="overlay" style="display:none">
+      <div class="box">
+        <h3>载入流程图</h3>
+        <p class="hint">把 mermaid <code>flowchart</code> 源码粘贴到下面，或先用示例试玩。</p>
+        <textarea id="pasteTA" placeholder="flowchart TD&#10;  A[开始] --> B{是否通过?}"></textarea>
+        <p><button id="btnLoad" class="primary">载入</button> <button id="btnDemo">载入示例</button></p>
+      </div>
+    </div>
+  </div>
+  <aside id="props"><h4>未选中对象</h4><p class="hint">点击节点 / 连线 / 分组标题可在此编辑属性。<br><br>· 拖节点移动<br>· 从节点下方圆点拖到另一节点 = 连线<br>· 双击空白 = 新建节点<br>· Del = 删除选中<br>· Ctrl+S = 导出 .mmd</p></aside>
+</main>
+
+<dialog id="help">
+  <h3>支持与限制</h3>
+  <p>本编辑器面向 codex-manager 生成的流程图，支持 mermaid 子集：</p>
+  <li><code>flowchart TD / LR</code>（方向）</li>
+  <li>节点三种形状：<code>A[矩形]</code>、<code>A{菱形判断}</code>、<code>A(圆角)</code></li>
+  <li>连线：<code>--&gt;</code> 实线、<code>-.-&gt;</code> 虚线，标签 <code>--&gt;|文字|</code></li>
+  <li><code>subgraph 分组 … end</code> 分组框</li>
+  <p>其余语法（classDef、样式、嵌套 subgraph 等）会被忽略，不影响其余部分编辑。</p>
+  <p class="hint">导出的是纯 mermaid 文本（文本是唯一事实源）；导出后可在会话里用 /codex-flow-save 回写项目框架。</p>
+  <form method="dialog"><button>知道了</button></form>
+</dialog>
+
+<script>
+"use strict";
+//__CORE_START__
+// ---------- 纯逻辑核心（可脱离 DOM 测试） ----------
+function cjkWidth(s){ let w=0; for (const ch of String(s)) w += /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 14 : 7.5; return w; }
+function nodeW(label){ return Math.min(240, Math.max(90, cjkWidth(label) + 34)); }
+const NODE_H = 40;
+
+function upsertNode(g, id, label, shape, subId){
+  let n = g.nodes.find(x => x.id === id);
+  if (!n){ n = { id, label: label || id, shape: shape || 'rect', sub: null, x:0, y:0, w:nodeW(label||id), h:NODE_H }; g.nodes.push(n); }
+  if (label !== undefined && label !== '' && n.label === id) n.label = label; // 裸 id 先占位，后遇显式标签则更新
+  if (shape && shape !== 'rect') n.shape = shape;
+  else if (shape === 'rect' && label !== undefined && label !== '' && n.label === id) n.shape = 'rect';
+  if (label !== undefined && label !== '' && label !== id && (n.label === id || arguments.length > 2)) n.label = label;
+  if (subId && !n.sub) n.sub = subId;
+  n.w = nodeW(n.label); n.h = NODE_H;
+  return n;
+}
+
+function parseEndpoint(s, g, subId){
+  s = String(s).trim();
+  let m = s.match(/^([A-Za-z_]\w*)\s*([\[({])["']?([\s\S]*?)["']?[\])}]$/);
+  if (m){
+    const shape = m[2] === '[' ? 'rect' : m[2] === '{' ? 'diamond' : 'round';
+    upsertNode(g, m[1], m[3].trim(), shape, subId);
+    return m[1];
+  }
+  m = s.match(/^([A-Za-z_]\w*)$/);
+  if (m){ upsertNode(g, m[1], '', 'rect', subId); return m[1]; }
+  return null;
+}
+
+function parseEdgeLine(line, g, subId){
+  if (!/(-->|-\.->)/.test(line)) return false;
+  const norm = line
+    .replace(/-\.\s*([^->]*?)\s*\.->/g, '-.->|$1|')
+    .replace(/--\s*([^->]*?)\s*-->/g, '-->|$1|');
+  const parts = norm.split(/(-->(?:\|[^|]*\|)?|-\.->(?:\|[^|]*\|)?)/);
+  if (parts.length < 3) return false;
+  let prev = parseEndpoint(parts[0], g, subId);
+  for (let i = 1; i < parts.length; i += 2){
+    const tok = parts[i], seg = (parts[i+1] || '').trim();
+    const style = tok.indexOf('-.') === 0 ? 'dotted' : 'solid';
+    const lm = tok.match(/\|([^|]*)\|\s*$/);
+    const label = lm ? lm[1].trim() : '';
+    const to = parseEndpoint(seg, g, subId);
+    if (prev && to) g.edges.push({ from: prev, to, label, style });
+    prev = to;
+  }
+  return true;
+}
+
+function parseMermaid(text){
+  const g = { dir:'TD', nodes:[], edges:[], subs:[], errors:[] };
+  const stack = [];
+  const lines = String(text || '').split(/\r?\n/);
+  for (let raw of lines){
+    const line = raw.replace(/%%.*$/, '').replace(/;$/, '').trim();
+    if (!line) continue;
+    let m = line.match(/^(?:flowchart|graph)\s+(TD|TB|LR|RL|BT)\b/i);
+    if (m){ g.dir = /L/i.test(m[1]) ? 'LR' : 'TD'; continue; }
+    if (/^subgraph\b/i.test(line)){
+      m = line.match(/^subgraph\s+(?:([^\[\]\s]+)\s*)?(?:\[(["']?)([\s\S]*?)\2\])?\s*$/i);
+      let id = null, title = null;
+      if (m && (m[1] || m[3] !== undefined)){
+        id = m[1] || null;
+        title = (m[3] !== undefined && m[3] !== '') ? m[3] : id;
+      }
+      if (!id){ const m2 = line.match(/^subgraph\s+(.+)$/i); id = null; title = m2 ? m2[1].trim() : null; }
+      if (!title) title = '分组' + (g.subs.length + 1);
+      if (!id) id = 'sg' + g.subs.length;
+      while (g.subs.some(s => s.id === id)) id += '_';
+      g.subs.push({ id, title });
+      stack.push(id);
+      continue;
+    }
+    if (/^end$/i.test(line)){ stack.pop(); continue; }
+    const subId = stack.length ? stack[stack.length-1] : null;
+    if (!parseEdgeLine(line, g, subId)){
+      const before = g.nodes.length;
+      const ep = parseEndpoint(line, g, subId);
+      if (!ep && g.nodes.length === before) g.errors.push(line);
+    }
+  }
+  return g;
+}
+
+function qLabel(s){ return String(s).replace(/"/g, '”'); }
+function shapeWrap(node){
+  const l = qLabel(node.label);
+  if (node.shape === 'diamond') return node.id + '{"' + l + '"}';
+  if (node.shape === 'round') return node.id + '("' + l + '")';
+  return node.id + '["' + l + '"]';
+}
+
+function toMermaid(g){
+  const out = ['flowchart ' + (g.dir === 'LR' ? 'LR' : 'TD')];
+  const validSub = new Set(g.subs.map(s => s.id));
+  for (const n of g.nodes){
+    if (!n.sub || !validSub.has(n.sub)) out.push('  ' + shapeWrap(n));
+  }
+  for (const s of g.subs){
+    const members = g.nodes.filter(n => n.sub === s.id);
+    if (!members.length) continue;
+    out.push('  subgraph ' + s.id + '["' + qLabel(s.title) + '"]');
+    for (const n of members) out.push('    ' + shapeWrap(n));
+    out.push('  end');
+  }
+  for (const e of g.edges){
+    if (!g.nodes.some(n => n.id === e.from) || !g.nodes.some(n => n.id === e.to)) continue;
+    const lbl = e.label ? '|' + String(e.label).replace(/\|/g, '∣') + '|' : '';
+    out.push('  ' + e.from + (e.style === 'dotted' ? ' -.->' : ' -->') + lbl + ' ' + e.to);
+  }
+  return out.join('\n');
+}
+
+function autoLayout(g, dir){
+  const level = {};
+  g.nodes.forEach(n => level[n.id] = 0);
+  let changed = true, guard = g.nodes.length + 8;
+  while (changed && guard-- > 0){
+    changed = false;
+    for (const e of g.edges){
+      if (!(e.from in level) || !(e.to in level)) continue;
+      if (level[e.to] < level[e.from] + 1){ level[e.to] = level[e.from] + 1; changed = true; }
+    }
+  }
+  g.nodes.forEach(n => { n.w = nodeW(n.label); n.h = NODE_H; });
+  const rows = {};
+  for (const n of g.nodes){ (rows[level[n.id]] = rows[level[n.id]] || []).push(n); }
+  const gapMain = 90, gapCross = 46;
+  if (dir === 'LR'){
+    let x = 30;
+    const keys = Object.keys(rows).map(Number).sort((a,b)=>a-b);
+    for (const lv of keys){
+      let y = 30;
+      for (const n of rows[lv]){ n.x = x; n.y = y; y += n.h + gapMain; }
+      x += Math.max.apply(null, rows[lv].map(n=>n.w)) + gapCross;
+    }
+  } else {
+    let y = 30;
+    const keys = Object.keys(rows).map(Number).sort((a,b)=>a-b);
+    for (const lv of keys){
+      let x = 30;
+      for (const n of rows[lv]){ n.x = x; n.y = y; x += n.w + gapCross; }
+      y += NODE_H + gapMain;
+    }
+  }
+  return g;
+}
+
+function newNodeId(g){
+  let i = 1;
+  while (g.nodes.some(n => n.id === 'n' + i)) i++;
+  return 'n' + i;
+}
+//__CORE_END__
+
+// ---------- 数据注入位（/codex-flow-edit 会把下面这行标记替换为 JSON） ----------
+const PAYLOAD = /*__FLOW_DATA__*/null;
+
+if (typeof document !== "undefined") (function UI(){
+  const $ = id => document.getElementById(id);
+  const svg = $('cv'), world = $('world'), ta = $('codeTA'), errBox = $('codeErr');
+  let g = parseMermaid('');
+  let sel = null;             // {type:'node'|'edge', id}
+  let view = { x:0, y:0, z:1 };
+  let mode = null;            // {kind:'pan'|'node'|'connect', ...}
+  let codeEditing = false;    // 用户正在改代码时，画布不回写文本框
+  const layoutKey = 'cmflow:' + strHash((PAYLOAD && PAYLOAD.mermaid) || '');
+
+  function strHash(s){ let h = 5381; for (let i=0;i<s.length;i++) h = ((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
+  function escXml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function clientToWorld(cx, cy){
+    const r = svg.getBoundingClientRect();
+    return { x:(cx - r.left - view.x)/view.z, y:(cy - r.top - view.y)/view.z };
+  }
+  function nodeById(id){ return g.nodes.find(n=>n.id===id); }
+  function anchors(n){
+    return g.dir === 'LR'
+      ? { out:{x:n.x+n.w, y:n.y+n.h/2}, inn:{x:n.x, y:n.y+n.h/2} }
+      : { out:{x:n.x+n.w/2, y:n.y+n.h}, inn:{x:n.x+n.w/2, y:n.y} };
+  }
+  function edgePath(e){
+    const a = nodeById(e.from), b = nodeById(e.to);
+    if (!a || !b) return '';
+    const p1 = anchors(a).out, p2 = anchors(b).inn;
+    const bend = g.dir === 'LR' ? Math.max(40, Math.abs(p2.x-p1.x)/2) : Math.max(40, Math.abs(p2.y-p1.y)/2);
+    const c1 = g.dir==='LR' ? {x:p1.x+bend, y:p1.y} : {x:p1.x, y:p1.y+bend};
+    const c2 = g.dir==='LR' ? {x:p2.x-bend, y:p2.y} : {x:p2.x, y:p2.y-bend};
+    const mid = t => ({ x:((1-t)**3)*p1.x + 3*((1-t)**2)*t*c1.x + 3*(1-t)*t*t*c2.x + t*t*t*p2.x,
+                        y:((1-t)**3)*p1.y + 3*((1-t)**2)*t*c1.y + 3*(1-t)*t*t*c2.y + t*t*t*p2.y });
+    const m = mid(.5);
+    return { d:'M'+p1.x+','+p1.y+' C'+c1.x+','+c1.y+' '+c2.x+','+c2.y+' '+p2.x+','+p2.y, mid:m };
+  }
+
+  function render(){
+    const subsHtml = g.subs.map((s, i) => {
+      const members = g.nodes.filter(n => n.sub === s.id);
+      if (!members.length) return '';
+      const x1 = Math.min.apply(null, members.map(n=>n.x)) - 18;
+      const y1 = Math.min.apply(null, members.map(n=>n.y)) - 34;
+      const x2 = Math.max.apply(null, members.map(n=>n.x+n.w)) + 18;
+      const y2 = Math.max.apply(null, members.map(n=>n.y+n.h)) + 18;
+      const fill = 'hsl(' + ((i*67)%360) + ' 70% 96%)', stroke = 'hsl(' + ((i*67)%360) + ' 45% 78%)';
+      return '<g data-sub="'+escXml(s.id)+'"><rect x="'+x1+'" y="'+y1+'" width="'+(x2-x1)+'" height="'+(y2-y1)+'" rx="12" fill="'+fill+'" stroke="'+stroke+'"/>' +
+        '<text x="'+(x1+10)+'" y="'+(y1+20)+'" font-size="13" fill="#475569">' + escXml(s.title) + '</text></g>';
+    }).join('');
+
+    const edgesHtml = g.edges.map((e, i) => {
+      const ep = edgePath(e); if (!ep) return '';
+      const selCls = sel && sel.type==='edge' && sel.id===i ? ' stroke="#2563eb"' : '';
+      const dotted = e.style==='dotted' ? ' stroke-dasharray="5,4"' : '';
+      const lbl = e.label ? '<g><rect x="'+(ep.mid.x-e.label.length*3.6-5)+'" y="'+(ep.mid.y-10)+'" width="'+(e.label.length*7.2+10)+'" height="20" rx="6" fill="#fff" stroke="#d8dee9"/><text x="'+ep.mid.x+'" y="'+(ep.mid.y+4)+'" text-anchor="middle" font-size="12" fill="#475569">'+escXml(e.label)+'</text></g>' : '';
+      return '<path d="'+ep.d+'" fill="none" stroke="transparent" stroke-width="16" data-edge="'+i+'"/>' +
+             '<path class="e'+i+'" d="'+ep.d+'" fill="none" stroke="'+(selCls?'#2563eb':'#64748b')+'" stroke-width="'+(selCls?'2.4':'1.6')+'"'+dotted+' marker-end="url(#arr)" pointer-events="none"/>'+lbl;
+    }).join('');
+
+    const nodesHtml = g.nodes.map(n => {
+      const selOn = sel && sel.type==='node' && sel.id===n.id;
+      const stroke = selOn ? '#2563eb' : '#64748b', sw = selOn ? 2.4 : 1.4;
+      const fill = n.shape==='diamond' ? '#fffbeb' : n.shape==='round' ? '#eff6ff' : '#ffffff';
+      let body;
+      if (n.shape === 'diamond'){
+        const cx=n.x+n.w/2, cy=n.y+n.h/2;
+        body = '<polygon points="'+cx+','+(n.y-4)+' '+(n.x+n.w+6)+','+cy+' '+cx+','+(n.y+n.h+4)+' '+(n.x-6)+','+cy+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+      } else {
+        const rx = n.shape==='round' ? 20 : 8;
+        body = '<rect x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+n.h+'" rx="'+rx+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+      }
+      const port = anchors(n).out;
+      return '<g data-node="'+escXml(n.id)+'">' + body +
+        '<text x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h/2+4.5)+'" text-anchor="middle" font-size="13" fill="#1f2937" pointer-events="none">'+escXml(n.label)+'</text>' +
+        '<circle cx="'+port.x+'" cy="'+port.y+'" r="5.5" fill="#2563eb" opacity="0.85" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/></g>';
+    }).join('');
+
+    const overlayHtml = mode && mode.kind==='connect' && mode.ghost
+      ? '<path d="'+mode.ghost+'" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="4,3"/>' : '';
+
+    world.innerHTML = subsHtml + edgesHtml + nodesHtml + overlayHtml;
+  }
+
+  function applyView(){ world.setAttribute('transform', 'translate('+view.x+','+view.y+') scale('+view.z+')'); }
+  function fit(){
+    if (!g.nodes.length) return;
+    const x1 = Math.min.apply(null, g.nodes.map(n=>n.x)) - 40;
+    const y1 = Math.min.apply(null, g.nodes.map(n=>n.y)) - 60;
+    const x2 = Math.max.apply(null, g.nodes.map(n=>n.x+n.w)) + 40;
+    const y2 = Math.max.apply(null, g.nodes.map(n=>n.y+n.h)) + 40;
+    const r = svg.getBoundingClientRect();
+    view.z = Math.min(2, Math.max(.2, Math.min(r.width/(x2-x1), (r.height*.6)/(y2-y1))));
+    view.x = (r.width - (x2-x1)*view.z)/2 - x1*view.z;
+    view.y = (r.height*.62 - (y2-y1)*view.z)/2 - y1*view.z;
+    applyView();
+  }
+
+  function syncCode(){ if (!codeEditing) ta.value = toMermaid(g); errBox.textContent = ''; }
+  function saveLayout(){
+    try { const pos = {}; g.nodes.forEach(n => pos[n.id] = [Math.round(n.x), Math.round(n.y)]);
+      localStorage.setItem(layoutKey, JSON.stringify({ pos, dir:g.dir })); } catch(e){}
+  }
+  function restoreLayout(){
+    try { const d = JSON.parse(localStorage.getItem(layoutKey) || 'null');
+      if (!d) return false;
+      if (d.dir) $('dirSel').value = d.dir, g.dir = d.dir;
+      let all = true;
+      g.nodes.forEach(n => { if (d.pos[n.id]) { n.x=d.pos[n.id][0]; n.y=d.pos[n.id][1]; } else all = false; });
+      return all && g.nodes.length > 0;
+    } catch(e){ return false; }
+  }
+  function refresh(fitNow){
+    render(); syncCode(); if (fitNow) fit(); else applyView();
+  }
+
+  function setSel(s){ sel = s; render(); renderPanel(); }
+
+  function renderPanel(){
+    const p = $('props');
+    if (!sel){ p.innerHTML = '<h4>未选中对象</h4><p class="hint">点击节点 / 连线 / 分组标题可在此编辑属性。<br><br>· 拖节点移动<br>· 从节点下方圆点拖到另一节点 = 连线<br>· 双击空白 = 新建节点<br>· Del = 删除选中<br>· Ctrl+S = 导出 .mmd</p>'; return; }
+    if (sel.type === 'node'){
+      const n = nodeById(sel.id); if (!n) return setSel(null);
+      const shapeSel = ['rect|矩形','diamond|菱形','round|圆角'].map(o=>{ const [v,t]=o.split('|'); return '<option value="'+v+'"'+(n.shape===v?' selected':'')+'>'+t+'</option>'; }).join('');
+      const subSel = '<option value="">（无分组）</option>' + g.subs.map(s=>'<option value="'+escXml(s.id)+'"'+(n.sub===s.id?' selected':'')+'>成员 → '+escXml(s.title)+'</option>').join('') +
+        '<option value="__new__">＋ 新建分组…</option>';
+      p.innerHTML = '<h4>节点属性</h4><label>ID</label><input type="text" value="'+escXml(n.id)+'" disabled>' +
+        '<label>标签</label><textarea id="pLabel">'+escXml(n.label)+'</textarea>' +
+        '<label>形状</label><select id="pShape">'+shapeSel+'</select>' +
+        '<label>所属分组</label><select id="pSub">'+subSel+'</select>' +
+        '<p><button id="pDel">删除节点</button></p>';
+      $('pLabel').addEventListener('input', ev => { n.label = ev.target.value || n.id; n.w = nodeW(n.label); render(); syncCode(); saveLayout(); });
+      $('pShape').addEventListener('change', ev => { n.shape = ev.target.value; render(); syncCode(); saveLayout(); });
+      $('pSub').addEventListener('change', ev => {
+        if (ev.target.value === '__new__'){ const t = prompt('新分组名称：'); if (t){ const id = newNodeId(g)+'s'; g.subs.push({id, title:t}); n.sub = id; } }
+        else n.sub = ev.target.value || null;
+        render(); syncCode(); saveLayout(); renderPanel();
+      });
+      $('pDel').addEventListener('click', () => deleteNode(n.id));
+    } else {
+      const e = g.edges[sel.id]; if (!e) return setSel(null);
+      const stSel = '<option value="solid"'+(e.style==='solid'?' selected':'')+'>实线</option><option value="dotted"'+(e.style==='dotted'?' selected':'')+'>虚线</option>';
+      p.innerHTML = '<h4>连线属性</h4><label>从 → 到</label><input type="text" value="'+escXml(e.from+' → '+e.to)+'" disabled>' +
+        '<label>标签</label><input type="text" id="pLabel" value="'+escXml(e.label||'')+'">' +
+        '<label>线型</label><select id="pStyle">'+stSel+'</select>' +
+        '<p><button id="pDel">删除连线</button></p>';
+      $('pLabel').addEventListener('input', ev => { e.label = ev.target.value.trim(); render(); syncCode(); saveLayout(); });
+      $('pStyle').addEventListener('change', ev => { e.style = ev.target.value; render(); syncCode(); saveLayout(); });
+      $('pDel').addEventListener('click', () => { g.edges.splice(sel.id,1); setSel(null); syncCode(); saveLayout(); });
+    }
+  }
+
+  function deleteNode(id){
+    g.nodes = g.nodes.filter(n => n.id !== id);
+    g.edges = g.edges.filter(e => e.from !== id && e.to !== id);
+    setSel(null); syncCode(); saveLayout();
+  }
+
+  // ---------- 指针交互 ----------
+  svg.addEventListener('pointerdown', ev => {
+    const portEl = ev.target.closest('[data-port]');
+    const nodeEl = ev.target.closest('[data-node]');
+    const edgeEl = ev.target.closest('[data-edge]');
+    svg.setPointerCapture(ev.pointerId);
+    if (portEl){
+      const id = portEl.getAttribute('data-port');
+      const n = nodeById(id), a = anchors(n).out;
+      mode = { kind:'connect', from:id };
+      setSel({type:'node', id});
+    } else if (nodeEl){
+      const id = nodeEl.getAttribute('data-node');
+      const n = nodeById(id), w = clientToWorld(ev.clientX, ev.clientY);
+      mode = { kind:'node', id, dx:w.x-n.x, dy:w.y-n.y };
+      setSel({type:'node', id});
+    } else if (edgeEl){
+      setSel({type:'edge', id:+edgeEl.getAttribute('data-edge')});
+      mode = null;
+    } else {
+      mode = { kind:'pan', sx:ev.clientX, sy:ev.clientY, ox:view.x, oy:view.y };
+      svg.classList.add('panning');
+      if (sel) setSel(null);
+    }
+  });
+  svg.addEventListener('pointermove', ev => {
+    if (!mode) return;
+    if (mode.kind === 'pan'){
+      view.x = mode.ox + (ev.clientX - mode.sx); view.y = mode.oy + (ev.clientY - mode.sy); applyView();
+    } else if (mode.kind === 'node'){
+      const n = nodeById(mode.id), w = clientToWorld(ev.clientX, ev.clientY);
+      n.x = Math.round(w.x - mode.dx); n.y = Math.round(w.y - mode.dy); render(); renderPanel();
+    } else if (mode.kind === 'connect'){
+      const a = nodeById(mode.from), w = clientToWorld(ev.clientX, ev.clientY);
+      const p = anchors(a).out;
+      mode.ghost = 'M'+p.x+','+p.y+' L'+w.x+','+w.y;
+      render();
+    }
+  });
+  svg.addEventListener('pointerup', ev => {
+    if (mode && mode.kind === 'connect'){
+      const w = clientToWorld(ev.clientX, ev.clientY);
+      const hit = g.nodes.find(n => w.x>=n.x && w.x<=n.x+n.w && w.y>=n.y && w.y<=n.y+n.h && n.id!==mode.from);
+      if (hit){ g.edges.push({from:mode.from, to:hit.id, label:'', style:'solid'}); setSel({type:'edge', id:g.edges.length-1}); syncCode(); saveLayout(); return; }
+      render();
+    }
+    if (mode && mode.kind === 'node') saveLayout();
+    mode = null; svg.classList.remove('panning');
+  });
+  svg.addEventListener('dblclick', ev => {
+    if (ev.target.closest('[data-node],[data-edge]')) return;
+    const w = clientToWorld(ev.clientX, ev.clientY);
+    const id = newNodeId(g);
+    const n = upsertNode(g, id, '新节点', 'rect', null);
+    n.x = Math.round(w.x - n.w/2); n.y = Math.round(w.y - n.h/2);
+    setSel({type:'node', id}); syncCode(); saveLayout();
+  });
+  svg.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const r = svg.getBoundingClientRect();
+    const k = ev.deltaY < 0 ? 1.12 : 1/1.12;
+    const nz = Math.min(2.6, Math.max(.25, view.z * k));
+    view.x = ev.clientX - r.left - (ev.clientX - r.left - view.x) * (nz/view.z);
+    view.y = ev.clientY - r.top - (ev.clientY - r.top - view.y) * (nz/view.z);
+    view.z = nz; applyView();
+  }, { passive:false });
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Delete' && sel){ if (sel.type==='node') deleteNode(sel.id); else { g.edges.splice(sel.id,1); setSel(null); syncCode(); saveLayout(); } }
+    if ((ev.ctrlKey||ev.metaKey) && ev.key === 's'){ ev.preventDefault(); doExport(); }
+  });
+
+  // ---------- 工具栏 ----------
+  function toast(msg){ const t = $('toast'); t.textContent = msg; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 1600); }
+  $('btnAdd').addEventListener('click', () => {
+    const id = newNodeId(g);
+    const n = upsertNode(g, id, '新节点', 'rect', null);
+    const r = svg.getBoundingClientRect(), w = clientToWorld(r.left + r.width/2, r.top + r.height/2);
+    n.x = Math.round(w.x - n.w/2); n.y = Math.round(w.y - n.h/2);
+    setSel({type:'node', id}); syncCode(); saveLayout();
+  });
+  $('btnLayout').addEventListener('click', () => { autoLayout(g, g.dir); refresh(true); saveLayout(); });
+  $('dirSel').addEventListener('change', ev => { g.dir = ev.target.value; autoLayout(g, g.dir); refresh(true); saveLayout(); });
+  $('btnFit').addEventListener('click', fit);
+  $('btnCopy').addEventListener('click', () => {
+    const txt = toMermaid(g);
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+      .then(()=>toast('mermaid 已复制')).catch(()=>{ ta.select(); document.execCommand('copy'); toast('mermaid 已复制'); });
+  });
+  $('btnPaste').addEventListener('click', () => $('overlay').style.display = 'flex');
+  $('btnLoad').addEventListener('click', () => loadText($('pasteTA').value, true));
+  $('btnDemo').addEventListener('click', () => loadText('flowchart TD\n  A[接到任务] --> B{一句话能说清?}\n  B -->|能| C[直接做]\n  B -->|不能| D[先拆解]\n  D --> C', true).then(()=>$('overlay').style.display='none'), );
+  $('btnHelp').addEventListener('click', () => $('help').showModal());
+  $('btnCodeToggle').addEventListener('click', () => { const c = $('code'); c.classList.toggle('hidden'); $('btnCodeToggle').textContent = c.classList.contains('hidden') ? '展开' : '收起'; });
+
+  let codeTimer = null;
+  ta.addEventListener('focus', () => codeEditing = true);
+  ta.addEventListener('input', () => {
+    clearTimeout(codeTimer);
+    codeTimer = setTimeout(() => {
+      const parsed = parseMermaid(ta.value);
+      if (parsed.errors.length && !parsed.nodes.length){ errBox.textContent = '无法解析（将保留上次结果）：' + parsed.errors[0]; return; }
+      const old = {}; g.nodes.forEach(n => old[n.id] = n);
+      g = parsed;
+      let placedAll = true;
+      g.nodes.forEach(n => { if (old[n.id]){ n.x=old[n.id].x; n.y=old[n.id].y; } else placedAll = false; });
+      g.edges = g.edges.filter(e => nodeById(e.from) && nodeById(e.to));
+      if (!placedAll) autoLayout(g, g.dir);
+      setSel(null); codeEditing = false; refresh(true);
+    }, 500);
+  });
+
+  async function doExport(){
+    const txt = toMermaid(g);
+    const fname = (PAYLOAD && PAYLOAD.exportName) || 'flow-export.mmd';
+    if (window.showSaveFilePicker){
+      try {
+        const fh = await window.showSaveFilePicker({ suggestedName: fname, types:[{ description:'Mermaid', accept:{'text/plain':['.mmd','.txt']} }] });
+        const w = await fh.createWritable(); await w.write(txt); await w.close();
+        toast('已保存：' + fh.name); return;
+      } catch(e){ if (e && e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain'}));
+    a.download = fname; a.click(); toast('已下载 ' + fname);
+  }
+  $('btnSave').addEventListener('click', doExport);
+
+  function loadText(text, fitNow){
+    g = parseMermaid(text);
+    if (g.errors.length) toast('已载入（忽略 ' + g.errors.length + ' 行不支持的语法）');
+    if (!restoreLayout()) autoLayout(g, g.dir);
+    $('dirSel').value = g.dir;
+    setSel(null); refresh(fitNow);
+    return Promise.resolve();
+  }
+
+  // ---------- 启动 ----------
+  $('defs').innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>';
+  if (PAYLOAD && PAYLOAD.mermaid){
+    $('srcInfo').textContent = '来源：' + ((PAYLOAD && PAYLOAD.source) || '未知');
+    loadText(PAYLOAD.mermaid, true);
+  } else {
+    $('srcInfo').textContent = '未注入数据';
+    $('overlay').style.display = 'flex';
+    syncCode();
+  }
+})();
+</script>
+</body>
+</html>

@@ -2,6 +2,15 @@
 
 本项目由 [@sanhansan](https://github.com/sanhansan) 维护。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循语义化版本。
 
+## [0.5.0] - 2026-10-06
+
+### 新增：可视化编辑流程图
+
+- **`/codex-flow-edit` 可视化编辑**：在浏览器画布上拖拽节点、从端口连线、双击空白加节点、改标签/形状/分组，参考 [dsh-deepseek-flow](https://github.com/kanghelyu/dsh-deepseek-flow) 的"文本是唯一事实源 + 画布双向同步"思路——画布改动实时写回 mermaid 源码，改源码也会重画
+- **`assets/flow-editor.html` 零依赖单文件编辑器**：纯 vanilla JS + SVG，离线可用；自动重排（TD/LR）、平移缩放、适应视图、布局位置本地记忆；`Ctrl+S` 导出 `.mmd`（支持文件另存对话框的浏览器直接写回原文件）；不支持的语法（classDef、嵌套 subgraph 等）自动忽略
+- 编辑来源灵活：`.md`/`.mmd` 文件、项目框架最新版本、或现场从当前会话生成；导出后经 `/codex-flow-save` 回写 `flow.json`，形成"生成 → 可视化修改 → 回写"闭环
+- 命令总数增至 9 个；插件清单与市场清单版本号同步至 0.5.0
+
 ## [0.4.1] - 2026-10-06
 
 ### 修复：试用反馈（真实数据全流程实测后）
