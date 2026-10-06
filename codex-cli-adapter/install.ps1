@@ -1,4 +1,4 @@
-# Codex Manager — Codex CLI 适配版安装/卸载脚本（Windows PowerShell）
+﻿# Codex Manager — Codex CLI 适配版安装/卸载脚本（Windows PowerShell）
 # 用法：
 #   powershell -ExecutionPolicy Bypass -File install.ps1            # 安装
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall # 卸载
