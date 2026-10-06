@@ -39,6 +39,17 @@ Turns a work session into a shareable Mermaid flowchart.
 - __Smart splicing__ — Long sessions are reconstructed by joining the "earliest full snapshot + recent window" for the most complete picture.
 - __Honest annotations__ — When a middle chunk of the log is missing, a gap marker honestly notes "middle omitted"; flow nodes are never fabricated.
 
+### 4. OpenAI Codex CLI Adapter (`codex-cli-adapter/`)
+
+A second adaptation target for the OpenAI Codex CLI (verified against codex-cli 0.157.1). Since Codex CLI has no hook system, the adapter achieves the same capabilities through three channels: scanning `~/.codex/sessions` rollout logs offline for usage stats; registering a standard-library-only MCP server exposing `codex_usage` / `codex_flow` / `codex_sessions` tools; and installing `/codex-usage` and `/codex-flow` custom commands. Metrics cover MCP server calls, native tools such as `exec`, built-in namespaces like `collaboration`, and token consumption (with honest annotation for compacted sessions).
+
+```bash
+powershell -ExecutionPolicy Bypass -File codex-cli-adapter/install.ps1   # Windows
+./codex-cli-adapter/install.sh                                           # macOS / Linux
+```
+
+See [codex-cli-adapter/README.md](./codex-cli-adapter/README.md) for details.
+
 ## Deployment & Usage Guide
 
 ### System Requirements

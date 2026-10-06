@@ -39,6 +39,17 @@
 - __智能拼接__：大会话采用"开头前缀 + 最近窗口"拼接策略，最大限度还原完整过程。
 - __诚实标注__：记录中段缺失时以 gap 事件如实标注"中段省略"，绝不编造流程节点。
 
+### 四、 OpenAI Codex CLI 适配（codex-cli-adapter/）
+
+面向 OpenAI Codex CLI（已在 codex-cli 0.157.1 真实环境验证）的第二适配目标。Codex CLI 没有钩子系统，改用三条通道实现同等能力：扫描 `~/.codex/sessions` 会话记录离线统计用量；注册一个纯标准库实现的 MCP 服务器（`codex_usage` / `codex_flow` / `codex_sessions` 三个工具）；安装 `/codex-usage`、`/codex-flow` 自定义命令。统计口径覆盖 MCP 服务器调用、exec 等原生工具、collaboration 内置命名空间与令牌消耗（含压缩会话的诚实标注）。
+
+```bash
+powershell -ExecutionPolicy Bypass -File codex-cli-adapter/install.ps1   # Windows
+./codex-cli-adapter/install.sh                                           # macOS / Linux
+```
+
+详见 [codex-cli-adapter/README.md](./codex-cli-adapter/README.md)。
+
 ## 部署与使用指南
 
 ### 系统要求

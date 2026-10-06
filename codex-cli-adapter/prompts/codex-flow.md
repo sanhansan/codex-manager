@@ -1,0 +1,15 @@
+---
+description: 把一次 Codex 会话转化为 Mermaid 流程图
+---
+
+用户想把一次工作会话转成流程图。参数：$ARGUMENTS（可为空 = 最近一次会话；也可以是会话 ID 片段或线程名关键词）。
+
+按以下步骤执行：
+
+1. 如果 $ARGUMENTS 为空且用户指的是"刚才/当前这次工作"，直接基于你当前对话的上下文梳理流程（用户需求 → 各阶段 → 分支 → 产出），跳到第 4 步。
+2. 否则优先调用 MCP 工具 `codex_sessions`（limit 10）帮用户确认目标会话；再用 `codex_flow`（参数 session = $ARGUMENTS 或选定的 ID 片段）获取事件流与自动生成的 Mermaid 图。
+3. MCP 工具不可用时，改在 shell 运行：
+   `python "<本提示词所在插件目录>/codex-cli-adapter/codex_manager.py" flow --session "<目标>" --json`
+   基于返回的 JSON 事件流绘图。
+4. 基于事件流绘制 `flowchart TD`：把连续同类工具调用合并为阶段节点（不要每个调用一个节点），中文标签不超过 20 字，节点总数控制在 4~12 个，结尾节点标注产出。脚本生成的图可以直接优化重排，但只能使用真实事件，缺失部分标注"中段省略"，不要编造节点。
+5. 把最终流程图保存为 `codex-flow-<会话ID前8位>-<YYYYMMDD>.md`（标题 + 一句话摘要 + mermaid 代码块），在回复中内嵌 mermaid 并给出文件完整路径。
