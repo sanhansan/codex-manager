@@ -4,14 +4,14 @@
     {
       "name": "codex-manager",
       "source": "./codex-manager",
-      "version": "0.4.0",
-      "description": "Codex 管家：自动记录各插件/技能/MCP 的使用量，一键导出 Excel 用量报表，并把每次工作会话转化为 Mermaid 流程图。",
+      "version": "0.4.1",
+      "description": "Codex 管家：自动记录插件/技能/MCP 用量并导出 Excel 报表；把工作会话转为 Mermaid 流程图，支持流程审查、项目复盘、习惯固化为 skill 与多智能体跨会话总结。",
       "displayName": "Codex Manager",
       "displayName_i18n": {
         "zh-CN": "Codex 管家"
       },
       "description_i18n": {
-        "zh-CN": "自动统计各插件/技能/MCP 的使用量，一键导出 Excel 报表，并把每次工作会话转化为 Mermaid 流程图"
+        "zh-CN": "自动记录插件/技能/MCP 用量并导出 Excel 报表；把工作会话转为 Mermaid 流程图，支持流程审查、项目复盘、习惯固化为 skill 与多智能体跨会话总结"
       }
     }
   ]

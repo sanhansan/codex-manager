@@ -11,12 +11,15 @@ argument-hint: "项目名 [；render 可选渲染图片]"
 
 ## 第二步：合并进项目框架（inline python）
 
-把下面脚本保存为 `_flow_save.py` 执行：`python _flow_save.py "<项目名>" "<本次 mermaid 文本文件>" "<阶段JSON文件>"`。脚本逻辑：读取（或创建）flow.json → `versions` 追加一条 `{"ts", "source": "session", "summary", "mermaid"}` → `stages` 按名称合并（同名阶段 `count` 累加、`tools` 并集，新阶段追加）→ 写回（UTF-8 缩进）。执行后删除临时文件。
+把下面脚本保存为 `_flow_save.py` 执行：`python _flow_save.py "<项目名>" "<本次 mermaid 文本文件>" "<阶段JSON文件>" "<一句话摘要>"`（摘要来自第一步的梳理，说明本次做了什么）。脚本逻辑：读取（或创建）flow.json → `versions` 追加一条 `{"ts", "source": "session", "summary", "mermaid"}` → `stages` 按名称合并（同名阶段 `count` 累加、`tools` 并集，新阶段追加）→ 写回（UTF-8 缩进）。执行后删除临时文件。
 
 ```python
-# 用法: python _flow_save.py <项目名> <mermaid文件> <stages.json文件>
+# 用法: python _flow_save.py <项目名> <mermaid文件> <stages.json文件> [一句话摘要]
 import json, os, sys
 from datetime import datetime
+if len(sys.argv) < 4:
+    print("用法: python _flow_save.py <项目名> <mermaid文件> <stages.json文件> [一句话摘要]")
+    sys.exit(2)
 base = os.path.join(os.path.expanduser("~"), ".zcode", "codex-manager", "projects", sys.argv[1])
 os.makedirs(base, exist_ok=True)
 fp = os.path.join(base, "flow.json")
@@ -27,7 +30,8 @@ if os.path.exists(fp):
 now = datetime.now().astimezone().isoformat(timespec="seconds")
 mermaid = open(sys.argv[2], encoding="utf-8").read()
 stages = json.load(open(sys.argv[3], encoding="utf-8"))
-data["versions"].append({"ts": now, "source": "session", "summary": sys.argv[1], "mermaid": mermaid})
+summary = (sys.argv[4].strip() if len(sys.argv) > 4 else "") or "（本次未提供摘要）"
+data["versions"].append({"ts": now, "source": "session", "summary": summary, "mermaid": mermaid})
 idx = {s["name"]: s for s in data["stages"]}
 for s in stages:
     if s["name"] in idx:

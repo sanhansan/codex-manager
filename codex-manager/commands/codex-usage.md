@@ -9,7 +9,7 @@ argument-hint: "[可选：统计最近 N 天，如 7；不填则统计全部]"
 2. **运行脚本**：把下面的脚本原样保存为工作区临时文件 `_codex_usage_xlsx.py`，然后执行
    `python _codex_usage_xlsx.py "<usage.jsonl 的完整路径>" "<输出.xlsx 的完整路径>" [天数]`
    - 天数取本命令的参数（若有）；输出文件名用 `codex-usage-YYYYMMDD-HHMMSS.xlsx`，保存到当前工作区根目录。
-   - 脚本会在 stdout 打印 Markdown 明细表，并在失败时以非 0 退出。
+   - 脚本会在 stdout 打印 Markdown 明细表，并在失败时以非 0 退出。若脚本输出 `EMPTY`：表示该统计范围内没有任何记录（可能是时间范围过滤后为空），此时不要生成文件，如实告知即可，流程到此结束。
 3. **展示结果**：把脚本打印的 Markdown 表格完整呈现在回复中，并给出 Excel 文件的完整路径。
 4. **收尾**：删除临时脚本 `_codex_usage_xlsx.py`。补充一句说明：表格只包含安装 codex-manager 之后的使用记录。
 5. 若脚本报 `ModuleNotFoundError: openpyxl`：改为把同样内容写成 CSV（UTF-8 带 BOM，文件名 `codex-usage-YYYYMMDD-HHMMSS.csv`，方便 Excel 直接打开），并提示用户可 `pip install openpyxl` 后重试以获得带样式的 Excel。

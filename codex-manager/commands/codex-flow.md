@@ -106,8 +106,7 @@ def main():
         sys.exit(2)
 
     last_line = ""
-    best_full = ""  # 同一 querySource 下消息数最多的 full 行（覆盖会话开头）
-    best_full_count = -1
+    best_full = {}  # querySource -> (消息数, 该来源下消息数最多的 full 行，覆盖会话开头)
     last_meta = {}
     with open(sys.argv[1], encoding="utf-8") as f:
         for line in f:
@@ -116,13 +115,21 @@ def main():
             last_line = line
             meta = scan_line_meta(line)
             last_meta = meta
-            if meta["kind"] == "full" and meta["count"] > best_full_count:
-                best_full_count = meta["count"]
-                best_full = line
+            if meta["kind"] == "full":
+                cur = best_full.get(meta["source"], (-1, ""))
+                if meta["count"] > cur[0]:
+                    best_full[meta["source"]] = (meta["count"], line)
 
     if not last_line.strip():
         print("EMPTY")
         return
+    # 只取与最后一行同 querySource 的 full 行，避免把其他来源的窗口拼进来；来源缺失时回退到全局最大。
+    if last_meta.get("source") in best_full:
+        _, best_full_line = best_full[last_meta["source"]]
+    elif best_full:
+        _, best_full_line = max(best_full.values())
+    else:
+        best_full_line = ""
     obj = json.loads(last_line)
     req = obj.get("request", {})
     msgs = req.get("messages")
@@ -139,9 +146,9 @@ def main():
     sid = str(obj.get("sessionId") or "")
     covered = 0
     fmsgs = []
-    if best_full and best_full is not last_line:
+    if best_full_line and best_full_line is not last_line:
         try:
-            fobj = json.loads(best_full)
+            fobj = json.loads(best_full_line)
             fmsgs = fobj.get("request", {}).get("messages", [])
             if not isinstance(fmsgs, list):
                 fmsgs = []

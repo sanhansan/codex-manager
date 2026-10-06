@@ -1,10 +1,10 @@
 # Codex Manager（Codex 管家）
 
-ZCode 插件 · ZCode plugin · v0.4.0
+ZCode 插件 · ZCode plugin · v0.4.1
 
 [English](#english) | [简体中文](#中文)
 
-一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.4.0**，由 [@sanhansan](https://github.com/sanhansan) 维护。
+一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.4.1**，由 [@sanhansan](https://github.com/sanhansan) 维护。
 
 ---
 
@@ -12,7 +12,7 @@ ZCode 插件 · ZCode plugin · v0.4.0
 
 ### zip 安装包使用方法
 
-1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.4.0**）；
+1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.4.1**）；
 2. 解压，得到 `codex-manager/` 目录（内含 `marketplace.json` 和本插件源码 `codex-manager/`）；
 3. 打开 ZCode → **插件市场 → 添加 → 添加插件市场** → 选择解压出的 `codex-manager` 目录（含 `marketplace.json` 的那一层）；
 4. 在 **个人** 页找到 **Codex Manager** → 点击 **安装**；
@@ -37,8 +37,7 @@ ZCode 插件 · ZCode plugin · v0.4.0
 ### 组成
 
 - `hooks/hooks.json` + `hooks/log-usage.mjs`：PostToolUse（Skill / mcp__*）与 SessionStart 钩子，静默写用量日志，绝不阻塞会话。
-- `commands/codex-usage.md`：用量报表命令。
-- `commands/codex-flow.md`：流程图命令。
+- `commands/`：8 个命令——`codex-usage`（用量报表）、`codex-flow`（流程图）、`codex-review`（流程审查）、`codex-optimize`（项目总结）、`codex-habit`（习惯成 skill）、`codex-flow-save`（流程框架）、`codex-agents-review`（多智能体审查）、`codex-summary`（最终汇总）。
 - `skills/codex-manager/SKILL.md`：自然语言触发入口。
 
 ### 数据与隐私
@@ -49,11 +48,11 @@ ZCode 插件 · ZCode plugin · v0.4.0
 
 ## English
 
-A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.4.0**, maintained by [@sanhansan](https://github.com/sanhansan).
+A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.4.1**, maintained by [@sanhansan](https://github.com/sanhansan).
 
 ### How to use the zip package
 
-1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.4.0**);
+1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.4.1**);
 2. Unzip it — you get a `codex-manager/` folder containing `marketplace.json` and this plugin's source (`codex-manager/`);
 3. Open ZCode → **Plugin Marketplace → Add → Add Plugin Marketplace** → select the extracted `codex-manager` folder (the one containing `marketplace.json`);
 4. Under **Personal**, find **Codex Manager** → click **Install**;
@@ -78,8 +77,7 @@ Natural language works too: "show plugin usage", "chart this session".
 ### Components
 
 - `hooks/hooks.json` + `hooks/log-usage.mjs`: PostToolUse (Skill / mcp__*) and SessionStart hooks that silently append to the usage log — never blocking your session.
-- `commands/codex-usage.md`: usage report command.
-- `commands/codex-flow.md`: flowchart command.
+- `commands/`: 8 commands — `codex-usage` (usage report), `codex-flow` (flowchart), `codex-review` (process review), `codex-optimize` (retrospective), `codex-habit` (habits into skills), `codex-flow-save` (flow framework), `codex-agents-review` (multi-agent review), `codex-summary` (final aggregation).
 - `skills/codex-manager/SKILL.md`: natural-language trigger entry.
 
 ### Data & privacy
@@ -89,6 +87,8 @@ The usage log holds six metadata fields only (timestamp, type, plugin name, skil
 ---
 
 ## 版本历史 / Changelog
+
+- **0.4.1**：试用反馈修复——`/codex-flow-save` 存入框架时 `versions` 的 `summary` 误写为项目名，现改为接收一句话摘要参数（缺省给出占位说明），并补充参数校验；`/codex-flow` 历史会话解析改为只取与最后一行同 querySource 的 full 行拼接（避免混合来源会话拼错开头）；`/codex-usage` 命令补充脚本输出 `EMPTY`（统计范围内无记录）的处理说明。
 
 - **0.4.0**：流程审查与改进闭环——新增 6 个命令：`/codex-review`（自我提问审查，可省/可优化/保留推荐）、`/codex-optimize`（项目结束总结 + 优化提示词推荐）、`/codex-habit`（个人习惯自动写成 skill，自主编写）、`/codex-flow-save`（流程框架持续搭建，人可编辑 flow.json，支持 kroki/mermaid-cli/AI 生图渲染）、`/codex-agents-review`（三子智能体并行审查 + 跨智能体总结沉淀）、`/codex-summary`（最后汇总总流程图与闭环报告）。
 - **0.3.0**：随仓库按里程碑发布 Release 安装包（`codex-manager-v0.3.0.zip`）；本 README 改为中英双语并加入 zip 安装包使用方法；插件清单版本与市场清单同步至 0.3.0。同仓库新增 OpenAI Codex CLI 适配（`codex-cli-adapter/`，见仓库根 README）。
