@@ -20,6 +20,7 @@ All versions are published on the [Releases](https://github.com/sanhansan/codex-
 
 | Version | Date | Contents | For whom |
 | --- | --- | --- | --- |
+| **v0.10.0 (latest, recommended)** | 2026-10-06 | Full: visual flowchart editor v3 (node kinds input/agent/map/cond/merge/output · feedback edges · drag-reconnect · trace query · standalone skill summary · AI edge optimization · resumable file sync) + all history | Everything in one package |
 | **v0.9.0 (latest, recommended)** | 2026-10-06 | Full: visual flowchart editor v2 (left taskbar · 3 views · multi-workflow · logic gates · file two-way sync · habits & skill summary dashboard) + review loop + Codex CLI adapter | Everything in one package |
 | v0.5.0 | 2026-10-06 | First visual flowchart editor + review loop + Codex CLI adapter | Try the canvas editor |
 | v0.4.0 | 2026-10-06 | Full: process review & improvement loop + ZCode plugin + OpenAI Codex CLI adapter | Headless / no editor needed |
@@ -87,16 +88,19 @@ Turns "seeing the process" into "improving the process":
 - __Multi-agent review__ (`/codex-agents-review`): efficiency / quality / prompt sub-agents review in parallel; the master agent deduplicates, arbitrates and aggregates; findings accumulate across sessions and agents (`agent_summaries`);
 - __Final aggregation__ (`/codex-summary`): rolls the continuously built framework into a master flowchart and a closed-loop review report.
 
-### 6. Visual Flowchart Editor (v0.5.0–v0.9.0)
+### 6. Visual Flowchart Editor (v0.5.0–v0.10.0)
 
 `/codex-flow-edit` opens `assets/flow-editor.html` — a dependency-free, single-file canvas editor (works offline):
 
-- __Left taskbar, three views__ (v0.9.0): 🖼 canvas / 🛰 distributed workspaces (one card per workflow) / 🧭 master-control relation map & table (dotted arrows = subflow references; click a node to enter that workspace);
-- __Multi-workflow workbench__ with subflow nodes (`▸→name`, double-click to jump) and 8 logic gates (IF/AND/OR/NOT/NAND/NOR/XOR/XNOR) with rule validation (NOT takes one input, IF at most two branches);
-- __Text is the single source of truth__: Mermaid / Markdown / JSON tabs stay two-way synced with the canvas; gates and subflows ride along as `⚙GATE` / `▸→flow` label suffixes;
-- __Two-way file sync__ (v0.8.0, File System Access API): edit the file in your IDE and the canvas redraws within ~1.5s; edit the canvas and it writes back (debounced, loop-protected);
-- __Comfortable editing__: undo/redo (60 steps), wheel pan + Ctrl+wheel zoom, duplicate/self-loop edge rejection, reverse-edge routing, serpentine folding for >8-level linear chains, white theme by default with dark mode toggle;
-- __📊 Habits & skills dashboard__: pick `usage.jsonl` to see KPIs, skill/MCP rankings, plugin distribution, 14-day activity trend, peak hours, habit candidates and a per-skill summary — one click copies a Markdown report for `/codex-habit`.
+- __Node kind system__ (v0.10.0, inspired by DeepSeek Flow): six node kinds — input / agent / map / cond / merge / output — one click from the toolbar with colored badges; kinds ride along as `◈agent`-style label suffixes across all three formats; "＋new flow framework" generates an input → agent → cond (yes/no) → merge → output skeleton with a feedback loop;
+- __Edge editing__ (v0.10.0): drag an edge endpoint onto another node to reconnect; parallel edges auto-lane; feedback cycles (DFS back edges) routed in red; "✨ tidy" dedupes edges and re-layouts (wider gaps, centered rows);
+- __Left taskbar, five views__: 🖼 canvas / 🛰 distributed workspaces / 🧭 master-control map & table / 🧩 skill summary (standalone module since v0.10.0) / 📜 trace query (replay every call filtered by keyword / kind / session);
+- __Multi-workflow workbench__ with subflow nodes (`▸→name`, double-click to jump) and 8 logic gates (IF/AND/OR/NOT/NAND/NOR/XOR/XNOR) with rule validation;
+- __Kind-aware validation v2__ (v0.10.0): inputs take no inbound edges, conditions need exactly two labeled branches, merges prefer multiple inputs, agents/maps need both edges, missing input/output nodes flagged — plus cycles, gate rules and reachability;
+- __Dual AI prompt channels__: "🔗 optimize edges" (structure only: merges, branch labels, feedback loops, dedupe) and "🧠 optimize the whole flow"; current validation issues are attached automatically;
+- __Text is the single source of truth__: Mermaid / Markdown / JSON tabs stay two-way synced; kinds/gates/subflows ride along as label suffixes; Markdown gains "execution order" (topological) and "node notes" (STEP docs) sections;
+- __Two-way file sync__ (v0.8.0, File System Access API; resumable since v0.10.0): edit the file in your IDE and the canvas redraws within ~1.5s; edit the canvas and it writes back (debounced, loop-protected); reopening the editor restores the last connection so browser and code stay in sync;
+- __Comfortable editing__: undo/redo (60 steps), wheel pan + Ctrl+wheel zoom, duplicate/self-loop edge rejection, serpentine folding for >8-level linear chains, white theme by default with dark mode toggle.
 
 ## Deployment & Usage Guide
 

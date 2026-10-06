@@ -12,6 +12,7 @@
     --edge:#64748b; --grid:rgba(37,99,235,.08);
     --sub-a:#faf5ff; --sub-a-line:#e3d5f8; --sub-b:#fff7ed; --sub-b-line:#f0dcc3;
     --code-bg:#ffffff; --code-bar:#f1f5f9; --code-ink:#1f2937; --code-err:#dc2626; --code-hl:#2563eb;
+    --fb:#e11d48;
   }
   :root[data-theme="dark"] {
     --line:#334155; --ink:#e2e8f0; --accent:#60a5fa; --muted:#94a3b8;
@@ -20,6 +21,7 @@
     --edge:#8ea0b5; --grid:rgba(148,163,184,.10);
     --sub-a:#241d33; --sub-a-line:#443b66; --sub-b:#2d2113; --sub-b-line:#5c4a2a;
     --code-bg:#0f172a; --code-bar:#1e293b; --code-ink:#e2e8f0; --code-err:#fca5a5; --code-hl:#60a5fa;
+    --fb:#fb7185;
   }
   * { box-sizing:border-box; }
   html,body { height:100%; margin:0; font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); }
@@ -93,6 +95,9 @@
   #cv .lbl-bg { fill:var(--panel); stroke:var(--line); }
   #cv .lbl-t { fill:var(--muted); font-size:12px; }
   #cv .arrow { fill:var(--edge); }
+  #cv .arrow-fb { fill:var(--fb); }
+  #cv .eg-fb { stroke:var(--fb); }
+  #cv .kbadge-t { fill:#fff; font-size:10px; font-weight:600; }
   #zoomer { position:absolute; right:12px; top:12px; display:flex; flex-direction:column; gap:6px; z-index:5; }
   #zoomer button { width:34px; height:34px; padding:0; font-size:16px; }
   aside { width:250px; border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; }
@@ -132,7 +137,7 @@
   #overlay textarea { width:100%; height:180px; font:12.5px Consolas,monospace; border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--panel); color:var(--ink); }
   .hint { color:var(--muted); font-size:12px; }
   #syncStat { font-size:11.5px; color:var(--code-hl); }
-  #habitOut { max-height:420px; overflow:auto; font-size:13px; }
+  #skillOut, #traceOut { max-height:520px; overflow:auto; font-size:13px; }
   .kpi { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
   .kpi div { flex:1; min-width:90px; border:1px solid var(--line); border-radius:8px; padding:6px 10px; text-align:center; }
   .kpi b { display:block; font-size:20px; color:var(--accent); }
@@ -149,6 +154,14 @@
   .days-wrap { margin-bottom:20px; }
   .hcard { border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:6px 0; font-size:12.5px; }
   .hcard b { color:var(--accent); }
+  .trow { display:flex; align-items:center; gap:8px; padding:3px 6px; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .trow:hover { background:var(--canvas); }
+  .trow .tts { color:var(--muted); font-size:11.5px; flex-shrink:0; font-family:Consolas,Menlo,monospace; }
+  .trow .tchip { color:#fff; font-size:10.5px; padding:1px 7px; border-radius:8px; flex-shrink:0; }
+  .trow .tname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .trow .tplug { color:var(--muted); font-size:11.5px; flex-shrink:0; }
+  .trow .tsess { color:var(--code-hl); font-size:11px; margin-left:auto; flex-shrink:0; }
+  .vbody textarea { border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:var(--panel); color:var(--ink); font:12.5px/1.5 Consolas,Menlo,monospace; margin-bottom:10px; }
   .toast { position:absolute; left:50%; top:14px; transform:translateX(-50%); background:#1e293b; color:#fff; padding:6px 14px; border-radius:8px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:9; }
 </style>
 </head>
@@ -159,12 +172,13 @@
   <button class="vbtn active" data-view="canvas">🖼 画布</button>
   <button class="vbtn" data-view="dist">🛰 分布工作区</button>
   <button class="vbtn" data-view="ctl">🧭 总控流程</button>
+  <button class="vbtn" data-view="skills">🧩 技能总结</button>
+  <button class="vbtn" data-view="trace">📜 轨迹查询</button>
   <div class="ssec">工作流（点击切换）</div>
   <div id="wfList" style="display:flex;flex-direction:column;gap:2px"></div>
-  <button id="btnNewWf" class="sbtn">＋ 新建工作流</button>
+  <button id="btnNewWf" class="sbtn" title="创建带 输入→Agent→条件→合并→输出 骨架的流程框架">＋ 新建流程框架</button>
   <button id="btnImportWf" class="sbtn">⬆ 导入 JSON</button>
   <div class="grow"></div>
-  <button id="btnHabit" class="sbtn" title="技能使用与习惯总结">📊 习惯与技能</button>
   <button id="btnHelp" class="sbtn">❓ 帮助</button>
   <button id="btnTheme" class="sbtn">🌙 深色</button>
 </nav>
@@ -175,10 +189,18 @@
     <button id="btnUndo" title="Ctrl+Z">撤销</button>
     <button id="btnRedo" title="Ctrl+Y">重做</button>
     <button id="btnAdd">＋节点</button>
+    <button class="small" data-add="input" title="输入节点（流程起点）">＋输入</button>
+    <button class="small" data-add="agent" title="Agent 节点（执行一次智能体任务）">＋Agent</button>
+    <button class="small" data-add="map" title="Map Agent（对列表逐项并行执行）">＋Map Agent</button>
+    <button class="small" data-add="cond" title="条件节点（是/否 两分支）">＋条件</button>
+    <button class="small" data-add="merge" title="合并节点（汇合并行分支）">＋合并</button>
+    <button class="small" data-add="output" title="输出节点（流程终点/交付）">＋输出</button>
     <button id="btnLayout">自动重排</button>
+    <button id="btnTidy" title="去重连线 + 自动排版">✨ 一键整理</button>
     <select id="dirSel" title="整体方向"><option value="TD">上下（TD）</option><option value="LR">左右（LR）</option></select>
     <button id="btnFit">适应视图</button>
     <button id="btnPaste">粘贴导入</button>
+    <button id="btnWfDoc" title="在下方 Markdown 页签查看工作流文档（WORKFLOW.md 语义）">📄 工作流文档</button>
     <button id="btnSave" class="primary">导出 .mmd (Ctrl+S)</button>
   </div>
   <div style="display:flex;flex:1;min-height:0">
@@ -226,10 +248,11 @@
     <div id="props" class="show"></div>
     <div id="aiPanel">
       <h4>AI 助手（Human-in-the-loop）</h4>
-      <button id="btnValidate" style="width:100%">🔍 校验流程（环路 / 门规则 / 可达性）</button>
+      <button id="btnValidate" style="width:100%">🔍 逻辑校验（环路 / 类型 / 门规则 / 可达性）</button>
       <div id="aiOut"></div>
-      <label>① 复制提示词 → 交给 AI 会话</label>
-      <button id="btnPrompt" style="width:100%">📋 生成优化提示词并复制</button>
+      <label>① 复制提示词 → 交给 AI 会话（二选一）</label>
+      <button id="btnPromptEdges" style="width:100%">🔗 生成「AI 优化连线」提示词</button>
+      <button id="btnPrompt" style="width:100%">🧠 生成「AI 优化整个流程」提示词</button>
       <label>② 粘贴 AI 回复（含 mermaid 代码块即可）</label>
       <textarea id="aiPrompt" placeholder="```mermaid&#10;flowchart TD&#10;  ...&#10;```"></textarea>
       <button id="btnPropose" style="width:100%">🧪 解析为修改提案</button>
@@ -260,33 +283,51 @@
     <p class="hint">双击画布上的虚线「子流程」节点也可直接跳转对应工作流。</p>
   </div>
 </div>
+<div id="viewSkills" class="view">
+  <div class="vhead">
+    <b>🧩 技能总结</b>
+    <span class="hint">usage.jsonl 本地解析，不上传；与「📜 轨迹查询」共用一份数据。</span>
+    <span style="flex:1"></span>
+    <button id="skillFile">📂 选择 usage.jsonl</button>
+    <button id="skillParse">解析粘贴数据</button>
+    <button id="skillCopy">📋 复制 Markdown 总结</button>
+  </div>
+  <div class="vbody">
+    <textarea id="skillTA" placeholder="或把 usage.jsonl 内容粘贴到这里（每行一个 JSON）" style="width:100%;height:70px"></textarea>
+    <div id="skillOut"><p class="hint">先选择文件或粘贴数据。</p></div>
+  </div>
+</div>
+<div id="viewTrace" class="view">
+  <div class="vhead">
+    <b>📜 轨迹查询</b>
+    <input id="traceKw" type="text" placeholder="搜索名称/插件/目录…" style="width:190px">
+    <select id="traceKind"><option value="all">全部类型</option><option value="skill">技能</option><option value="mcp">MCP</option><option value="session">会话</option><option value="other">其他</option></select>
+    <input id="traceSession" type="text" list="sessList" placeholder="会话 id 过滤…" style="width:150px">
+    <datalist id="sessList"></datalist>
+    <button id="traceFile">📂 选择 usage.jsonl</button>
+    <button id="traceParse">解析粘贴数据</button>
+  </div>
+  <div class="vbody">
+    <textarea id="traceTA" placeholder="或把 usage.jsonl 内容粘贴到这里（每行一个 JSON）" style="width:100%;height:70px"></textarea>
+    <div id="traceOut"><p class="hint">先选择文件或粘贴数据，即可按时间倒序回放每次调用。</p></div>
+  </div>
 </div>
 </div>
-
-<dialog id="habitDlg">
-  <h3>📊 技能使用与习惯总结</h3>
-  <p class="hint">数据来自 codex-manager 钩子记录的 usage.jsonl（<code>%USERPROFILE%\.zcode\codex-manager\usage.jsonl</code>）。全部在本页解析，不上传。</p>
-  <p>
-    <button id="habitFile">📂 选择 usage.jsonl</button>
-    <button id="habitParse">解析粘贴的数据</button>
-    <button id="habitCopy">📋 复制 Markdown 总结</button>
-  </p>
-  <textarea id="habitTA" placeholder="或把 usage.jsonl 内容粘贴到这里（每行一个 JSON）" style="width:100%;height:80px"></textarea>
-  <div id="habitOut"><p class="hint">先选择文件或粘贴数据。</p></div>
-  <form method="dialog"><button>关闭</button></form>
-</dialog>
+</div>
 
 <dialog id="help">
   <h3>支持与限制</h3>
   <li>mermaid 子集：<code>flowchart TD / LR</code>；节点 <code>A[矩形]</code> <code>A{菱形}</code> <code>A(圆角)</code>；连线 <code>--&gt;</code> / <code>-.-&gt;</code> 与标签 <code>--&gt;|文字|</code>；<code>subgraph</code> 分组</li>
-  <li>逻辑门与子流程用标签后缀随 mermaid 携带：<code>⚙IF</code>（八类门）、<code>▸→工作流名</code>（子流程）</li>
-  <li>底部三个页签与画布双向同步：Mermaid 源码、Markdown 工作流文档、JSON（机器可读，门/子流程完整保留）</li>
-  <li>左侧任务栏：画布 / 分布工作区 / 总控流程 三个视图手动切换；工作流列表点击即切换</li>
-  <li>「🛰 分布工作区」：每个工作流是一张卡片（打开 / 重命名 / 删除 / 导出）</li>
-  <li>「🧭 总控流程」：关系图 + 关系表，展示所有工作流与子流程引用</li>
+  <li>标签后缀随 mermaid/JSON/Markdown 携带：<code>⚙IF</code>（八类门）、<code>▸→工作流名</code>（子流程）、<code>◈agent</code>（节点类型：input / agent / map / cond / merge / output）</li>
+  <li>「＋新建流程框架」一键生成 输入 → Agent → 条件（是/否）→ 合并 → 输出 骨架，含虚线反馈修正环；工具栏 six 个「＋类型」按钮可随时加节点</li>
+  <li>连线：从圆点拖到另一节点新建；拖动连线端点到别的节点 = 改接；红色边 = 反馈环，平行边自动分道；「✨ 一键整理」去重连线并重新排版</li>
+  <li>节点说明（STEP 文档）在右侧属性面板编辑，随 Markdown「节点说明」与 JSON 导出；「📄 工作流文档」在底部 Markdown 页签查看执行顺序 + 说明</li>
+  <li>底部三个页签与画布双向同步：Mermaid 源码、Markdown 工作流文档、JSON（机器可读，类型/门/子流程完整保留）</li>
+  <li>左侧任务栏五个视图：画布 / 分布工作区 / 总控流程 / 技能总结 / 轨迹查询；工作流列表点击即切换</li>
+  <li>「🧩 技能总结」与「📜 轨迹查询」是独立模块：选 usage.jsonl 后可看每技能调用统计，也可按关键字/类型/会话回放每次调用轨迹</li>
+  <li>AI 助手两条提示词通道：「优化连线」（只调结构：汇合/分支/反馈）与「优化整个流程」；校验会检查环路、类型规则（输入无入边、条件两分支等）、门规则与可达性</li>
   <li>超过 8 层的线性链自动蛇形折行；重复连线与自环会被拒绝</li>
   <li>「🔗 连接文件」后画布与本地文件双向同步：AI / 会话改文件 → 画布自动更新；画布改动 → 自动写回文件（建议 Edge / Chrome）</li>
-  <li>「📊 习惯与技能」页：选择 usage.jsonl 即可看技能总结、调用排行、活跃趋势与习惯候选，可复制 Markdown 总结</li>
   <p class="hint">文本是唯一事实源。导出后可在会话里用 /codex-flow-save 回写项目框架；JSON 最完整，Markdown 适合人读与版本库。</p>
   <form method="dialog"><button>知道了</button></form>
 </dialog>
@@ -297,21 +338,49 @@
 // ---------- 纯逻辑核心（可脱离 DOM 测试） ----------
 const GATES = ['IF','AND','OR','NOT','NAND','NOR','XOR','XNOR'];
 const GATE_CN = { IF:'IF/ELSE', AND:'AND 全部成立', OR:'OR 任一成立', NOT:'NOT 取反', NAND:'NAND', NOR:'NOR', XOR:'XOR 奇真', XNOR:'XNOR 偶真' };
+// 节点类型（参考 DeepSeek Flow：输入 / Agent / Map Agent / 条件 / 合并 / 输出）
+const KINDS = ['input','output','agent','map','cond','merge'];
+const KIND_CN = { input:'输入', output:'输出', agent:'Agent', map:'Map Agent', cond:'条件', merge:'合并' };
+const KIND_COLOR = { input:'#2563eb', output:'#059669', agent:'#7c3aed', map:'#b45309', cond:'#dc2626', merge:'#0891b2' };
+const KIND_SHAPE = { input:'round', output:'round', cond:'diamond' };
 
 function cjkWidth(s){ let w=0; for (const ch of String(s)) w += /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 14 : 7.5; return w; }
 function nodeW(label){ return Math.min(240, Math.max(90, cjkWidth(label) + 34)); }
 const NODE_H = 40;
 
+// 清洗节点标签：剥掉生成器残留的包裹引号（""…"" / "…" / '…'），字面 \n \t 显示为空格
+function cleanLabel(t){
+  let s = String(t == null ? '' : t).trim();
+  for (let i = 0; i < 2; i++){
+    const a = s.charAt(0), b = s.charAt(s.length - 1);
+    if (s.length >= 2 && a === b && (a === '"' || a === "'")) s = s.slice(1, -1).trim();
+    else break;
+  }
+  return s.replace(/\\n|\\t/g, ' ').trim();
+}
+// 按显示宽度截断（避免长标签溢出节点框）
+function fitText(t, maxW){
+  let w = 0, out = '';
+  for (const ch of String(t == null ? '' : t)){
+    const cw = /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 14 : 7.5;
+    if (w + cw > maxW) return out + '…';
+    w += cw; out += ch;
+  }
+  return out;
+}
+
 function splitLabel(raw){
   const s = String(raw == null ? '' : raw);
-  const m = s.match(/^([\s\S]*?)(?:\s*⚙([A-Za-z]+))?(?:\s*▸→(\S+))?\s*$/);
+  const m = s.match(/^([\s\S]*?)(?:\s*⚙([A-Za-z]+))?(?:\s*▸→(\S+?))?(?:\s*◈(input|output|agent|map|cond|merge))?\s*$/i);
   const gate = m && m[2] && GATES.includes(m[2].toUpperCase()) ? m[2].toUpperCase() : '';
-  return { label: (m ? m[1] : s).trim(), gate, subflow: m && m[3] ? m[3] : '' };
+  const kind = m && m[4] ? m[4].toLowerCase() : '';
+  return { label: (m ? m[1] : s).trim(), gate, subflow: m && m[3] ? m[3] : '', kind };
 }
 function joinLabel(n){
   let s = n.label || n.id;
   if (n.gate) s += ' ⚙' + n.gate;
   if (n.subflow) s += ' ▸→' + n.subflow;
+  if (n.kind) s += ' ◈' + n.kind;
   return s;
 }
 function sizeNode(n){ n.w = nodeW(n.label); n.h = NODE_H; return n; }
@@ -319,13 +388,14 @@ function normalize(g){ (g.nodes||[]).forEach(sizeNode); return g; }
 
 function upsertNode(g, id, label, shape, subId){
   let n = g.nodes.find(x => x.id === id);
-  if (!n){ n = { id, label:'', shape:'rect', sub:null, gate:'', subflow:'', x:0, y:0, w:90, h:NODE_H }; g.nodes.push(n); }
+  if (!n){ n = { id, label:'', shape:'rect', sub:null, gate:'', subflow:'', kind:'', doc:'', x:0, y:0, w:90, h:NODE_H }; g.nodes.push(n); }
   const parts = splitLabel(label !== undefined && label !== '' ? label : n.label);
   const hadExplicit = label !== undefined && label !== '';
   if (hadExplicit && parts.label) n.label = parts.label;
   else if (!n.label) n.label = id;
   if (hadExplicit && !parts.label) n.label = id;
   if (parts.gate) n.gate = parts.gate;
+  if (parts.kind) n.kind = parts.kind;
   if (shape && shape !== 'rect') n.shape = shape;
   if (parts.subflow) n.subflow = parts.subflow;
   if (subId && !n.sub) n.sub = subId;
@@ -335,10 +405,15 @@ function upsertNode(g, id, label, shape, subId){
 
 function parseEndpoint(s, g, subId){
   s = String(s).trim();
-  let m = s.match(/^([A-Za-z_]\w*)\s*([\[({])["']?([\s\S]*?)["']?[\])}]$/);
+  let m = s.match(/^([A-Za-z_]\w*)\s*\(\[["']?([\s\S]*?)["']?\]\)\s*$/); // stadium：(["标签"]) 生成器常用
+  if (m){
+    upsertNode(g, m[1], cleanLabel(m[2]), 'round', subId);
+    return m[1];
+  }
+  m = s.match(/^([A-Za-z_]\w*)\s*([\[({])["']?([\s\S]*?)["']?[\])}]$/);
   if (m){
     const shape = m[2] === '[' ? 'rect' : m[2] === '{' ? 'diamond' : 'round';
-    upsertNode(g, m[1], m[3].trim(), shape, subId);
+    upsertNode(g, m[1], cleanLabel(m[3]), shape, subId);
     return m[1];
   }
   m = s.match(/^([A-Za-z_]\w*)$/);
@@ -436,7 +511,7 @@ function graphToJSON(g){
     version: 1,
     name: g.name || '',
     dir: g.dir,
-    nodes: g.nodes.map(n => ({ id:n.id, label:n.label, shape:n.shape, sub:n.sub || '', gate:n.gate || '', subflow:n.subflow || '', x:Math.round(n.x), y:Math.round(n.y) })),
+    nodes: g.nodes.map(n => ({ id:n.id, label:n.label, shape:n.shape, sub:n.sub || '', gate:n.gate || '', subflow:n.subflow || '', kind:n.kind || '', doc:n.doc || '', x:Math.round(n.x), y:Math.round(n.y) })),
     edges: g.edges.map(e => ({ from:e.from, to:e.to, label:e.label || '', style:e.style || 'solid' })),
     subs: g.subs.map(s => ({ id:s.id, title:s.title }))
   };
@@ -447,7 +522,7 @@ function jsonToGraph(obj){
   const g = { name:String(obj.name || ''), dir: obj.dir === 'LR' ? 'LR' : 'TD', nodes:[], edges:[], subs:[], errors:[] };
   for (const n of obj.nodes){
     if (!n || !n.id) continue;
-    g.nodes.push(sizeNode({ id:String(n.id), label:String(n.label || n.id), shape:['rect','diamond','round'].includes(n.shape) ? n.shape : 'rect', sub:n.sub ? String(n.sub) : null, gate:n.gate && GATES.includes(String(n.gate).toUpperCase()) ? String(n.gate).toUpperCase() : '', subflow:n.subflow ? String(n.subflow) : '', x:Number(n.x)||0, y:Number(n.y)||0, w:0, h:NODE_H }));
+    g.nodes.push(sizeNode({ id:String(n.id), label:String(n.label || n.id), shape:['rect','diamond','round'].includes(n.shape) ? n.shape : 'rect', sub:n.sub ? String(n.sub) : null, gate:n.gate && GATES.includes(String(n.gate).toUpperCase()) ? String(n.gate).toUpperCase() : '', subflow:n.subflow ? String(n.subflow) : '', kind:KINDS.includes(String(n.kind || '').toLowerCase()) ? String(n.kind).toLowerCase() : '', doc:n.doc ? String(n.doc) : '', x:Number(n.x)||0, y:Number(n.y)||0, w:0, h:NODE_H }));
   }
   const ids = new Set(g.nodes.map(n => n.id));
   for (const e of (obj.edges || [])){
@@ -470,18 +545,38 @@ function graphToMarkdown(g){
     if (st) line += ' @' + st;
     if (n.gate) line += ' ⚙' + n.gate;
     if (n.subflow) line += ' ▸→' + n.subflow;
+    if (n.kind) line += ' ◈' + n.kind;
     out.push(line);
   }
   out.push('', '## 连接', '');
   for (const e of g.edges){
     out.push('- `' + e.from + '` → `' + e.to + '`' + (e.label ? ' |' + e.label + '|' : '') + (e.style === 'dotted' ? ' [虚线]' : ''));
   }
+  // 忽略回边后必为无环（每个环至少含一条 DFS 回边），任何图都能给出执行顺序
+  const back = backEdgeSet(g);
+  const topo = topoOrder({ nodes: g.nodes, edges: g.edges.filter(e => !back.has(e.from + '>' + e.to)) });
+  if (topo){
+    out.push('', '## 执行顺序', '');
+    topo.forEach((id, i) => {
+      const n = g.nodes.find(x => x.id === id);
+      out.push((i + 1) + '. `' + id + '`' + (n && n.kind ? '（' + KIND_CN[n.kind] + '）' : '') + ' ' + ((n && n.label) || id));
+    });
+  }
+  const docs = g.nodes.filter(n => n.doc);
+  if (docs.length){
+    out.push('', '## 节点说明', '');
+    for (const n of docs){
+      out.push('### `' + n.id + '` ' + (n.label || n.id), '');
+      String(n.doc).split(/\r?\n/).forEach(l => out.push(l));
+      out.push('');
+    }
+  }
   return out.join('\n');
 }
 function markdownToGraph(text){
   const g = { name:'', dir:'TD', nodes:[], edges:[], subs:[], errors:[] };
   const lines = String(text || '').split(/\r?\n/);
-  let section = '';
+  let section = '', docId = null;
   const subByTitle = new Map();
   const ensureSub = title => {
     if (!subByTitle.has(title)){
@@ -498,6 +593,14 @@ function markdownToGraph(text){
     if (m && !g.name){ g.name = m[1].trim(); continue; }
     m = line.match(/^方向：(\w+)$/);
     if (m){ g.dir = /L/i.test(m[1]) ? 'LR' : 'TD'; continue; }
+    if (/^##?\s*节点说明/.test(line)){ section = 'doc'; docId = null; continue; }
+    if (section === 'doc'){
+      m = line.match(/^### `(\w+)`/);
+      if (m){ docId = g.nodes.some(n => n.id === m[1]) ? m[1] : null; if (docId){ const n = g.nodes.find(x => x.id === docId); n.doc = ''; } continue; }
+      if (/^#/.test(line)){ section = ''; continue; }
+      if (docId){ const n = g.nodes.find(x => x.id === docId); if (n) n.doc = (n.doc ? n.doc + '\n' : '') + line; }
+      continue;
+    }
     if (/^##?\s*节点/.test(line)){ section = 'node'; continue; }
     if (/^##?\s*连接/.test(line)){ section = 'edge'; continue; }
     if (/^#/.test(line)){ section = ''; continue; }
@@ -506,7 +609,7 @@ function markdownToGraph(text){
       if (m){
         const shape = m[2] === '菱形' ? 'diamond' : m[2] === '圆角' ? 'round' : 'rect';
         let rest = m[3];
-        const subM = rest.match(/\s@([^\s@⚙▸]+)(?= |$)/);
+        const subM = rest.match(/\s@([^\s@⚙▸◈]+)(?= |$)/);
         let subId = null;
         if (subM){ subId = ensureSub(subM[1]); rest = rest.slice(0, subM.index) + rest.slice(subM.index + subM[0].length); }
         const n = upsertNode(g, m[1], rest, shape, subId);
@@ -514,6 +617,7 @@ function markdownToGraph(text){
         if (parts.label) n.label = parts.label; else n.label = m[1];
         if (parts.gate) n.gate = parts.gate;
         if (parts.subflow) n.subflow = parts.subflow;
+        if (parts.kind) n.kind = parts.kind;
         sizeNode(n);
       } else g.errors.push(line);
     } else if (section === 'edge'){
@@ -573,21 +677,43 @@ function validateGraph(g, knownNames){
       const labels = g.edges.filter(e => e.from === n.id).map(e => e.label);
       if (labels.some(l => !l)) issues.push({ level:'warn', msg:'IF/ELSE（' + n.id + '）分支建议标注「是 / 否」', nodeId:n.id });
     }
+    // 节点类型规则（cond 与 IF 门同义，避免重复报错）
+    if (n.kind === 'cond' && n.gate !== 'IF'){
+      if (d.out > 2) issues.push({ level:'error', msg:'条件节点（' + n.id + '）最多 2 个分支（是/否），当前 ' + d.out, nodeId:n.id });
+      else if (d.out < 2) issues.push({ level:'warn', msg:'条件节点（' + n.id + '）应有 2 个分支（是/否），当前 ' + d.out, nodeId:n.id });
+      if (d.out >= 1 && g.edges.filter(e => e.from === n.id).some(e => !e.label))
+        issues.push({ level:'warn', msg:'条件节点（' + n.id + '）分支建议标注「是 / 否」', nodeId:n.id });
+    }
+    if (n.kind === 'input' && d.in > 0) issues.push({ level:'warn', msg:'输入节点（' + n.id + '）不应有输入连线', nodeId:n.id });
+    if (n.kind === 'input' && d.out === 0 && g.nodes.length > 1) issues.push({ level:'warn', msg:'输入节点（' + n.id + '）没有输出连线', nodeId:n.id });
+    if (n.kind === 'output' && d.out > 0) issues.push({ level:'warn', msg:'输出节点（' + n.id + '）不应有输出连线', nodeId:n.id });
+    if (n.kind === 'output' && d.in === 0 && g.nodes.length > 1) issues.push({ level:'warn', msg:'输出节点（' + n.id + '）没有输入连线', nodeId:n.id });
+    if ((n.kind === 'agent' || n.kind === 'map') && g.nodes.length > 1){
+      if (d.in === 0) issues.push({ level:'warn', msg:KIND_CN[n.kind] + '节点（' + n.id + '）缺少输入连线', nodeId:n.id });
+      if (d.out === 0) issues.push({ level:'warn', msg:KIND_CN[n.kind] + '节点（' + n.id + '）缺少输出连线', nodeId:n.id });
+    }
+    if (n.kind === 'merge' && d.in < 2) issues.push({ level:'warn', msg:'合并节点（' + n.id + '）建议 ≥2 个输入连线，当前 ' + d.in, nodeId:n.id });
     if (n.subflow && Array.isArray(knownNames) && knownNames.length && !knownNames.includes(n.subflow))
       issues.push({ level:'error', msg:'子流程「' + n.subflow + '」（' + n.id + '）不存在，可在总控视图新建', nodeId:n.id });
-    if (!n.gate && !n.subflow && d.in === 0 && d.out === 0 && g.nodes.length > 1)
+    if (!n.gate && !n.subflow && !n.kind && d.in === 0 && d.out === 0 && g.nodes.length > 1)
       issues.push({ level:'warn', msg:'节点 ' + n.id + ' 与任何连线都不相连', nodeId:n.id });
+  }
+  if (g.nodes.some(n => n.kind)){
+    if (!g.nodes.some(n => n.kind === 'input')) issues.push({ level:'warn', msg:'流程缺少「输入」节点：建议设置明确起点' });
+    if (!g.nodes.some(n => n.kind === 'output')) issues.push({ level:'warn', msg:'流程缺少「输出」节点：建议设置明确交付' });
   }
   return issues;
 }
 
 function autoLayout(g, dir){
+  const back = backEdgeSet(g); // 反馈边不参与定层，避免环把层级越抬越高、把上游节点压到图底部
   const level = {};
   g.nodes.forEach(n => level[n.id] = 0);
   let changed = true, guard = g.nodes.length + 8;
   while (changed && guard-- > 0){
     changed = false;
     for (const e of g.edges){
+      if (back.has(e.from + '>' + e.to)) continue;
       if (!(e.from in level) || !(e.to in level)) continue;
       if (level[e.to] < level[e.from] + 1){ level[e.to] = level[e.from] + 1; changed = true; }
     }
@@ -596,7 +722,7 @@ function autoLayout(g, dir){
   const rows = {};
   for (const n of g.nodes){ (rows[level[n.id]] = rows[level[n.id]] || []).push(n); }
   const keys = Object.keys(rows).map(Number).sort((a,b)=>a-b);
-  const gapMain = 90, gapCross = 46;
+  const gapMain = 104, gapCross = 60;
   if (keys.length > 8 && keys.every(lv => rows[lv].length === 1)){
     const BAND = 6;
     if (dir === 'LR'){
@@ -633,17 +759,30 @@ function autoLayout(g, dir){
     return g;
   }
   if (dir === 'LR'){
+    const colW = {};
+    let maxH = 0;
+    for (const lv of keys){
+      colW[lv] = Math.max.apply(null, rows[lv].map(n=>n.w));
+      maxH = Math.max(maxH, rows[lv].reduce((a,n)=>a + n.h + gapMain, -gapMain));
+    }
     let x = 30;
     for (const lv of keys){
-      let y = 30;
-      for (const n of rows[lv]){ n.x = x; n.y = y; y += n.h + gapMain; }
-      x += Math.max.apply(null, rows[lv].map(n=>n.w)) + gapCross;
+      const colH = rows[lv].reduce((a,n)=>a + n.h + gapMain, -gapMain);
+      let y = 30 + Math.max(0, (maxH - colH) / 2);
+      for (const n of rows[lv]){ n.x = x; n.y = Math.round(y); y += n.h + gapMain; }
+      x += colW[lv] + gapCross;
     }
   } else {
+    const rowW = {};
+    let maxW = 0;
+    for (const lv of keys){
+      rowW[lv] = rows[lv].reduce((a,n)=>a + n.w + gapCross, -gapCross);
+      maxW = Math.max(maxW, rowW[lv]);
+    }
     let y = 30;
     for (const lv of keys){
-      let x = 30;
-      for (const n of rows[lv]){ n.x = x; n.y = y; x += n.w + gapCross; }
+      let x = 30 + Math.max(0, (maxW - rowW[lv]) / 2);
+      for (const n of rows[lv]){ n.x = Math.round(x); n.y = y; x += n.w + gapCross; }
       y += NODE_H + gapMain;
     }
   }
@@ -726,6 +865,127 @@ function habitCandidates(agg){
   const dirs = Object.entries(agg.dirs).sort((a,b)=>b[1]-a[1]);
   if (dirs.length > 1) out.push({ title:'多项目切换', evidence:'在 ' + dirs.length + ' 个不同目录工作过，最频繁是 ' + dirs[0][0], suggestion:'跨项目共性习惯适合写成全局 skill' });
   return out.slice(0, 5);
+}
+
+// ---------- 流程框架模板（新建工作流默认骨架，含反馈修正环） ----------
+function flowTemplate(name){
+  const mk = (id, label, kind, extra) => Object.assign({ id, label, shape: KIND_SHAPE[kind] || 'rect', kind, gate:'', subflow:'', doc:'' }, extra || {});
+  const nodes = [
+    mk('n1', '输入', 'input'),
+    mk('n2', '处理 Agent', 'agent'),
+    mk('n3', '是否通过?', 'cond', { gate:'IF' }),
+    mk('n4', '通过后处理', 'agent'),
+    mk('n5', '未通过修正', 'agent'),
+    mk('n6', '合并', 'merge'),
+    mk('n7', '输出', 'output')
+  ];
+  const edges = [
+    { from:'n1', to:'n2', label:'', style:'solid' },
+    { from:'n2', to:'n3', label:'', style:'solid' },
+    { from:'n3', to:'n4', label:'是', style:'solid' },
+    { from:'n3', to:'n5', label:'否', style:'solid' },
+    { from:'n4', to:'n6', label:'', style:'solid' },
+    { from:'n5', to:'n2', label:'反馈修正', style:'dotted' },
+    { from:'n6', to:'n7', label:'', style:'solid' }
+  ];
+  return { name: name || '新流程框架', dir:'TD', nodes, edges, subs:[] };
+}
+
+// ---------- 拓扑排序（执行顺序；有环返回 null） ----------
+function topoOrder(g){
+  const deg = {}, adj = {};
+  g.nodes.forEach(n => { deg[n.id] = 0; adj[n.id] = []; });
+  g.edges.forEach(e => {
+    if (deg[e.from] === undefined || deg[e.to] === undefined) return;
+    adj[e.from].push(e.to); deg[e.to]++;
+  });
+  const q = g.nodes.filter(n => deg[n.id] === 0).map(n => n.id);
+  const out = [];
+  while (q.length){
+    const u = q.shift(); out.push(u);
+    for (const v of adj[u]) if (--deg[v] === 0) q.push(v);
+  }
+  return out.length === g.nodes.length ? out : null;
+}
+
+// ---------- DFS 回边检测（有向图的「反馈连线」，渲染红色绕行） ----------
+function backEdgeSet(g){
+  const adj = {};
+  g.nodes.forEach(n => adj[n.id] = []);
+  g.edges.forEach(e => { if (adj[e.from] && adj[e.to] !== undefined) adj[e.from].push(e.to); });
+  const color = {}, back = new Set();
+  function dfs(u){
+    color[u] = 1;
+    for (const v of adj[u]){
+      if (color[v] === 1) back.add(u + '>' + v);
+      else if (!color[v]) dfs(v);
+    }
+    color[u] = 2;
+  }
+  g.nodes.forEach(n => { if (!color[n.id]) dfs(n.id); });
+  return back;
+}
+
+// ---------- 连线元数据：车道偏移（平行线分道）与反馈边识别（纯函数可测试） ----------
+function edgeMeta(g){
+  const back = backEdgeSet(g);
+  const level = {};
+  g.nodes.forEach(n => level[n.id] = 0);
+  let changed = true, guard = g.nodes.length + 8;
+  while (changed && guard-- > 0){
+    changed = false;
+    for (const e of g.edges){
+      if (back.has(e.from + '>' + e.to)) continue; // 回边不参与定层，避免环把层级越抬越高
+      if (!(e.from in level) || !(e.to in level)) continue;
+      if (level[e.to] < level[e.from] + 1){ level[e.to] = level[e.from] + 1; changed = true; }
+    }
+  }
+  const metas = g.edges.map(e => ({
+    key: [e.from, e.to].sort().join('|'),
+    feedback: back.has(e.from + '>' + e.to) || ((e.from in level) && (e.to in level) && level[e.to] < level[e.from])
+  }));
+  const cnt = {}, seen = {};
+  metas.forEach(m => { cnt[m.key] = (cnt[m.key] || 0) + 1; });
+  return metas.map(m => {
+    const laneIdx = seen[m.key] || 0;
+    seen[m.key] = laneIdx + 1;
+    return { key:m.key, feedback:m.feedback, laneIdx, laneCnt: cnt[m.key] };
+  });
+}
+
+// ---------- 轨迹查询（usage.jsonl 记录级解析与过滤，纯函数可测试） ----------
+function parseUsageRecords(jsonlText){
+  const out = [];
+  for (const line of String(jsonlText || '').split(/\r?\n/)){
+    const s = line.trim(); if (!s) continue;
+    let r; try { r = JSON.parse(s); } catch(e){ continue; }
+    const t = r.ts ? new Date(r.ts) : null;
+    out.push({
+      ts: t && !isNaN(t) ? t.getTime() : 0,
+      tsText: String(r.ts || ''),
+      kind: ['skill','mcp','session'].includes(r.kind) ? r.kind : 'other',
+      name: String(r.name || ''),
+      plugin: String(r.plugin || ''),
+      session: String(r.session || ''),
+      cwd: String(r.cwd || '')
+    });
+  }
+  return out;
+}
+function traceQuery(records, opt){
+  opt = opt || {};
+  const kw = String(opt.kw || '').trim().toLowerCase();
+  const kind = opt.kind || 'all';
+  const session = String(opt.session || '').trim().toLowerCase();
+  return records.filter(r => {
+    if (kind !== 'all' && r.kind !== kind) return false;
+    if (session && r.session.toLowerCase().indexOf(session) < 0) return false;
+    if (kw){
+      const hay = (r.name + ' ' + r.plugin + ' ' + r.session + ' ' + r.cwd).toLowerCase();
+      if (hay.indexOf(kw) < 0) return false;
+    }
+    return true;
+  }).sort((a, b) => b.ts - a.ts);
 }
 
 function newNodeId(g){
@@ -838,7 +1098,7 @@ if (typeof document !== "undefined") var UI = function(){
       ? { out:{x:n.x+n.w, y:n.y+n.h/2}, inn:{x:n.x, y:n.y+n.h/2} }
       : { out:{x:n.x+n.w/2, y:n.y+n.h}, inn:{x:n.x+n.w/2, y:n.y} };
   }
-  function edgePath(e){
+  function edgePath(e, mt){
     const a = nodeById(e.from), b = nodeById(e.to);
     if (!a || !b) return '';
     const p1 = anchors(a).out, p2 = anchors(b).inn;
@@ -853,6 +1113,14 @@ if (typeof document !== "undefined") var UI = function(){
       const bend = g.dir === 'LR' ? Math.max(40, Math.abs(p2.x-p1.x)/2) : Math.max(40, Math.abs(p2.y-p1.y)/2);
       c1 = g.dir==='LR' ? {x:p1.x+bend, y:p1.y} : {x:p1.x, y:p1.y+bend};
       c2 = g.dir==='LR' ? {x:p2.x-bend, y:p2.y} : {x:p2.x, y:p2.y-bend};
+    }
+    // 平行边分道 + 反馈边外扩：沿 p1→p2 的法线方向平移控制点
+    if (mt && (mt.laneCnt > 1 || mt.feedback)){
+      const off = (mt.laneCnt > 1 ? (mt.laneIdx - (mt.laneCnt - 1) / 2) * 18 : 0) + (mt.feedback ? 30 : 0);
+      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      c1 = { x:c1.x + nx*off, y:c1.y + ny*off };
+      c2 = { x:c2.x + nx*off, y:c2.y + ny*off };
     }
     const mid = t => ({ x:((1-t)**3)*p1.x + 3*((1-t)**2)*t*c1.x + 3*(1-t)*t*t*c2.x + t*t*t*p2.x,
                         y:((1-t)**3)*p1.y + 3*((1-t)**2)*t*c1.y + 3*(1-t)*t*t*c2.y + t*t*t*p2.y });
@@ -872,13 +1140,17 @@ if (typeof document !== "undefined") var UI = function(){
         '<text class="sub-t" x="'+(x1+10)+'" y="'+(y1+20)+'">' + escXml(s.title) + '</text></g>';
     }).join('');
 
+    const metas = edgeMeta(g);
     const edgesHtml = g.edges.map((e, i) => {
-      const ep = edgePath(e); if (!ep) return '';
+      const ep = edgePath(e, metas[i]); if (!ep) return '';
       const selCls = sel && sel.type==='edge' && sel.id===i ? ' eg-sel' : '';
+      const fb = metas[i].feedback;
+      const fbCls = fb && !selCls ? ' eg-fb' : '';
       const dotted = e.style==='dotted' ? ' stroke-dasharray="5,4"' : '';
+      const marker = fb ? 'url(#arrFb)' : 'url(#arr)';
       const lbl = e.label ? '<g><rect class="lbl-bg" x="'+(ep.mid.x-e.label.length*3.6-5)+'" y="'+(ep.mid.y-10)+'" width="'+(e.label.length*7.2+10)+'" height="20" rx="6"/><text class="lbl-t" x="'+ep.mid.x+'" y="'+(ep.mid.y+4)+'" text-anchor="middle">'+escXml(e.label)+'</text></g>' : '';
       return '<path d="'+ep.d+'" fill="none" stroke="transparent" stroke-width="16" data-edge="'+i+'"/>' +
-             '<path class="eg'+selCls+'" d="'+ep.d+'"'+dotted+' marker-end="url(#arr)" pointer-events="none"/>'+lbl;
+             '<path class="eg'+selCls+fbCls+'" d="'+ep.d+'"'+dotted+' marker-end="'+marker+'" pointer-events="none"/>'+lbl;
     }).join('');
 
     const nodesHtml = g.nodes.map(n => {
@@ -898,15 +1170,30 @@ if (typeof document !== "undefined") var UI = function(){
         const t = '⚙' + n.gate, bw = t.length * 7 + 10;
         badge = '<rect class="badge-r" x="'+(n.x+n.w/2-bw/2)+'" y="'+(n.y-20)+'" width="'+bw+'" height="15" rx="7"/><text class="badge-t" x="'+(n.x+n.w/2)+'" y="'+(n.y-9)+'" text-anchor="middle">'+escXml(t)+'</text>';
       }
+      if (n.kind){
+        const t = KIND_CN[n.kind] || n.kind, bw = cjkWidth(t) + 12;
+        const bx = n.gate ? n.x + n.w/2 - bw - 14 : n.x + n.w/2 - bw/2;
+        badge += '<rect x="'+bx+'" y="'+(n.y-20)+'" width="'+bw+'" height="15" rx="7" fill="'+(KIND_COLOR[n.kind]||'#64748b')+'" opacity=".93"/>' +
+          '<text class="kbadge-t" x="'+(bx+bw/2)+'" y="'+(n.y-9)+'" text-anchor="middle">'+escXml(t)+'</text>';
+      }
       const port = anchors(n).out;
-      const txt = (n.subflow ? '▸ ' : '') + n.label;
+      const txt = (n.subflow ? '▸ ' : '') + fitText(n.label, n.w - 16);
       return '<g data-node="'+escXml(n.id)+'">' + body +
         '<text class="nd-t" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h/2+4.5)+'" text-anchor="middle" pointer-events="none">'+escXml(txt)+'</text>' + badge +
         '<circle class="port" cx="'+port.x+'" cy="'+port.y+'" r="5.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/></g>';
     }).join('');
 
-    const overlayHtml = mode && mode.kind==='connect' && mode.ghost
-      ? '<path d="'+mode.ghost+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4,3"/>' : '';
+    let overlayHtml = '';
+    if (mode && mode.kind==='connect' && mode.ghost){
+      overlayHtml = '<path d="'+mode.ghost+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4,3"/>';
+    } else if (mode && mode.kind==='relink' && mode.w){
+      const e = g.edges[mode.idx];
+      const other = e ? nodeById(mode.end==='from' ? e.to : e.from) : null;
+      if (other){
+        const p = mode.end==='from' ? anchors(other).inn : anchors(other).out;
+        overlayHtml = '<path d="M'+p.x+','+p.y+' L'+mode.w.x+','+mode.w.y+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4,3"/>';
+      }
+    }
 
     world.innerHTML = subsHtml + edgesHtml + nodesHtml + overlayHtml;
   }
@@ -962,25 +1249,36 @@ if (typeof document !== "undefined") var UI = function(){
   function renderPanel(){
     const p = $('props');
     if (!sel){
-      p.innerHTML = '<h4>未选中对象</h4><p class="hint">点击节点 / 连线可在此编辑属性。<br><br>· 拖节点移动；双击空白 = 新建；双击节点 = 改标签<br>· 双击虚线「子流程」节点 = 跳转该工作流<br>· 从圆点拖到另一节点 = 连线（重复/自环会被拒绝）<br>· Del 删除，Esc 取消，Ctrl+Z/Y 撤销重做<br>· 滚轮平移，Ctrl+滚轮缩放，Ctrl+S 导出</p>';
+      p.innerHTML = '<h4>未选中对象</h4><p class="hint">点击节点 / 连线可在此编辑属性（含类型与节点说明）。<br><br>· 拖节点移动；双击空白 = 新建；双击节点 = 改标签<br>· 从圆点拖到另一节点 = 连线；拖动连线端点 = 改接<br>· 红色边 = 反馈环；平行边自动分道<br>· 双击虚线「子流程」节点 = 跳转该工作流<br>· Del 删除，Esc 取消，Ctrl+Z/Y 撤销重做<br>· 滚轮平移，Ctrl+滚轮缩放，Ctrl+S 导出</p>';
       return;
     }
     if (sel.type === 'node'){
       const n = nodeById(sel.id); if (!n) return setSel(null);
       const shapeSel = ['rect|矩形','diamond|菱形','round|圆角'].map(o=>{ const [v,t]=o.split('|'); return '<option value="'+v+'"'+(n.shape===v?' selected':'')+'>'+t+'</option>'; }).join('');
+      const kindSel = '<option value="">（普通节点）</option>' + KINDS.map(k=>'<option value="'+k+'"'+(n.kind===k?' selected':'')+'>'+KIND_CN[k]+'</option>').join('');
       const gateSel = '<option value="">（无）</option>' + GATES.map(gt=>'<option value="'+gt+'"'+(n.gate===gt?' selected':'')+'>'+GATE_CN[gt]+'</option>').join('');
       const subSel = '<option value="">（无分组）</option>' + g.subs.map(s=>'<option value="'+escXml(s.id)+'"'+(n.sub===s.id?' selected':'')+'>成员 → '+escXml(s.title)+'</option>').join('') +
         '<option value="__new__">＋ 新建分组…</option>';
       const wfSel2 = '<option value="">（不是子流程）</option>' + entryNames().map(nm=>'<option value="'+escXml(nm)+'"'+(n.subflow===nm?' selected':'')+'>▸ '+escXml(nm)+'</option>').join('');
       p.innerHTML = '<h4>节点属性</h4><label>ID</label><input type="text" value="'+escXml(n.id)+'" disabled>' +
         '<label>标签</label><textarea id="pLabel">'+escXml(n.label)+'</textarea>' +
+        '<label>类型（输入 / Agent / Map Agent / 条件 / 合并 / 输出）</label><select id="pKind">'+kindSel+'</select>' +
         '<label>形状</label><select id="pShape">'+shapeSel+'</select>' +
         '<label>逻辑门</label><select id="pGate">'+gateSel+'</select>' +
+        '<label>节点说明（STEP 文档，随 Markdown/JSON 导出）</label><textarea id="pDoc" style="height:80px">'+escXml(n.doc||'')+'</textarea>' +
         '<label>子流程（虚线节点，双击可跳转）</label><select id="pSubflow">'+wfSel2+'</select>' +
         '<label>所属分组</label><select id="pSub">'+subSel+'</select>' +
         '<p><button id="pDel">删除节点</button></p>';
       $('pLabel').addEventListener('focus', pushHistory);
       $('pLabel').addEventListener('input', ev => { n.label = ev.target.value || n.id; sizeNode(n); render(); syncCode(); markDirty(); });
+      $('pKind').addEventListener('change', () => {
+        pushHistory();
+        n.kind = $('pKind').value;
+        if (n.kind && KIND_SHAPE[n.kind] && n.shape !== KIND_SHAPE[n.kind]) n.shape = KIND_SHAPE[n.kind];
+        sizeNode(n); render(); syncCode(); markDirty(); renderPanel();
+      });
+      $('pDoc').addEventListener('focus', pushHistory);
+      $('pDoc').addEventListener('input', ev => { n.doc = ev.target.value; syncCode(); markDirty(); });
       $('pShape').addEventListener('change', () => { pushHistory(); n.shape = $('pShape').value; render(); syncCode(); markDirty(); });
       $('pGate').addEventListener('change', () => { pushHistory(); n.gate = $('pGate').value; render(); syncCode(); markDirty(); });
       $('pSubflow').addEventListener('change', () => { pushHistory(); n.subflow = $('pSubflow').value; sizeNode(n); render(); syncCode(); markDirty(); });
@@ -1018,7 +1316,7 @@ if (typeof document !== "undefined") var UI = function(){
     const portEl = ev.target.closest('[data-port]');
     const nodeEl = ev.target.closest('[data-node]');
     const edgeEl = ev.target.closest('[data-edge]');
-    svg.setPointerCapture(ev.pointerId);
+    try { svg.setPointerCapture(ev.pointerId); } catch(e){} // 合成事件/异常指针可能没有活动指针，忽略
     if (portEl){
       mode = { kind:'connect', from:portEl.getAttribute('data-port') };
       setSel({type:'node', id:mode.from});
@@ -1029,8 +1327,18 @@ if (typeof document !== "undefined") var UI = function(){
       mode = { kind:'node', id, dx:w.x-n.x, dy:w.y-n.y };
       setSel({type:'node', id});
     } else if (edgeEl){
-      setSel({type:'edge', id:+edgeEl.getAttribute('data-edge')});
+      const idx = +edgeEl.getAttribute('data-edge');
+      const e = g.edges[idx];
+      setSel({type:'edge', id:idx});
       mode = null;
+      if (e){
+        const w = clientToWorld(ev.clientX, ev.clientY);
+        const a = nodeById(e.from), b = nodeById(e.to);
+        const pa = a ? anchors(a).out : null, pb = b ? anchors(b).inn : null;
+        const near = p => p && Math.hypot(w.x-p.x, w.y-p.y) < 26; // port 圆点盖住锚点，半径放宽保证捏得住端点
+        if (near(pa)) mode = { kind:'relink', idx, end:'from' };
+        else if (near(pb)) mode = { kind:'relink', idx, end:'to' };
+      }
     } else {
       mode = { kind:'pan', sx:ev.clientX, sy:ev.clientY, ox:view.x, oy:view.y };
       svg.classList.add('panning');
@@ -1048,6 +1356,9 @@ if (typeof document !== "undefined") var UI = function(){
       const a = nodeById(mode.from), w = clientToWorld(ev.clientX, ev.clientY);
       const p = anchors(a).out;
       mode.ghost = 'M'+p.x+','+p.y+' L'+w.x+','+w.y;
+      render();
+    } else if (mode.kind === 'relink'){
+      mode.w = clientToWorld(ev.clientX, ev.clientY);
       render();
     }
   });
@@ -1067,6 +1378,28 @@ if (typeof document !== "undefined") var UI = function(){
         }
       } else render();
     }
+    if (mode && mode.kind === 'relink'){
+      const e = g.edges[mode.idx];
+      const w = mode.w || clientToWorld(ev.clientX, ev.clientY);
+      const hit = g.nodes.find(n => w.x>=n.x && w.x<=n.x+n.w && w.y>=n.y && w.y<=n.y+n.h);
+      if (e && hit){
+        const anchorId = mode.end === 'from' ? e.from : e.to;
+        const otherId = mode.end === 'from' ? e.to : e.from;
+        if (hit.id !== anchorId && hit.id !== otherId){
+          const nf = mode.end === 'from' ? hit.id : e.from;
+          const nt = mode.end === 'from' ? e.to : hit.id;
+          if (nf === nt) toast('不支持自环连线');
+          else if (g.edges.some((x, i) => i !== mode.idx && x.from === nf && x.to === nt)) toast('这两个节点之间已有连线');
+          else {
+            pushHistory();
+            e.from = nf; e.to = nt;
+            syncCode(); markDirty();
+            toast('连线已改接：' + nf + ' → ' + nt);
+          }
+        }
+      }
+      render();
+    }
     if (mode && mode.kind === 'node') markDirty();
     mode = null; svg.classList.remove('panning');
   });
@@ -1077,6 +1410,7 @@ if (typeof document !== "undefined") var UI = function(){
       const n = nodeById(id);
       if (n && n.subflow && entryNames().includes(n.subflow)){ switchWorkflow(n.subflow); return; }
       setSel({type:'node', id});
+      $('tabProps').click(); // 若 AI 页签开着，双击编辑节点时自动切回属性页签
       renderPanel.focusLabel = true; renderPanel();
       return;
     }
@@ -1130,7 +1464,40 @@ if (typeof document !== "undefined") var UI = function(){
     n.x = Math.round(w.x - n.w/2); n.y = Math.round(w.y - n.h/2);
     setSel({type:'node', id}); syncCode(); markDirty();
   });
+  const KIND_LABEL = { input:'输入', output:'输出', agent:'Agent 任务', map:'Map Agent', cond:'是否通过?', merge:'合并' };
+  function addKindNode(kind){
+    const id = newNodeId(g);
+    pushHistory();
+    const n = upsertNode(g, id, KIND_LABEL[kind] || '新节点', KIND_SHAPE[kind] || 'rect', null);
+    n.kind = kind;
+    if (kind === 'cond') n.gate = n.gate || 'IF';
+    const r = svg.getBoundingClientRect(), w = clientToWorld(r.left + r.width/2, r.top + r.height/2);
+    const k = g.nodes.length % 6;
+    n.x = Math.round(w.x - n.w/2 + k * 26); n.y = Math.round(w.y - n.h/2 + k * 20);
+    setSel({type:'node', id}); syncCode(); markDirty();
+  }
+  document.querySelectorAll('#cvTools [data-add]').forEach(b => b.addEventListener('click', () => addKindNode(b.dataset.add)));
   $('btnLayout').addEventListener('click', () => { pushHistory(); autoLayout(g, g.dir); refresh(true); markDirty(); });
+  $('btnTidy').addEventListener('click', () => {
+    pushHistory();
+    const before = g.edges.length;
+    const seen = new Set();
+    g.edges = g.edges.filter(e => {
+      if (!nodeById(e.from) || !nodeById(e.to)) return false;
+      const k = e.from + '>' + e.to + '>' + (e.label || '') + '>' + (e.style || 'solid');
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    autoLayout(g, g.dir);
+    refresh(true); markDirty();
+    toast('已整理：清理 ' + (before - g.edges.length) + ' 条冗余连线并重新排版');
+  });
+  $('btnWfDoc').addEventListener('click', () => {
+    const c = $('code');
+    if (c.classList.contains('hidden')){ c.classList.remove('hidden'); $('btnCodeToggle').textContent = '收起'; }
+    setTab('md');
+    toast('下方「Markdown」页签即工作流文档（WORKFLOW.md 语义：执行顺序 + 节点说明）');
+  });
   $('dirSel').addEventListener('change', () => { pushHistory(); g.dir = $('dirSel').value; autoLayout(g, g.dir); refresh(true); markDirty(); });
   $('btnFit').addEventListener('click', fit);
   $('zIn').addEventListener('click', () => zoomAtCenter(1.2));
@@ -1246,12 +1613,14 @@ if (typeof document !== "undefined") var UI = function(){
     if (name !== 'canvas' && curView === 'canvas') markDirtyNow();
     curView = name;
     document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['canvas','dist','ctl'].forEach(v => {
+    ['canvas','dist','ctl','skills','trace'].forEach(v => {
       const el = $('view' + v.charAt(0).toUpperCase() + v.slice(1));
       if (el) el.classList.toggle('show', v === name);
     });
     if (name === 'dist') renderDist();
     if (name === 'ctl') renderCtl();
+    if (name === 'skills') renderSkills();
+    if (name === 'trace') renderTrace();
     if (name === 'canvas') applyView();
   }
   document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
@@ -1353,16 +1722,22 @@ if (typeof document !== "undefined") var UI = function(){
     svg.querySelectorAll('[data-mwf]').forEach(nd => nd.addEventListener('click', () => switchWorkflow(nd.dataset.mwf)));
   }
   $('btnNewWf').addEventListener('click', () => {
-    const nn = prompt('新工作流名称：', '工作流' + (WF.list.length + 1));
+    const nn = prompt('新工作流名称（将创建 输入→Agent→条件→合并→输出 框架）：', '工作流' + (WF.list.length + 1));
     if (!nn) return;
     if (entryNames().includes(nn)) return toast('名称已存在');
-    WF.list.push({ name:nn, data:{ name:nn, dir:'TD', nodes:[], edges:[], subs:[] } });
+    const tg = normalize(JSON.parse(JSON.stringify(flowTemplate(nn))));
+    tg.errors = [];
+    tg.name = nn;
+    autoLayout(tg, 'TD');
+    WF.list.push({ name:nn, data:{ name:nn, dir:tg.dir, nodes:tg.nodes, edges:tg.edges, subs:tg.subs } });
     markDirtyNow();
     WF.active = nn;
-    g = { name:nn, dir:'TD', nodes:[], edges:[], subs:[], errors:[] };
+    g = normalize(JSON.parse(JSON.stringify(tg)));
+    if (!g.errors) g.errors = [];
     hist.past.length = 0; hist.future.length = 0;
     fillWfSel(); setSel(null); refresh(true); updateSrcInfo(); saveAll();
     showView('canvas');
+    toast('已创建流程框架：输入 → Agent → 条件 →（是/否）→ 合并 → 输出，含反馈修正环');
   });
   $('btnImportWf').addEventListener('click', () => { importMode = 'wf'; $('fileIn').value = ''; $('fileIn').click(); });
 
@@ -1383,10 +1758,11 @@ if (typeof document !== "undefined") var UI = function(){
           saveAll(); fillWfSel(); switchWorkflow(nn);
           toast('已导入工作流：' + nn);
         } catch(e){ toast('导入失败：' + e.message); }
-      } else if (importMode === 'habit'){
-        habitAgg = aggregateUsage(text);
-        if (!habitAgg.total) toast('没有解析到任何记录');
-        else { renderHabit(habitAgg); toast('已解析 ' + habitAgg.total + ' 条记录'); }
+      } else if (importMode === 'usage'){
+        if (loadUsageText(text)){
+          afterUsageLoad();
+          toast('已解析 ' + usageAgg.total + ' 条记录（技能总结 / 轨迹查询共用）');
+        } else toast('没有解析到任何记录');
       } else if (importMode === 'sync-readonly'){
         loadText(text, true, '');
         syncStatus('📄 ' + f.name + '（当前浏览器不支持写回，仅只读载入）');
@@ -1412,21 +1788,41 @@ if (typeof document !== "undefined") var UI = function(){
       if (it.nodeId && nodeById(it.nodeId)){ setSel({type:'node', id:it.nodeId}); $('tabProps').click(); }
     }));
   });
-  $('btnPrompt').addEventListener('click', () => {
-    const prompt = [
-      '你是流程优化助手。请优化下面这张工作流程图（mermaid flowchart），要求：',
-      '1. 合并重复步骤、补齐缺失环节；判断节点用菱形 {}，分支连线加 |是/否| 标签；',
-      '2. 只输出一个 ```mermaid 代码块，不要解释；节点 4~15 个，中文标签不超过 20 字；',
-      '3. 保留原有的 ⚙逻辑门 与 ▸→子流程 后缀标记（如有）。',
+  function copyAiPrompt(lines, okMsg){
+    (navigator.clipboard ? navigator.clipboard.writeText(lines.join('\n')) : Promise.reject())
+      .then(()=>toast(okMsg)).catch(()=>{ $('aiPrompt').value = lines.join('\n'); toast('剪贴板不可用，提示词已填入下方输入框'); });
+  }
+  $('btnPromptEdges').addEventListener('click', () => {
+    const issues = validateGraph(g, entryNames());
+    copyAiPrompt([
+      '你是流程连线优化助手。下面是一张工作流程图（mermaid）与结构 JSON，请只优化「连线和流程结构」，不要改动各节点的文字语义：',
+      '1. 并行分支结束后必须汇合到「◈merge 合并」节点，缺失汇合的补上；',
+      '2. 条件判断用「◈cond」菱形节点，且两个分支连线分别标注 |是| 与 |否|；',
+      '3. 需要返工修正的路径，用虚线反馈连线指回上游 Agent 节点；',
+      '4. 删除重复连线与孤立节点；确保唯一的「◈input 输入」起点与「◈output 输出」终点；',
+      '5. 现有校验发现的问题（请顺手修复）：' + (issues.length ? issues.map(i => i.msg).join('；') : '无'),
+      '6. 只输出一个 ```mermaid 代码块，不要解释；节点标签保留原中文，◈input/◈agent/◈map/◈cond/◈merge/◈output 类型后缀原样保留。',
       '',
       '当前流程（mermaid）：',
       toMermaid(g),
       '',
-      '当前结构（JSON，含门与子流程）：',
+      '当前结构（JSON）：',
       JSON.stringify(graphToJSON(g))
-    ].join('\n');
-    (navigator.clipboard ? navigator.clipboard.writeText(prompt) : Promise.reject())
-      .then(()=>toast('提示词已复制，去 AI 会话粘贴即可')).catch(()=>{ $('aiPrompt').value = prompt; toast('剪贴板不可用，提示词已填入下方输入框'); });
+    ], '「优化连线」提示词已复制，去 AI 会话粘贴即可');
+  });
+  $('btnPrompt').addEventListener('click', () => {
+    copyAiPrompt([
+      '你是流程优化助手。请优化下面这张工作流程图（mermaid flowchart），要求：',
+      '1. 合并重复步骤、补齐缺失环节；判断节点用菱形 {}，分支连线加 |是/否| 标签；',
+      '2. 只输出一个 ```mermaid 代码块，不要解释；节点 4~15 个，中文标签不超过 20 字；',
+      '3. 保留原有的 ⚙逻辑门、◈类型 与 ▸→子流程 后缀标记（如有）。',
+      '',
+      '当前流程（mermaid）：',
+      toMermaid(g),
+      '',
+      '当前结构（JSON，含类型/门/子流程）：',
+      JSON.stringify(graphToJSON(g))
+    ], '「优化整个流程」提示词已复制，去 AI 会话粘贴即可');
   });
   $('btnPropose').addEventListener('click', () => {
     const text = $('aiPrompt').value || '';
@@ -1455,13 +1851,40 @@ if (typeof document !== "undefined") var UI = function(){
     $('propNo').addEventListener('click', () => { box.innerHTML = '<p class="hint">已拒绝提案。</p>'; });
   });
 
-  // ---------- 文件双向同步（code ↔ 网页：AI 改文件、人改画布，实时互通） ----------
-  let fh = null, syncKind = 'mermaid', lastFileText = '', lastWritten = '', syncTimer = null, writeTimer = null, applyingFile = false;
+  // ---------- 文件双向同步（code ↔ 网页：AI 改文件、人改画布，实时互通；句柄存 IndexedDB 可恢复） ----------
+  let fh = null, syncKind = 'mermaid', lastFileText = '', lastWritten = '', syncTimer = null, writeTimer = null, applyingFile = false, pendingFh = null;
   function syncStatus(t){ $('syncStat').textContent = t; }
+  const FH_DB = 'cmflow-sync';
+  function idbOpen(){
+    return new Promise((res, rej) => {
+      const rq = indexedDB.open(FH_DB, 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    });
+  }
+  async function fhSave(h){ try { const db = await idbOpen(); db.transaction('handles', 'readwrite').objectStore('handles').put(h, 'last'); } catch(e){} }
+  async function fhLoad(){ try { const db = await idbOpen(); return await new Promise(res => { const rq = db.transaction('handles', 'readonly').objectStore('handles').get('last'); rq.onsuccess = () => res(rq.result || null); rq.onerror = () => res(null); }); } catch(e){ return null; } }
+  async function fhClear(){ try { const db = await idbOpen(); db.transaction('handles', 'readwrite').objectStore('handles').delete('last'); } catch(e){} }
+  async function attachSyncFile(h, restored){
+    fh = h; pendingFh = null;
+    const f = await h.getFile();
+    const txt = await f.text();
+    lastFileText = lastWritten = txt;
+    syncKind = guessKind(txt);
+    applyingFile = true;
+    setTab(syncKind);
+    loadText(txt, true, '');
+    applyingFile = false;
+    if (!syncTimer) syncTimer = setInterval(pollSyncFile, 1500);
+    syncStatus('🔗 ' + f.name + (restored ? '（已恢复双向同步）' : '（双向同步中）'));
+    toast(restored ? '已恢复文件同步：' + f.name : '已连接文件：AI 改文件、你改画布，双向自动同步');
+  }
   async function connectSyncFile(){
     if (fh){
       if (!confirm('断开文件同步？')) return;
-      fh = null; clearInterval(syncTimer); syncTimer = null;
+      fh = null; clearInterval(syncTimer); syncTimer = null; pendingFh = null;
+      fhClear();
       syncStatus(''); toast('已断开文件同步');
       return;
     }
@@ -1469,21 +1892,32 @@ if (typeof document !== "undefined") var UI = function(){
       importMode = 'sync-readonly'; $('fileIn').value = ''; $('fileIn').click();
       return;
     }
+    if (pendingFh){
+      const h = pendingFh;
+      pendingFh = null;
+      try {
+        if (await h.requestPermission({ mode: 'readwrite' }) === 'granted'){
+          await attachSyncFile(h, true); fhSave(h); return;
+        }
+      } catch(e){}
+      syncStatus('');
+    }
     try {
       const [h] = await window.showOpenFilePicker({ types:[{ description:'流程文件', accept:{ 'text/plain':['.mmd','.md','.txt','.json'] } }] });
-      fh = h;
-      const f = await h.getFile();
-      const txt = await f.text();
-      lastFileText = lastWritten = txt;
-      syncKind = guessKind(txt);
-      applyingFile = true;
-      setTab(syncKind);
-      loadText(txt, true, '');
-      applyingFile = false;
-      syncStatus('🔗 ' + f.name + '（双向同步中）');
-      if (!syncTimer) syncTimer = setInterval(pollSyncFile, 1500);
-      toast('已连接文件：AI 改文件、你改画布，双向自动同步');
+      await attachSyncFile(h, false);
+      fhSave(h);
     } catch(e){ if (e && e.name !== 'AbortError') toast('连接失败：' + e.message); }
+  }
+  async function tryRestoreSync(){
+    if (!window.showOpenFilePicker || !window.indexedDB) return;
+    const h = await fhLoad();
+    if (!h) return;
+    try {
+      const st = await h.queryPermission({ mode: 'readwrite' });
+      if (st === 'granted'){ await attachSyncFile(h, true); return; }
+      pendingFh = h;
+      syncStatus('⏸ 上次同步：' + (h.name || '') + '（点「🔗 连接文件」恢复）');
+    } catch(e){}
   }
   async function pollSyncFile(){
     if (!fh) return;
@@ -1531,23 +1965,43 @@ if (typeof document !== "undefined") var UI = function(){
   }
   $('btnSync').addEventListener('click', connectSyncFile);
 
-  // ---------- 📊 习惯总结可视化页 ----------
-  let habitAgg = null;
-  $('btnHabit').addEventListener('click', () => { $('habitDlg').showModal(); if (habitAgg) renderHabit(habitAgg); });
-  $('habitFile').addEventListener('click', () => { importMode = 'habit'; $('fileIn').value = ''; $('fileIn').click(); });
-  $('habitParse').addEventListener('click', () => {
-    const text = $('habitTA').value;
-    habitAgg = aggregateUsage(text);
-    if (!habitAgg.total) return toast('没有解析到任何记录（每行需是一个 JSON）');
-    renderHabit(habitAgg);
+  // ---------- 🧩 技能总结 / 📜 轨迹查询（独立视图，共用一份 usage 数据） ----------
+  let usageAgg = null, usageRecords = [];
+  function loadUsageText(text){
+    usageAgg = aggregateUsage(text);
+    usageRecords = parseUsageRecords(text);
+    if (!usageAgg.total) return false;
+    fillSessList();
+    return true;
+  }
+  function afterUsageLoad(){
+    if (curView === 'skills') renderSkills();
+    if (curView === 'trace') renderTrace();
+  }
+  function fillSessList(){
+    const bySess = {};
+    usageRecords.forEach(r => { if (r.session) bySess[r.session] = Math.max(bySess[r.session] || 0, r.ts); });
+    const tops = Object.entries(bySess).sort((a,b) => b[1] - a[1]).slice(0, 60);
+    $('sessList').innerHTML = tops.map(([s]) => '<option value="' + escXml(s) + '">').join('');
+  }
+  function pickUsageFile(){ importMode = 'usage'; $('fileIn').value = ''; $('fileIn').click(); }
+  $('skillFile').addEventListener('click', pickUsageFile);
+  $('traceFile').addEventListener('click', pickUsageFile);
+  $('skillParse').addEventListener('click', () => {
+    if (!loadUsageText($('skillTA').value)) return toast('没有解析到任何记录（每行需是一个 JSON）');
+    renderSkills(); toast('已解析 ' + usageAgg.total + ' 条记录');
   });
-  $('habitCopy').addEventListener('click', () => {
-    if (!habitAgg) return toast('先选择文件或粘贴数据');
-    const md = habitSummaryMd(habitAgg);
+  $('traceParse').addEventListener('click', () => {
+    if (!loadUsageText($('traceTA').value)) return toast('没有解析到任何记录（每行需是一个 JSON）');
+    renderTrace(); toast('已解析 ' + usageAgg.total + ' 条记录');
+  });
+  $('skillCopy').addEventListener('click', () => {
+    if (!usageAgg) return toast('先选择文件或粘贴数据');
+    const md = usageSummaryMd(usageAgg);
     (navigator.clipboard ? navigator.clipboard.writeText(md) : Promise.reject())
-      .then(()=>toast('习惯总结已复制')).catch(()=>{ $('habitTA').value = md; toast('已把总结填入下方文本框'); });
+      .then(()=>toast('总结已复制')).catch(()=>{ $('skillTA').value = md; toast('已把总结填入文本框'); });
   });
-  function habitSummaryMd(agg){
+  function usageSummaryMd(agg){
     const top = Object.entries(agg.byName).sort((a,b)=>b[1]-a[1]).slice(0, 8);
     const lines = ['# 技能使用与习惯总结', '', '- 记录总数：' + agg.total + '（会话 ' + agg.sessions + ' 个；技能 ' + agg.kinds.skill + ' / MCP ' + agg.kinds.mcp + '）', ''];
     const sk = skillSummary(agg);
@@ -1569,7 +2023,10 @@ if (typeof document !== "undefined") var UI = function(){
     }
     return lines.join('\n');
   }
-  function renderHabit(agg){
+  function renderSkills(){
+    const box = $('skillOut');
+    if (!usageAgg){ box.innerHTML = '<p class="hint">先选择 usage.jsonl 或粘贴数据（一般在 %USERPROFILE%\\.zcode\\codex-manager\\usage.jsonl）。</p>'; return; }
+    const agg = usageAgg;
     const top = Object.entries(agg.byName).sort((a,b)=>b[1]-a[1]).slice(0, 8);
     const plugins = Object.entries(agg.byPlugin).sort((a,b)=>b[1]-a[1]).slice(0, 5);
     const days = Object.entries(agg.byDay).sort((a,b)=>a[0].localeCompare(b[0])).slice(-14);
@@ -1581,12 +2038,12 @@ if (typeof document !== "undefined") var UI = function(){
     const sk = skillSummary(agg);
     const kindTxt = r => r.kind === 'mcp' ? 'MCP' : r.kind === 'skill' ? '技能' : '其他';
     const bar = ([k, v], max) => '<div class="hrow"><span class="hlab" title="' + escXml(k) + '">' + escXml(k) + '</span><div class="hbar"><i style="width:' + Math.round(v/max*100) + '%"></i></div><b>' + v + '</b></div>';
-    $('habitOut').innerHTML =
+    box.innerHTML =
       '<div class="kpi"><div><b>' + agg.total + '</b><span>总记录</span></div><div><b>' + agg.sessions + '</b><span>会话</span></div><div><b>' + agg.kinds.skill + '</b><span>技能调用</span></div><div><b>' + agg.kinds.mcp + '</b><span>MCP 调用</span></div></div>' +
       '<div class="hsec">技能总结</div>' +
       (sk.rows.length ? '<p class="hint" style="margin:4px 0">' + escXml(sk.text) + '</p><table class="stable"><thead><tr><th>技能/工具</th><th>插件</th><th>类型</th><th>次数</th><th>占比</th><th>最近使用</th></tr></thead><tbody>' +
-        sk.rows.slice(0, 12).map(r => '<tr><td>' + escXml(r.name) + '</td><td>' + escXml(r.plugin) + '</td><td>' + kindTxt(r) + '</td><td>' + r.count + '</td><td>' + r.pct + '%</td><td>' + escXml(r.last || '—') + '</td></tr>').join('') + '</tbody></table>' +
-        (sk.rows.length > 12 ? '<p class="hint">仅显示前 12 项，完整清单见「复制 Markdown 总结」。</p>' : '')
+        sk.rows.slice(0, 40).map(r => '<tr><td>' + escXml(r.name) + '</td><td>' + escXml(r.plugin) + '</td><td>' + kindTxt(r) + '</td><td>' + r.count + '</td><td>' + r.pct + '%</td><td>' + escXml(r.last || '—') + '</td></tr>').join('') + '</tbody></table>' +
+        (sk.rows.length > 40 ? '<p class="hint">仅显示前 40 项，完整清单见「复制 Markdown 总结」。</p>' : '')
         : '<p class="hint">暂无技能/MCP 调用记录</p>') +
       '<div class="hsec">调用排行（技能 / MCP）</div>' + (top.length ? top.map(t=>bar(t, maxName)).join('') : '<p class="hint">暂无技能/MCP 调用</p>') +
       '<div class="hsec">插件分布</div>' + (plugins.length ? plugins.map(t=>bar(t, Math.max(1, ...plugins.map(p=>p[1])))).join('') : '<p class="hint">暂无</p>') +
@@ -1594,16 +2051,45 @@ if (typeof document !== "undefined") var UI = function(){
       '<div class="hsec">活跃时段 Top3</div><p>' + escXml(hourTxt) + '</p>' +
       '<div class="hsec">习惯候选（可运行 /codex-habit 固化）</div>' + (cands.length ? cands.map(c=>'<div class="hcard"><b>' + escXml(c.title) + '</b>：' + escXml(c.evidence) + '<br><span class="hint">→ ' + escXml(c.suggestion) + '</span></div>').join('') : '<p class="hint">数据还不足以提炼习惯</p>');
   }
+  let traceTimer = null;
+  function renderTrace(){
+    const box = $('traceOut');
+    if (!usageRecords.length){ box.innerHTML = '<p class="hint">先选择 usage.jsonl 或粘贴数据，即可按时间倒序回放每次调用。</p>'; return; }
+    const recs = traceQuery(usageRecords, { kw: $('traceKw').value, kind: $('traceKind').value, session: $('traceSession').value });
+    const kTxt = { skill:'技能', mcp:'MCP', session:'会话', other:'其他' };
+    const colors = { skill:'#2563eb', mcp:'#7c3aed', session:'#64748b', other:'#b45309' };
+    const fmt = r => {
+      if (!r.ts) return r.tsText || '—';
+      const d = new Date(r.ts);
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+    };
+    box.innerHTML = '<p class="hint">命中 ' + recs.length + ' / ' + usageRecords.length + ' 条（按时间倒序' + (recs.length > 200 ? '，仅显示最近 200 条' : '') + '）</p>' +
+      recs.slice(0, 200).map(r =>
+        '<div class="trow"><span class="tts">' + fmt(r) + '</span>' +
+        '<span class="tchip" style="background:' + (colors[r.kind] || '#64748b') + '">' + (kTxt[r.kind] || r.kind) + '</span>' +
+        '<span class="tname" title="' + escXml(r.cwd) + '">' + escXml(r.name || '(未命名)') + '</span>' +
+        '<span class="tplug">' + escXml(r.plugin || '') + '</span>' +
+        (r.session ? '<span class="tsess" title="会话 ' + escXml(r.session) + '">' + escXml(r.session.slice(0, 12)) + '</span>' : '') +
+        '</div>').join('');
+  }
+  ['traceKw', 'traceKind', 'traceSession'].forEach(idv => {
+    $(idv).addEventListener('input', () => { clearTimeout(traceTimer); traceTimer = setTimeout(renderTrace, 250); });
+    $(idv).addEventListener('change', () => { clearTimeout(traceTimer); traceTimer = setTimeout(renderTrace, 50); });
+  });
 
   // ---------- 启动 ----------
-  $('defs').innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>';
+  $('defs').innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>' +
+    '<marker id="arrFb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-fb" d="M0,0 L10,5 L0,10 z"/></marker>';
   const stored = loadAll();
-  if (stored){
+  const payRev = PAYLOAD && PAYLOAD.rev;
+  if (stored && (!payRev || stored.rev === payRev)){
+    // 无注入数据，或注入数据与上次一致 → 用本地存档（保留用户的手工修改）
     WF = stored;
   } else {
+    // 命令新生成的工作副本（rev 变了）→ 以代码侧注入的数据为准重新播种，浏览器旧存档让位
     const seed = parseMermaid((PAYLOAD && PAYLOAD.mermaid) || '');
     const nm = (PAYLOAD && PAYLOAD.workflow) || '主流程';
-    WF = { list: [{ name: nm, data: { name: nm, dir: seed.dir, nodes: seed.nodes, edges: seed.edges, subs: seed.subs } }], active: nm };
+    WF = { list: [{ name: nm, data: { name: nm, dir: seed.dir, nodes: seed.nodes, edges: seed.edges, subs: seed.subs } }], active: nm, rev: payRev || null };
     saveAll();
   }
   fillWfSel();
@@ -1615,8 +2101,9 @@ if (typeof document !== "undefined") var UI = function(){
   updateSrcInfo();
   setSel(null); refresh(true);
   syncCode();
+  tryRestoreSync(); // 上次连接过文件时自动/一键恢复双向同步，避免浏览器与 code 侧数据脱节
   // 测试钩子（自动化验证用，不影响正常使用）
-  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, skillSummary, ctlLayout, counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
+  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderSkills, renderTrace, addKindNode, loadUsageText, afterUsageLoad, skillSummary, ctlLayout, counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

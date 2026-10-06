@@ -22,10 +22,11 @@ argument-hint: "[可选：.md/.mmd 文件路径，或项目名；不填 = 先按
 
 ```python
 # 用法: python _mk_editor.py <模板.html> <mermaid源文件> "来源描述"
-import json, sys
+import hashlib, json, sys
 tpl = open(sys.argv[1], encoding="utf-8").read()
 mermaid = open(sys.argv[2], encoding="utf-8").read()
-payload = json.dumps({"mermaid": mermaid, "source": sys.argv[3], "exportName": "flow-export.mmd"}, ensure_ascii=False).replace("</", "<\\/")
+rev = hashlib.sha1(mermaid.encode("utf-8")).hexdigest()[:10]  # rev 变了编辑器才会用新数据覆盖浏览器旧存档
+payload = json.dumps({"mermaid": mermaid, "source": sys.argv[3], "exportName": "flow-export.mmd", "rev": rev}, ensure_ascii=False).replace("</", "<\\/")
 open("flow-editor.html", "w", encoding="utf-8").write(tpl.replace("/*__FLOW_DATA__*/null", payload, 1))
 print("OK")
 ```
@@ -39,9 +40,10 @@ print("OK")
   1. 后台启动服务：`python -m http.server 8377 --directory "<工作副本所在目录>"`（用后台方式运行，别阻塞会话；端口被占用就换 8378 等）；
   2. 打开 `start "" "http://127.0.0.1:8377/flow-editor.html"`，并把该网址给用户。
   注意：HTTP 方式下「🔗 连接文件」仍可用（Edge/Chrome）。
-- 告诉用户编辑器用法（v0.9.0 布局）：**左侧任务栏**可手动切换三个视图——「🖼 画布」编辑当前图；「🛰 分布工作区」每张卡片是一个工作流（打开/重命名/删除/导出）；「🧭 总控流程」用关系图 + 关系表查看所有工作流的子流程引用（点节点进入对应工作区）。工作流列表在任务栏下方，点击即切换。画布内：**拖节点移动**；**从节点下方蓝色圆点拖到另一节点 = 连线**；**双击空白 = 新建节点**；右侧面板改标签/形状/分组/逻辑门；底部 Mermaid / Markdown / JSON 三页签与画布**双向同步**；`Ctrl+S` 导出 `.mmd`；"自动重排"一键整理布局。
-- **引导双向同步（code ↔ 网页，强烈推荐）**：打开后让用户点底部「🔗 连接文件」，选择刚才那个 mermaid/Markdown 文件。之后：你在会话里**改文件** → 页面 1~2 秒内自动重画；用户在**画布上改** → 自动写回文件，你读文件即可拿到最新版。要求 Edge/Chrome（File System Access API）；不支持的浏览器会降级为只读载入并提示。
-- **习惯与技能可视化**：左侧任务栏「📊 习惯与技能」可选择 `usage.jsonl`（`%USERPROFILE%\.zcode\codex-manager\usage.jsonl`），本地渲染**技能总结**（每个技能/MCP 的调用次数、占比、最近使用时间与汇总结论）、调用排行、活跃趋势与习惯候选，可复制 Markdown 总结直接供本会话引用。
+- 告诉用户编辑器用法（v0.10.0 布局）：**左侧任务栏**可手动切换五个视图——「🖼 画布」编辑当前图（工具栏可加 输入/Agent/Map Agent/条件/合并/输出 六类节点，双击节点在右侧面板改标签/类型/形状/逻辑门/**节点说明**）；「🛰 分布工作区」每张卡片是一个工作流（打开/重命名/删除/导出）；「🧭 总控流程」用关系图 + 关系表查看子流程引用；「🧩 技能总结」「📜 轨迹查询」是独立数据模块。画布内：**拖节点移动**；**从节点圆点拖到另一节点 = 连线**；**拖动连线端点到别的节点 = 改接**；红色边 = 反馈环；**双击空白 = 新建节点**；底部 Mermaid / Markdown / JSON 三页签与画布**双向同步**；`Ctrl+S` 导出 `.mmd`；"✨ 一键整理"去重连线并重排。
+- **引导双向同步（code ↔ 网页，强烈推荐）**：打开后让用户点底部「🔗 连接文件」，选择刚才那个 mermaid/Markdown 文件。之后：你在会话里**改文件** → 页面 1~2 秒内自动重画；用户在**画布上改** → 自动写回文件，你读文件即可拿到最新版。**连接过的文件句柄会被记住**：下次再打开编辑器会自动恢复同步（需要授权时点一下「🔗 连接文件」即可），浏览器与 code 侧数据保持一致。要求 Edge/Chrome（File System Access API）；不支持的浏览器会降级为只读载入并提示。
+- **数据一致性说明**：工作副本带 rev 指纹，用户用浏览器打开时若 rev 比本地存档新，编辑器会以代码侧注入的最新数据为准（旧存档自动让位）；之后用户的手工修改仍实时保存在本地存档与同步文件里。
+- **技能与轨迹可视化**：左侧任务栏「🧩 技能总结」「📜 轨迹查询」可选择 `usage.jsonl`（`%USERPROFILE%\.zcode\codex-manager\usage.jsonl`），本地渲染技能总结（每技能调用次数/占比/最近使用）、调用排行与习惯候选（可复制 Markdown 供 /codex-habit），或按关键字/类型/会话回放每次调用轨迹。
 
 ## 第四步：回写（用户导出后）
 
