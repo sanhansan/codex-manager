@@ -8,6 +8,26 @@ English | [简体中文](README.md)
 
 This plugin targets Codex-style AI coding agent workbenches (built on the ZCode plugin ecosystem) and answers two questions that come up all the time: "Of all the plugins I've installed, which ones do I actually use?" and "How exactly did the AI get this task done, step by step?" With silent background hooks and one-command results, it keeps plugin usage and your working process fully visible — no extra effort required.
 
+> **Maintenance** — Actively maintained by [@sanhansan](https://github.com/sanhansan), last updated 2026-10-06. For bug reports or adaptation requests, please open an [Issue](https://github.com/sanhansan/zcode-plugins/issues).
+
+## Download & Use the Release Packages
+
+All versions are published on the [Releases](https://github.com/sanhansan/zcode-plugins/releases) page, released milestone by milestone:
+
+| Version | Date | Contents | For whom |
+| --- | --- | --- | --- |
+| **v0.3.0 (latest, recommended)** | 2026-10-06 | Full: ZCode plugin (0.3.0) + OpenAI Codex CLI adapter + bilingual docs | Everything in one package |
+| v0.2.0 | 2026-10-06 | ZCode plugin + structured bilingual docs | ZCode only |
+| v0.1.0 | 2026-10-06 | Initial ZCode plugin | Basic usage tracking only |
+
+**How to use a downloaded zip**:
+
+1. **ZCode plugin** (included in every version): unzip → ZCode → Plugin Marketplace → Add → Add Plugin Marketplace → select the extracted `zcode-plugins` folder (the one containing `marketplace.json`) → install Codex Manager under "Personal".
+2. **OpenAI Codex CLI adapter** (since v0.3.0): enter the extracted `codex-cli-adapter/`, run `powershell -ExecutionPolicy Bypass -File install.ps1` on Windows or `./install.sh` on macOS/Linux, then **restart Codex** and use `/codex-usage` or `/codex-flow` in a session.
+3. **Standalone CLI** (since v0.3.0, no host required): `python codex-cli-adapter/codex_manager.py usage --days 30 --xlsx report.xlsx` to analyze local Codex usage directly.
+
+See [CHANGELOG.md](./CHANGELOG.md) for the changes in each version.
+
 ## Core Architecture & Features
 
 The plugin is organized into three logical modules: automatic usage collection, one-command reports, and session flowchart retrospectives.
