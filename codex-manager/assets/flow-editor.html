@@ -137,7 +137,7 @@
   #overlay textarea { width:100%; height:180px; font:12.5px Consolas,monospace; border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--panel); color:var(--ink); }
   .hint { color:var(--muted); font-size:12px; }
   #syncStat { font-size:11.5px; color:var(--code-hl); }
-  #skillOut, #traceOut { max-height:520px; overflow:auto; font-size:13px; }
+  #skillOut, #traceOut, #qaOut { max-height:520px; overflow:auto; font-size:13px; }
   .kpi { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
   .kpi div { flex:1; min-width:90px; border:1px solid var(--line); border-radius:8px; padding:6px 10px; text-align:center; }
   .kpi b { display:block; font-size:20px; color:var(--accent); }
@@ -161,6 +161,15 @@
   .trow .tname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .trow .tplug { color:var(--muted); font-size:11.5px; flex-shrink:0; }
   .trow .tsess { color:var(--code-hl); font-size:11px; margin-left:auto; flex-shrink:0; }
+  .qrow { display:flex; align-items:center; gap:8px; padding:4px 6px; border-bottom:1px solid var(--line); font-size:12.5px; cursor:pointer; }
+  .qrow:hover { background:var(--canvas); }
+  .qrow .qarr { width:13px; flex-shrink:0; color:var(--muted); font-size:10px; text-align:center; }
+  .qrow .tname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .qrow .qkws { color:var(--muted); font-size:11px; flex-shrink:0; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qbody { border-bottom:1px solid var(--line); padding:8px 10px 10px 27px; font-size:12.5px; }
+  .qbody .qsec { margin:5px 0; white-space:pre-wrap; word-break:break-word; max-height:240px; overflow:auto; background:var(--canvas); border-radius:6px; padding:6px 8px; }
+  .qbody .qmeta { color:var(--muted); font-size:11.5px; margin:4px 0; }
+  .qkw { display:inline-block; border:1px solid var(--line); border-radius:8px; padding:0 7px; margin:2px 4px 2px 0; font-size:11px; color:var(--muted); }
   .vbody textarea { border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:var(--panel); color:var(--ink); font:12.5px/1.5 Consolas,Menlo,monospace; margin-bottom:10px; }
   .toast { position:absolute; left:50%; top:14px; transform:translateX(-50%); background:#1e293b; color:#fff; padding:6px 14px; border-radius:8px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:9; }
 </style>
@@ -174,6 +183,7 @@
   <button class="vbtn" data-view="ctl">🧭 总控流程</button>
   <button class="vbtn" data-view="skills">🧩 技能总结</button>
   <button class="vbtn" data-view="trace">📜 轨迹查询</button>
+  <button class="vbtn" data-view="qa">💬 问答</button>
   <div class="ssec">工作流（点击切换）</div>
   <div id="wfList" style="display:flex;flex-direction:column;gap:2px"></div>
   <button id="btnNewWf" class="sbtn" title="创建带 输入→Agent→条件→合并→输出 骨架的流程框架">＋ 新建流程框架</button>
@@ -312,6 +322,24 @@
     <div id="traceOut"><p class="hint">先选择文件或粘贴数据，即可按时间倒序回放每次调用。</p></div>
   </div>
 </div>
+<div id="viewQa" class="view">
+  <div class="vhead">
+    <b>💬 问答</b>
+    <span class="hint">点行展开问答与关键词；🧠 总智能体 / 🤖 子智能体，画布来源特别标注。</span>
+    <select id="qaWho" title="按来源过滤"><option value="all">全部来源</option><option value="master">🧠 总智能体</option><option value="sub">🤖 子智能体</option></select>
+    <input id="qaKw" type="text" placeholder="搜索问答/关键词…" style="width:160px">
+    <span style="flex:1"></span>
+    <button id="qaFile">📂 选择会话记录</button>
+    <button id="qaAgentDir" title="选 ~/.zcode/cli/agents 下的 sess_* 目录（含子目录）">🤖 选择子智能体目录</button>
+    <button id="qaParse">解析粘贴数据</button>
+  </div>
+  <div class="vbody">
+    <textarea id="qaTA" placeholder="或粘贴数据：rollout 会话记录（model-io-sess_*.jsonl 内容，每行一个 JSON）或子智能体 metadata.json" style="width:100%;height:70px"></textarea>
+    <div id="qaOut"><p class="hint">先「📂 选择会话记录」（%USERPROFILE%\.zcode\cli\rollout\ 下的 model-io-sess_*.jsonl）或「🤖 选择子智能体目录」（%USERPROFILE%\.zcode\cli\agents\ 下的 sess_* 文件夹），即可逐项展开查看问答与关键词。</p></div>
+    <input type="file" id="qaFileIn" accept=".jsonl,.json,.txt" multiple style="display:none">
+    <input type="file" id="qaDirIn" webkitdirectory style="display:none">
+  </div>
+</div>
 </div>
 </div>
 
@@ -323,8 +351,9 @@
   <li>连线：从圆点拖到另一节点新建；拖动连线端点到别的节点 = 改接；红色边 = 反馈环，平行边自动分道；「✨ 一键整理」去重连线并重新排版</li>
   <li>节点说明（STEP 文档）在右侧属性面板编辑，随 Markdown「节点说明」与 JSON 导出；「📄 工作流文档」在底部 Markdown 页签查看执行顺序 + 说明</li>
   <li>底部三个页签与画布双向同步：Mermaid 源码、Markdown 工作流文档、JSON（机器可读，类型/门/子流程完整保留）</li>
-  <li>左侧任务栏五个视图：画布 / 分布工作区 / 总控流程 / 技能总结 / 轨迹查询；工作流列表点击即切换</li>
+  <li>左侧任务栏六个视图：画布 / 分布工作区 / 总控流程 / 技能总结 / 轨迹查询 / 问答；工作流列表点击即切换</li>
   <li>「🧩 技能总结」与「📜 轨迹查询」是独立模块：选 usage.jsonl 后可看每技能调用统计，也可按关键字/类型/会话回放每次调用轨迹</li>
+  <li>「💬 问答」逐项回放会话问答：选 rollout 会话文件（~/.zcode/cli/rollout/）与子智能体目录（~/.zcode/cli/agents/ 下的 sess_*），每项点 ▼ 展开看完整问答与关键词；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体（Agent 派生聊天），每条可「→ 添加为画布节点」</li>
   <li>AI 助手两条提示词通道：「优化连线」（只调结构：汇合/分支/反馈）与「优化整个流程」；校验会检查环路、类型规则（输入无入边、条件两分支等）、门规则与可达性</li>
   <li>超过 8 层的线性链自动蛇形折行；重复连线与自环会被拒绝</li>
   <li>「🔗 连接文件」后画布与本地文件双向同步：AI / 会话改文件 → 画布自动更新；画布改动 → 自动写回文件（建议 Edge / Chrome）</li>
@@ -988,6 +1017,134 @@ function traceQuery(records, opt){
   }).sort((a, b) => b.ts - a.ts);
 }
 
+// ---------- 问答视图（rollout 会话 Q&A 与子智能体聊天解析，纯函数可测试） ----------
+const QA_STOP_CHARS = '的了和是与在不有没这那你我他她它个们啊吧呢吗呀哦嗯就很太都也还又被把给从对向往让等比而所以因为但如果或者需要应该可以已经现在时候自己什么怎么为何因此于是还有就是不是之一来去说要想看用上下的中得着过';
+const QA_STOP_WORDS = new Set(('the a an of to in is are and or for with on at by this that be as it from we you they he she was were will would can could should i do does did not no yes but if then than so such our your their its have has had about into over under out up down').split(/\s+/));
+function qaTokens(text){
+  const s = String(text || '').toLowerCase();
+  const out = [];
+  (s.match(/[a-z0-9][a-z0-9._\-]+/g) || []).forEach(w => out.push(w));
+  (s.match(/[\u4e00-\u9fff]+/g) || []).forEach(run => {
+    if (run.length === 1){ out.push(run); return; }
+    for (let i = 0; i < run.length - 1; i++) out.push(run.slice(i, i + 2));
+  });
+  return out;
+}
+function extractKeywords(text, n){
+  n = n || 6;
+  const freq = {};
+  qaTokens(text).forEach(w => {
+    if (QA_STOP_WORDS.has(w)) return;
+    if (w.length === 2 && /[\u4e00-\u9fff]/.test(w) && QA_STOP_CHARS.indexOf(w[0]) >= 0 && QA_STOP_CHARS.indexOf(w[1]) >= 0) return;
+    freq[w] = (freq[w] || 0) + 1;
+  });
+  return Object.keys(freq).sort((a, b) => freq[b] - freq[a] || b.length - a.length).slice(0, n);
+}
+// rollout 会话文件（每行一次模型请求）→ 总智能体问答回合：
+// 与 /codex-flow 同策略，最后一次 full 行拼开头 + 最后一行拼结尾，重叠处以后者为准。
+function parseQaTurns(jsonlText){
+  const lines = String(jsonlText || '').split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { session: '', turns: [] };
+  let lastObj = null;
+  const bestFull = {}; // querySource -> { count, obj }
+  const tsAt = {};     // 消息序号 -> startedAt（哪行带来该消息就记哪行的时间）
+  for (const line of lines){
+    let o; try { o = JSON.parse(line); } catch(e){ continue; }
+    const req = o.request || {};
+    const msgs = Array.isArray(req.messages) ? req.messages : [];
+    const off = req.messageOffset || 0;
+    const st = o.startedAt ? new Date(o.startedAt).getTime() : 0;
+    if (st) for (let i = 0; i < msgs.length; i++){ if (!tsAt[off + i]) tsAt[off + i] = st; }
+    if (req.messagesKind === 'full' && msgs.length){
+      const cur = bestFull[o.querySource || ''];
+      const cnt = req.messageCount || msgs.length;
+      if (!cur || cnt > cur.count) bestFull[o.querySource || ''] = { count: cnt, obj: o };
+    }
+    lastObj = o;
+  }
+  if (!lastObj) return { session: '', turns: [] };
+  const treq = lastObj.request || {};
+  let tmsgs = Array.isArray(treq.messages) ? treq.messages : (treq.body || {}).messages;
+  if (!Array.isArray(tmsgs)) tmsgs = [];
+  const tOff = treq.messageOffset || 0;
+  let fullObj = bestFull[lastObj.querySource || ''] ? bestFull[lastObj.querySource || ''].obj : null;
+  if (!fullObj){
+    const srcs = Object.keys(bestFull);
+    if (srcs.length) fullObj = bestFull[srcs.sort((a, b) => bestFull[b].count - bestFull[a].count)[0]].obj;
+  }
+  const merged = {};
+  if (fullObj && fullObj !== lastObj){
+    const fm = (fullObj.request || {}).messages;
+    if (Array.isArray(fm)) for (let i = 0; i < Math.min(fm.length, tOff); i++) merged[i] = fm[i];
+  }
+  for (let i = 0; i < tmsgs.length; i++) merged[tOff + i] = tmsgs[i];
+  const msgText = m => {
+    const c = m && m.content;
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) return c.filter(b => b && b.type === 'text' && typeof b.text === 'string').map(b => b.text).join('\n');
+    return '';
+  };
+  const turns = [];
+  let cur = null;
+  Object.keys(merged).map(Number).sort((a, b) => a - b).forEach(i => {
+    const m = merged[i];
+    if (m.role === 'user'){
+      const t = msgText(m).trim();
+      if (!t || t.startsWith('<')) return; // 系统注入内容不算提问
+      cur = { q: t, a: '', tools: [], idx: i, ts: tsAt[i] || 0 };
+      turns.push(cur);
+    } else if (m.role === 'assistant' && cur){
+      const t = msgText(m).trim();
+      if (t) cur.a += (cur.a ? '\n' : '') + t;
+      const calls = m.toolCalls || m.tool_calls || [];
+      if (Array.isArray(calls)) calls.forEach(c => {
+        const nm = (c && (c.name || (c.function || {}).name)) || '';
+        if (nm) cur.tools.push(nm);
+      });
+    }
+  });
+  turns.forEach(t => { t.kw = extractKeywords(t.q + '\n' + t.a); if (t.a.length > 4000) t.a = t.a.slice(0, 4000) + '…'; });
+  return { session: String(lastObj.sessionId || ''), turns };
+}
+// 子智能体目录（agents/sess_x/agent_y/metadata.json + output.txt）→ 子智能体聊天记录
+function parseAgentRecords(entries){
+  const out = [];
+  (entries || []).forEach(e => {
+    let meta; try { meta = JSON.parse(e.metaText); } catch(err){ return; }
+    if (!meta || typeof meta !== 'object' || (!meta.prompt && !meta.agentId)) return;
+    const answer = String(e.outputText || '').trim();
+    out.push({
+      profile: String(meta.profileId || (meta.profileSnapshot || {}).name || 'subagent'),
+      description: String(meta.description || ''),
+      q: String(meta.prompt || ''),
+      a: answer.length > 4000 ? answer.slice(0, 4000) + '…' : answer,
+      status: String(meta.status || ''),
+      tokens: meta.totalTokens || (meta.usage || {}).totalTokens || 0,
+      durationMs: meta.totalDurationMs || 0,
+      parentSession: String(meta.parentSessionId || ''),
+      cwd: String(meta.cwd || ''),
+      ts: meta.createdAt ? new Date(meta.createdAt).getTime() : 0,
+      kw: extractKeywords(String(meta.prompt || '') + '\n' + answer)
+    });
+  });
+  return out;
+}
+// 问答条目过滤（who: all|master|sub；kw 命中问答/关键词/描述/角色），按时间倒序
+function qaFilter(items, opt){
+  opt = opt || {};
+  const who = opt.who || 'all';
+  const kw = String(opt.kw || '').trim().toLowerCase();
+  return (items || []).filter(it => {
+    if (who === 'master' && it.who !== 'master') return false;
+    if (who === 'sub' && it.who !== 'sub') return false;
+    if (kw){
+      const hay = (it.q + ' ' + it.a + ' ' + (it.kw || []).join(' ') + ' ' + (it.description || '') + ' ' + (it.profile || '')).toLowerCase();
+      if (hay.indexOf(kw) < 0) return false;
+    }
+    return true;
+  }).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+}
+
 function newNodeId(g){
   let i = 1;
   while (g.nodes.some(n => n.id === 'n' + i)) i++;
@@ -1453,7 +1610,7 @@ if (typeof document !== "undefined") var UI = function(){
 
   // ---------- 工具栏 ----------
   function toast(msg){ const t = $('toast'); t.textContent = msg; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 1800); }
-  function updateSrcInfo(){ $('srcInfo').textContent = '工作流：' + WF.active + (PAYLOAD && PAYLOAD.source ? ' · ' + PAYLOAD.source : ''); }
+  function updateSrcInfo(){ $('srcInfo').textContent = '工作流：' + WF.active + (PAYLOAD && PAYLOAD.source ? ' · ' + PAYLOAD.source : '') + (PAYLOAD && PAYLOAD.session ? ' · 总智能体会话 ' + PAYLOAD.session.slice(0, 13) : ''); }
   $('btnUndo').addEventListener('click', undo);
   $('btnRedo').addEventListener('click', redo);
   $('btnAdd').addEventListener('click', () => {
@@ -1613,7 +1770,7 @@ if (typeof document !== "undefined") var UI = function(){
     if (name !== 'canvas' && curView === 'canvas') markDirtyNow();
     curView = name;
     document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['canvas','dist','ctl','skills','trace'].forEach(v => {
+    ['canvas','dist','ctl','skills','trace','qa'].forEach(v => {
       const el = $('view' + v.charAt(0).toUpperCase() + v.slice(1));
       if (el) el.classList.toggle('show', v === name);
     });
@@ -1621,6 +1778,7 @@ if (typeof document !== "undefined") var UI = function(){
     if (name === 'ctl') renderCtl();
     if (name === 'skills') renderSkills();
     if (name === 'trace') renderTrace();
+    if (name === 'qa') renderQa();
     if (name === 'canvas') applyView();
   }
   document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
@@ -2077,6 +2235,155 @@ if (typeof document !== "undefined") var UI = function(){
     $(idv).addEventListener('change', () => { clearTimeout(traceTimer); traceTimer = setTimeout(renderTrace, 50); });
   });
 
+  // ---------- 💬 问答（rollout 总智能体 Q&A + 子智能体聊天，逐项展开） ----------
+  let qaItems = [];
+  let lastQaItems = [];
+  const qaOpen = new Set();
+  const qaSeen = new Set(); // 去重：同一来源同一条问答只收一次
+  function qaPush(it){
+    const key = it.who + '|' + (it.ts || 0) + '|' + String(it.q || '').slice(0, 80);
+    if (qaSeen.has(key)) return false;
+    qaSeen.add(key); qaItems.push(it); return true;
+  }
+  function qaAddTurns(parsed, src){
+    parsed.turns.forEach(t => qaPush(Object.assign({
+      who: 'master', src: src, sessionId: parsed.session,
+      canvasSrc: !!(PAYLOAD && PAYLOAD.session && parsed.session === PAYLOAD.session)
+    }, t)));
+  }
+  function loadQaText(text, src){
+    const s = String(text || '').trim();
+    if (!s) return 0;
+    let single = null; try { single = JSON.parse(s); } catch(e){}
+    if (single && typeof single === 'object' && !Array.isArray(single) && (single.profileId || single.agentId)){
+      const recs = parseAgentRecords([{ metaText: s, outputText: '' }]);
+      recs.forEach(r => qaPush(Object.assign({ who: 'sub', src: src || '粘贴数据' }, r)));
+      return recs.length;
+    }
+    const parsed = parseQaTurns(s);
+    qaAddTurns(parsed, src || '粘贴数据');
+    return parsed.turns.length;
+  }
+  function renderQa(){
+    const box = $('qaOut');
+    if (!qaItems.length){
+      box.innerHTML = '<p class="hint">先「📂 选择会话记录」（~/.zcode/cli/rollout/ 下的 model-io-sess_*.jsonl）或「🤖 选择子智能体目录」（~/.zcode/cli/agents/ 下的 sess_* 文件夹），即可逐项展开查看问答与关键词。</p>';
+      return;
+    }
+    const items = qaFilter(qaItems, { who: $('qaWho').value, kw: $('qaKw').value });
+    lastQaItems = items;
+    const fmt = ts => {
+      if (!ts) return '—';
+      const d = new Date(ts);
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    };
+    box.innerHTML = '<p class="hint">命中 ' + items.length + ' / ' + qaItems.length + ' 条问答；点行展开/收起。</p>' + items.map((it, ix) => {
+      const isM = it.who === 'master';
+      const open = qaOpen.has(ix);
+      const badge = isM ? (it.canvasSrc ? '🧠 总智能体·画布来源' : '🧠 总智能体') : '🤖 子智能体';
+      const title = String(it.q || '(无提问)').replace(/\s+/g, ' ').slice(0, 60);
+      let body = '';
+      if (open){
+        const tools = Array.from(new Set(it.tools || []));
+        body = '<div class="qbody">' +
+          (it.description ? '<div class="qmeta">' + escXml(it.description) + '</div>' : '') +
+          '<div class="qsec"><b>问：</b>' + escXml(it.q || '(无提问)') + '</div>' +
+          '<div class="qsec"><b>答：</b>' + escXml(it.a || (isM ? '(本轮无文字回答，工具调用 ' + (it.tools || []).length + ' 次)' : '(未载入 output.txt，回答为空)')) + '</div>' +
+          (tools.length ? '<div class="qmeta">工具：' + escXml(tools.join('、')) + '</div>' : '') +
+          (!isM ? '<div class="qmeta">角色 ' + escXml(it.profile || '') + (it.status ? ' · 状态 ' + escXml(it.status) : '') + ' · ' + (it.tokens || 0) + ' tokens · ' + Math.round((it.durationMs || 0) / 1000) + 's' + (it.parentSession ? ' · 父会话 ' + escXml(it.parentSession.slice(0, 13)) : '') + '</div>' : '') +
+          ((it.kw || []).length ? '<div>关键词：' + it.kw.map(k => '<span class="qkw">' + escXml(k) + '</span>').join('') + '</div>' : '') +
+          '<p style="margin:8px 0 0"><button class="small" data-qanode="' + ix + '">→ 添加为画布节点</button></p>' +
+          '</div>';
+      }
+      return '<div class="qrow" data-qi="' + ix + '"><span class="qarr">' + (open ? '▼' : '▶') + '</span>' +
+        '<span class="tchip" style="background:' + (isM ? (it.canvasSrc ? '#0d9488' : '#2563eb') : '#7c3aed') + '">' + badge + '</span>' +
+        '<span class="tts">' + fmt(it.ts) + '</span>' +
+        '<span class="tname" title="' + escXml(it.q || '') + '">' + escXml(title) + '</span>' +
+        '<span class="qkws" title="关键词">' + escXml((it.kw || []).slice(0, 3).join(' ')) + '</span>' +
+        '</div>' + body;
+    }).join('');
+  }
+  function addQaNode(it){
+    if (!it) return;
+    showView('canvas');
+    const id = newNodeId(g);
+    pushHistory();
+    const label = String(it.q || '问答').replace(/\s+/g, ' ').slice(0, 14) || '问答';
+    const n = upsertNode(g, id, label, 'round', null);
+    n.kind = 'agent';
+    n.doc = '问：' + String(it.q || '') + '\n答：' + String(it.a || '').slice(0, 800) + '\n关键词：' + (it.kw || []).join('、');
+    const r = svg.getBoundingClientRect(), w = clientToWorld(r.left + r.width/2, r.top + r.height/2);
+    const k = g.nodes.length % 6;
+    n.x = Math.round(w.x - n.w/2 + k * 26); n.y = Math.round(w.y - n.h/2 + k * 20);
+    setSel({ type: 'node', id }); syncCode(); markDirty();
+    toast('已把该问答添加为画布节点「' + label + '」');
+  }
+  $('qaFile').addEventListener('click', () => $('qaFileIn').click());
+  $('qaAgentDir').addEventListener('click', () => $('qaDirIn').click());
+  $('qaFileIn').addEventListener('change', ev => {
+    const files = Array.from(ev.target.files || []);
+    ev.target.value = '';
+    if (!files.length) return;
+    let added = 0, left = files.length;
+    files.forEach(f => {
+      const rd = new FileReader();
+      rd.onload = () => {
+        added += loadQaText(rd.result, f.name);
+        if (--left === 0){ renderQa(); toast('已解析 ' + added + ' 条问答（去重后）'); }
+      };
+      rd.readAsText(f);
+    });
+  });
+  $('qaDirIn').addEventListener('change', ev => {
+    const files = Array.from(ev.target.files || []);
+    ev.target.value = '';
+    const groups = {};
+    files.forEach(f => {
+      const p = f.webkitRelativePath || f.name;
+      const dir = p.split('/').slice(0, -1).join('/');
+      (groups[dir] = groups[dir] || {})[f.name] = f;
+    });
+    const entries = [];
+    Object.keys(groups).forEach(dir => {
+      const gm = groups[dir];
+      if (gm['metadata.json']) entries.push({ dir, metaF: gm['metadata.json'], outF: gm['output.txt'] || gm['task.output'] });
+    });
+    if (!entries.length){ toast('所选目录里没有找到 metadata.json（应选 agents 下的 sess_* 文件夹）'); return; }
+    let added = 0, left = entries.length;
+    entries.forEach(en => {
+      let metaTxt = '', outTxt = '', gotM = false, gotO = !en.outF;
+      const finish = () => {
+        if (!gotM || !gotO) return;
+        parseAgentRecords([{ metaText: metaTxt, outputText: outTxt }]).forEach(r => {
+          if (qaPush(Object.assign({ who: 'sub', src: en.dir }, r))) added++;
+        });
+        if (--left === 0){ renderQa(); toast('已解析 ' + added + ' 条子智能体聊天'); }
+      };
+      const rdM = new FileReader();
+      rdM.onload = () => { metaTxt = rdM.result; gotM = true; finish(); };
+      rdM.readAsText(en.metaF);
+      if (en.outF){ const rdO = new FileReader(); rdO.onload = () => { outTxt = rdO.result; gotO = true; finish(); }; rdO.readAsText(en.outF); }
+    });
+  });
+  $('qaParse').addEventListener('click', () => {
+    const n = loadQaText($('qaTA').value);
+    renderQa();
+    if (!n) toast('没有解析到问答（需 rollout 会话 JSONL 或子智能体 metadata.json）');
+    else toast('已解析 ' + n + ' 条问答');
+  });
+  $('qaOut').addEventListener('click', ev => {
+    const addBtn = ev.target.closest('[data-qanode]');
+    if (addBtn){ addQaNode(lastQaItems[Number(addBtn.dataset.qanode)]); return; }
+    const row = ev.target.closest('.qrow');
+    if (!row) return;
+    const ix = Number(row.dataset.qi);
+    if (qaOpen.has(ix)) qaOpen.delete(ix); else qaOpen.add(ix);
+    renderQa();
+  });
+  let qaTimer = null;
+  $('qaKw').addEventListener('input', () => { clearTimeout(qaTimer); qaTimer = setTimeout(renderQa, 250); });
+  $('qaWho').addEventListener('change', renderQa);
+
   // ---------- 启动 ----------
   $('defs').innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>' +
     '<marker id="arrFb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-fb" d="M0,0 L10,5 L0,10 z"/></marker>';
@@ -2103,7 +2410,7 @@ if (typeof document !== "undefined") var UI = function(){
   syncCode();
   tryRestoreSync(); // 上次连接过文件时自动/一键恢复双向同步，避免浏览器与 code 侧数据脱节
   // 测试钩子（自动化验证用，不影响正常使用）
-  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderSkills, renderTrace, addKindNode, loadUsageText, afterUsageLoad, skillSummary, ctlLayout, counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
+  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderSkills, renderTrace, renderQa, loadQaText, qaItems: () => qaItems, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, ctlLayout, counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

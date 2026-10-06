@@ -1,7 +1,7 @@
 {
   "name": "codex-manager",
-  "version": "0.10.0",
-  "description": "Codex 管家：自动记录插件/技能/MCP 用量并导出报表；会话转流程图，可视化编辑器支持节点类型（输入/Agent/Map/条件/合并/输出）、反馈连线、轨迹查询与 AI 优化。",
+  "version": "0.11.0",
+  "description": "Codex 管家：自动记录报表；会话转流程图，可视化编辑器支持节点类型、反馈连线、轨迹查询、问答视图（逐项展开总智能体与子智能体问答+关键词）与 AI 优化。",
   "author": {
     "name": "litaizhe"
   },

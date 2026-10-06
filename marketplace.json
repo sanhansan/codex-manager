@@ -4,14 +4,14 @@
     {
       "name": "codex-manager",
       "source": "./codex-manager",
-      "version": "0.10.0",
-      "description": "Codex 管家：自动记录插件/技能/MCP 用量并导出 Excel 报表；把工作会话转为 Mermaid 流程图，可视化编辑器支持节点类型/反馈连线/轨迹查询/逻辑校验/AI 优化连线，技能总结与轨迹查询独立成模块。",
+      "version": "0.11.0",
+      "description": "Codex 管家：自动记录插件/技能/MCP 用量并导出 Excel 报表；把工作会话转为 Mermaid 流程图，可视化编辑器支持节点类型/反馈连线/轨迹查询/问答视图（总智能体+子智能体逐项展开）/逻辑校验/AI 优化连线，技能总结与轨迹查询独立成模块。",
       "displayName": "Codex Manager",
       "displayName_i18n": {
         "zh-CN": "Codex 管家"
       },
       "description_i18n": {
-        "zh-CN": "Codex 管家：自动记录插件/技能/MCP 用量并导出 Excel 报表；把工作会话转为 Mermaid 流程图，可视化编辑器支持节点类型/反馈连线/轨迹查询/逻辑校验/AI 优化连线，技能总结与轨迹查询独立成模块。"
+        "zh-CN": "Codex 管家：自动记录插件/技能/MCP 用量并导出 Excel 报表；把工作会话转为 Mermaid 流程图，可视化编辑器支持节点类型/反馈连线/轨迹查询/问答视图（总智能体+子智能体逐项展开）/逻辑校验/AI 优化连线，技能总结与轨迹查询独立成模块。"
       }
     }
   ]

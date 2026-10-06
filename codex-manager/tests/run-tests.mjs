@@ -14,16 +14,17 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseAgentRecords, qaFilter };");
 
 const core = await import(pathToFileURL(corePath).href);
-const {
+  const {
   parseMermaid, toMermaid, graphToJSON, jsonToGraph,
   graphToMarkdown, markdownToGraph,
   guessKind, aggregateUsage, skillSummary, habitCandidates,
   ctlLayout, autoLayout, findCycle, validateGraph, newNodeId,
   splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta,
   parseUsageRecords, traceQuery, cleanLabel, fitText,
+  extractKeywords, parseQaTurns, parseAgentRecords, qaFilter,
 } = core;
 
 let pass = 0, fail = 0;
@@ -301,6 +302,81 @@ t("fitText：超宽标签截断加省略号", () => {
   eq(fitText("短标签", 100), "短标签");
   const t1 = fitText("甲".repeat(30), 100);
   ok(t1.endsWith("…") && t1.length <= 10, "长标签应截断：" + t1);
+});
+
+// ---------- 问答视图（总智能体 rollout Q&A / 子智能体记录 / 关键词） ----------
+t("extractKeywords：中文去停用词、取 top-N", () => {
+  const kws = extractKeywords("帮我把流程图编辑器加上问答视图，问答视图每项可以展开看关键词。流程图编辑器很好用", 5);
+  eq(kws.length, 5);
+  ok(kws.includes("流程") || kws.includes("编辑") || kws.includes("问答"), "应含内容词：" + kws.join(","));
+  ok(!kws.includes("的了") && !kws.includes("可以") && !kws.includes("就是"), "停用词不应入选：" + kws.join(","));
+  const en = extractKeywords("flow editor canvas editor zoom editor", 2);
+  eq(en[0], "editor");
+});
+t("parseQaTurns：full+tail 拼接、系统消息跳过、工具收集", () => {
+  const fullLine = JSON.stringify({
+    sessionId: "sess_X", querySource: "main_turn", startedAt: "2026-10-07T01:00:00Z",
+    request: { messagesKind: "full", messageOffset: 0, messageCount: 5, messages: [
+      { role: "user", content: "<system-reminder>注入内容</system-reminder>" },
+      { role: "user", content: "帮我梳理流程图" },
+      { role: "assistant", content: [{ type: "text", text: "好的，开始梳理。" }], toolCalls: [{ id: "c1", name: "Read", input: {} }] },
+      { role: "user", content: "再改成 LR" },
+      { role: "assistant", content: [{ type: "text", text: "已改为 LR。" }] },
+    ] }
+  });
+  const tailLine = JSON.stringify({
+    sessionId: "sess_X", querySource: "main_turn", startedAt: "2026-10-07T01:01:00Z",
+    request: { messagesKind: "tail", messageOffset: 3, messageCount: 2, messages: [
+      { role: "user", content: "再改成 LR" },
+      { role: "assistant", content: [{ type: "text", text: "已改为 LR。" }] },
+    ] }
+  });
+  const r = parseQaTurns(fullLine + "\n" + tailLine);
+  eq(r.session, "sess_X");
+  eq(r.turns.length, 2, "系统注入不算提问，应只有 2 个回合");
+  eq(r.turns[0].q, "帮我梳理流程图");
+  ok(r.turns[0].a.includes("开始梳理"));
+  eq(r.turns[0].tools, ["Read"]);
+  eq(r.turns[1].q, "再改成 LR");
+  eq(r.turns[1].a, "已改为 LR。");
+  ok(r.turns[0].kw.length > 0, "每个回合应有关键词");
+  ok(r.turns[0].ts > 0 && r.turns[1].ts >= r.turns[0].ts, "回合应带时间戳");
+});
+t("parseQaTurns：坏行跳过、空输入返回空", () => {
+  eq(parseQaTurns("not json\n").turns.length, 0);
+  eq(parseQaTurns("").session, "");
+});
+t("parseAgentRecords：子智能体 metadata+output 映射、坏 JSON 跳过", () => {
+  const meta = JSON.stringify({
+    agentId: "agent_1", profileId: "general-purpose", description: "质量审查员",
+    prompt: "你是质量审查员，审查流程", status: "completed",
+    totalTokens: 20864, totalDurationMs: 176107,
+    parentSessionId: "sess_P", createdAt: "2026-10-06T09:36:16.481Z",
+  });
+  const recs = parseAgentRecords([
+    { metaText: meta, outputText: "发现列表：市场同步未逐文件校验" },
+    { metaText: "not json", outputText: "" },
+    { metaText: "{}", outputText: "" },
+  ]);
+  eq(recs.length, 1);
+  eq(recs[0].profile, "general-purpose");
+  eq(recs[0].q, "你是质量审查员，审查流程");
+  ok(recs[0].a.includes("市场同步"));
+  eq(recs[0].status, "completed");
+  eq(recs[0].tokens, 20864);
+  eq(recs[0].parentSession, "sess_P");
+  ok(recs[0].ts > 0);
+  ok(recs[0].kw.length > 0);
+});
+t("qaFilter：来源过滤与关键字命中关键词表", () => {
+  const items = [
+    { who: "master", ts: 100, q: "梳理流程图", a: "好的", kw: ["流程", "梳理"], description: "", profile: "" },
+    { who: "sub", ts: 200, q: "你是质量审查员", a: "发现列表", kw: ["审查", "质量"], description: "质量审查员", profile: "general-purpose" },
+  ];
+  eq(qaFilter(items, { who: "master" }).length, 1);
+  eq(qaFilter(items, { who: "sub" })[0].profile, "general-purpose");
+  eq(qaFilter(items, { kw: "审查" }).length, 1, "关键字应命中关键词表与描述");
+  eq(qaFilter(items, {})[0].ts, 200, "默认时间倒序");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
