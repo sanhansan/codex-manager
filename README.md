@@ -1,4 +1,6 @@
-# Codex Manager — Plugin Usage Tracking & Session Flowcharts for Your Codex Workbench
+# Codex Manager
+
+Plugin usage tracking & session flowcharts for Codex workbenches.
 
 English | [简体中文](README.zh-CN.md)
 
@@ -8,11 +10,11 @@ English | [简体中文](README.zh-CN.md)
 
 This plugin targets Codex-style AI coding agent workbenches (built on the ZCode plugin ecosystem) and answers two questions that come up all the time: "Of all the plugins I've installed, which ones do I actually use?" and "How exactly did the AI get this task done, step by step?" With silent background hooks and one-command results, it keeps plugin usage and your working process fully visible — no extra effort required.
 
-> **Maintenance** — Actively maintained by [@sanhansan](https://github.com/sanhansan), last updated 2026-10-06. For bug reports or adaptation requests, please open an [Issue](https://github.com/sanhansan/zcode-plugins/issues).
+> **Maintenance** — Actively maintained by [@sanhansan](https://github.com/sanhansan), last updated 2026-10-06. For bug reports or adaptation requests, please open an [Issue](https://github.com/sanhansan/codex-manager/issues).
 
 ## Download & Use the Release Packages
 
-All versions are published on the [Releases](https://github.com/sanhansan/zcode-plugins/releases) page, released milestone by milestone:
+All versions are published on the [Releases](https://github.com/sanhansan/codex-manager/releases) page, released milestone by milestone:
 
 | Version | Date | Contents | For whom |
 | --- | --- | --- | --- |
@@ -22,7 +24,7 @@ All versions are published on the [Releases](https://github.com/sanhansan/zcode-
 
 **How to use a downloaded zip**:
 
-1. **ZCode plugin** (included in every version): unzip → ZCode → Plugin Marketplace → Add → Add Plugin Marketplace → select the extracted `zcode-plugins` folder (the one containing `marketplace.json`) → install Codex Manager under "Personal".
+1. **ZCode plugin** (included in every version): unzip → ZCode → Plugin Marketplace → Add → Add Plugin Marketplace → select the extracted `codex-manager` folder (the one containing `marketplace.json`) → install Codex Manager under "Personal".
 2. **OpenAI Codex CLI adapter** (since v0.3.0): enter the extracted `codex-cli-adapter/`, run `powershell -ExecutionPolicy Bypass -File install.ps1` on Windows or `./install.sh` on macOS/Linux, then **restart Codex** and use `/codex-usage` or `/codex-flow` in a session.
 3. **Standalone CLI** (since v0.3.0, no host required): `python codex-cli-adapter/codex_manager.py usage --days 30 --xlsx report.xlsx` to analyze local Codex usage directly.
 
@@ -81,13 +83,13 @@ See [codex-cli-adapter/README.md](./codex-cli-adapter/README.md) for details.
 ### Get the Repository
 
 ```bash
-git clone https://github.com/sanhansan/zcode-plugins.git
+git clone https://github.com/sanhansan/codex-manager.git
 ```
 
 ### Install the Plugin (either way)
 
-- __Local directory (works everywhere)__ — Open ZCode → Plugin Marketplace → Add → Add Plugin Marketplace → select the cloned `zcode-plugins` folder (the one containing `marketplace.json`) → find Codex Manager under "Personal" → Install.
-- __GitHub marketplace source__ — When adding a marketplace, enter `sanhansan/zcode-plugins` directly (requires a client that supports GitHub-type marketplace sources), then install from "Personal".
+- __Local directory (works everywhere)__ — Open ZCode → Plugin Marketplace → Add → Add Plugin Marketplace → select the cloned `codex-manager` folder (the one containing `marketplace.json`) → find Codex Manager under "Personal" → Install.
+- __GitHub marketplace source__ — When adding a marketplace, enter `sanhansan/codex-manager` directly (requires a client that supports GitHub-type marketplace sources), then install from "Personal".
 
 After installing, start a fresh task, trigger a few plugin skills, then run `/codex-usage` to verify that data collection is working.
 

@@ -1,4 +1,6 @@
-# Codex Manager — Codex 工作台插件用量管理与工作流程图工具
+# Codex Manager
+
+Codex 工作台的插件用量管理与工作流程图工具。
 
 [English](README.md) | 简体中文
 
@@ -8,11 +10,11 @@
 
 本插件面向 Codex 式 AI 编程智能体工作台（基于 ZCode 插件生态构建），旨在回答两个高频问题："我装的这些插件，到底哪个用得多？"以及"这次任务，AI 到底是怎么一步步干完的？"。通过后台钩子自动采集、命令一键出结果的无感设计，降低使用门槛，让插件用量与工作过程一目了然。
 
-> **维护状态**：本项目由 [@sanhansan](https://github.com/sanhansan) 持续维护，最近更新 2026-10-06；问题反馈与新适配建议请提 [Issue](https://github.com/sanhansan/zcode-plugins/issues)。
+> **维护状态**：本项目由 [@sanhansan](https://github.com/sanhansan) 持续维护，最近更新 2026-10-06；问题反馈与新适配建议请提 [Issue](https://github.com/sanhansan/codex-manager/issues)。
 
 ## 安装包下载与使用
 
-全部版本发布在 [Releases](https://github.com/sanhansan/zcode-plugins/releases) 页面，按里程碑依次发布、持续维护：
+全部版本发布在 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，按里程碑依次发布、持续维护：
 
 | 版本 | 发布日期 | 包内容 | 适合谁 |
 | --- | --- | --- | --- |
@@ -22,7 +24,7 @@
 
 **下载 zip 后的使用方法**：
 
-1. **ZCode 插件**（三个版本均包含）：解压 → ZCode → 插件市场 → 添加 → 添加插件市场 → 选择解压出的 `zcode-plugins` 目录（含 `marketplace.json` 的那一层）→ 在"个人"页安装 Codex Manager。
+1. **ZCode 插件**（三个版本均包含）：解压 → ZCode → 插件市场 → 添加 → 添加插件市场 → 选择解压出的 `codex-manager` 目录（含 `marketplace.json` 的那一层）→ 在"个人"页安装 Codex Manager。
 2. **OpenAI Codex CLI 适配**（v0.3.0 起包含）：解压后进入 `codex-cli-adapter/`，Windows 执行 `powershell -ExecutionPolicy Bypass -File install.ps1`，macOS/Linux 执行 `./install.sh`，然后**重启 Codex**，在会话里输入 `/codex-usage` 或 `/codex-flow`。
 3. **独立命令行**（v0.3.0 起包含，无需任何宿主）：`python codex-cli-adapter/codex_manager.py usage --days 30 --xlsx report.xlsx` 直接统计本机 Codex 用量。
 
@@ -81,13 +83,13 @@ powershell -ExecutionPolicy Bypass -File codex-cli-adapter/install.ps1   # Windo
 ### 获取仓库
 
 ```bash
-git clone https://github.com/sanhansan/zcode-plugins.git
+git clone https://github.com/sanhansan/codex-manager.git
 ```
 
 ### 安装插件（二选一）
 
-- __方式一（本地目录，通用）__：打开 ZCode → 插件市场 → 添加 → 添加插件市场 → 选择克隆后的 `zcode-plugins` 目录（含 `marketplace.json` 的那一层）→ 在"个人"页找到 Codex Manager → 安装。
-- __方式二（GitHub 市场源）__：添加插件市场时直接填 `sanhansan/zcode-plugins`（需客户端支持 github 类型市场源），后续在"个人"页安装。
+- __方式一（本地目录，通用）__：打开 ZCode → 插件市场 → 添加 → 添加插件市场 → 选择克隆后的 `codex-manager` 目录（含 `marketplace.json` 的那一层）→ 在"个人"页找到 Codex Manager → 安装。
+- __方式二（GitHub 市场源）__：添加插件市场时直接填 `sanhansan/codex-manager`（需客户端支持 github 类型市场源），后续在"个人"页安装。
 
 安装后建议新开一个任务，随便触发几个插件技能，再运行 `/codex-usage` 验证数据采集是否生效。
 

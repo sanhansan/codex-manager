@@ -1,4 +1,6 @@
-# Codex Manager（Codex 管家）— ZCode 插件
+# Codex Manager（Codex 管家）
+
+ZCode 插件 · ZCode plugin · v0.3.0
 
 [English](#english) | [简体中文](#中文)
 
@@ -10,13 +12,13 @@
 
 ### zip 安装包使用方法
 
-1. 打开 [Releases](https://github.com/sanhansan/zcode-plugins/releases) 页面，下载最新版的 `zcode-plugins-vX.Y.Z.zip`（当前 **v0.3.0**）；
-2. 解压，得到 `zcode-plugins/` 目录（内含 `marketplace.json` 和本插件源码 `codex-manager/`）；
-3. 打开 ZCode → **插件市场 → 添加 → 添加插件市场** → 选择解压出的 `zcode-plugins` 目录（含 `marketplace.json` 的那一层）；
+1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.3.0**）；
+2. 解压，得到 `codex-manager/` 目录（内含 `marketplace.json` 和本插件源码 `codex-manager/`）；
+3. 打开 ZCode → **插件市场 → 添加 → 添加插件市场** → 选择解压出的 `codex-manager` 目录（含 `marketplace.json` 的那一层）；
 4. 在 **个人** 页找到 **Codex Manager** → 点击 **安装**；
 5. 新建任务，输入下述命令即可使用。
 
-> 也可以不走安装包：`git clone https://github.com/sanhansan/zcode-plugins.git` 后，把克隆出的目录按第 3 步添加，效果相同，且更新更及时。
+> 也可以不走安装包：`git clone https://github.com/sanhansan/codex-manager.git` 后，把克隆出的目录按第 3 步添加，效果相同，且更新更及时。
 
 ### 功能与命令
 
@@ -47,13 +49,13 @@ A ZCode plugin for managing your Codex workbench: see other plugins' usage autom
 
 ### How to use the zip package
 
-1. Open the [Releases](https://github.com/sanhansan/zcode-plugins/releases) page and download the latest `zcode-plugins-vX.Y.Z.zip` (currently **v0.3.0**);
-2. Unzip it — you get a `zcode-plugins/` folder containing `marketplace.json` and this plugin's source (`codex-manager/`);
-3. Open ZCode → **Plugin Marketplace → Add → Add Plugin Marketplace** → select the extracted `zcode-plugins` folder (the one containing `marketplace.json`);
+1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.3.0**);
+2. Unzip it — you get a `codex-manager/` folder containing `marketplace.json` and this plugin's source (`codex-manager/`);
+3. Open ZCode → **Plugin Marketplace → Add → Add Plugin Marketplace** → select the extracted `codex-manager` folder (the one containing `marketplace.json`);
 4. Under **Personal**, find **Codex Manager** → click **Install**;
 5. Start a new task and use the commands below.
 
-> Prefer source? `git clone https://github.com/sanhansan/zcode-plugins.git` and add the cloned folder as in step 3 — same result, always up to date.
+> Prefer source? `git clone https://github.com/sanhansan/codex-manager.git` and add the cloned folder as in step 3 — same result, always up to date.
 
 ### Features & commands
 
@@ -80,6 +82,6 @@ The usage log holds six metadata fields only (timestamp, type, plugin name, skil
 
 ## 版本历史 / Changelog
 
-- **0.3.0**：随仓库按里程碑发布 Release 安装包（`zcode-plugins-v0.3.0.zip`）；本 README 改为中英双语并加入 zip 安装包使用方法；插件清单版本与市场清单同步至 0.3.0。同仓库新增 OpenAI Codex CLI 适配（`codex-cli-adapter/`，见仓库根 README）。
+- **0.3.0**：随仓库按里程碑发布 Release 安装包（`codex-manager-v0.3.0.zip`）；本 README 改为中英双语并加入 zip 安装包使用方法；插件清单版本与市场清单同步至 0.3.0。同仓库新增 OpenAI Codex CLI 适配（`codex-cli-adapter/`，见仓库根 README）。
 - **0.2.0**：用量报表的"最近使用"与"最近 N 天"过滤改用本地时区（此前为 UTC，过滤会漏掉下午的记录）；明细表只统计技能/MCP 调用，会话记录只计入概览页；流程图脚本把 meta 概要事件移到事件流开头。
 - **0.1.0**：首个版本。用量记录钩子、`/codex-usage` 报表、`/codex-flow` 流程图。
