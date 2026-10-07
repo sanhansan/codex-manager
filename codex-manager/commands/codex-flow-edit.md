@@ -27,10 +27,18 @@ tpl = open(sys.argv[1], encoding="utf-8").read()
 mermaid = open(sys.argv[2], encoding="utf-8").read()
 rev = hashlib.sha1(mermaid.encode("utf-8")).hexdigest()[:10]  # rev 变了编辑器才会用新数据覆盖浏览器旧存档
 payload = json.dumps({"mermaid": mermaid, "source": sys.argv[3], "session": (sys.argv[4] if len(sys.argv) > 4 else ""), "exportName": "flow-export.mmd", "watch": "flow-source.mmd", "rev": rev}, ensure_ascii=False).replace("</", "<\\/")
-open("flow-editor.html", "w", encoding="utf-8").write(tpl.replace("/*__FLOW_DATA__*/null", payload, 1))
+assert "/*__FLOW_DATA__*/null" in tpl, "模板缺少注入标记 /*__FLOW_DATA__*/null"
+out = tpl.replace("/*__FLOW_DATA__*/null", payload, 1)
+# 注入自检：PAYLOAD 必须落在**单独一行**且不含裸换行——否则整段 <script> 会解析失败，
+# 表现为「页面能开但**所有按钮点击都没反应**」（事件监听器全都没绑上）。
+lines = [l for l in out.split("\n") if l.startswith("const PAYLOAD =")]
+assert len(lines) == 1, "注入后 PAYLOAD 跨行（%d 行）——JSON 未正确转义，会让页面脚本整体解析失败" % len(lines)
+open("flow-editor.html", "w", encoding="utf-8").write(out)
 open("flow-source.mmd", "w", encoding="utf-8").write(mermaid)  # HTTP 自动连接的同步文件（flow_serve.py 负责读写）
 print("OK")
 ```
+
+> **务必用上面这段直接注入，不要自己另写替换逻辑。** 若用 `re.sub(pattern, payload, ...)` 之类的写法，替换串里的 `\n` 会被当成转义序列还原成**真换行**，把 JSON 字符串撑成多行 → `<script>` 报 `Invalid or unexpected token` → 页面看似正常但**任何选项点击都无反应**。生成后请确认 `const PAYLOAD = ...` 是**一整行**。
 
    把第一步拿到的 mermaid 先存成临时 `.mmd` 文件再执行（命令用完删除临时脚本）；来源描述写清楚（如 `项目 X 第 3 版` / `当前会话` / 文件路径）。来源是**当前会话**时，把会话 ID（`sess_…`，可从 `%USERPROFILE%\.zcode\codex-manager\usage.jsonl` 最后一条 session 记录取）作为第 4 参数传入——编辑器「💬 问答」视图会用它把该会话的条目标为「🧠 总智能体·画布来源」。
 

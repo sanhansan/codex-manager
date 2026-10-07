@@ -1,10 +1,10 @@
 # Codex Manager（Codex 管家）
 
-ZCode 插件 · ZCode plugin · v0.24.0
+ZCode 插件 · ZCode plugin · v0.24.1
 
 [English](#english) | [简体中文](#中文)
 
-一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图并在浏览器画布上可视化编辑。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.24.0**，由 [@sanhansan](https://github.com/sanhansan) 维护。
+一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图并在浏览器画布上可视化编辑。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.24.1**，由 [@sanhansan](https://github.com/sanhansan) 维护。
 
 ---
 
@@ -12,7 +12,7 @@ ZCode 插件 · ZCode plugin · v0.24.0
 
 ### zip 安装包使用方法
 
-1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.24.0**）；
+1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.24.1**）；
 2. 解压，得到 `codex-manager/` 目录（内含 `marketplace.json` 和本插件源码 `codex-manager/`）；
 3. 打开 ZCode → **插件市场 → 添加 → 添加插件市场** → 选择解压出的 `codex-manager` 目录（含 `marketplace.json` 的那一层）；
 4. 在 **个人** 页找到 **Codex Manager** → 点击 **安装**；
@@ -50,11 +50,11 @@ ZCode 插件 · ZCode plugin · v0.24.0
 
 ## English
 
-A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart you can visually edit on a canvas. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.24.0**, maintained by [@sanhansan](https://github.com/sanhansan).
+A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart you can visually edit on a canvas. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.24.1**, maintained by [@sanhansan](https://github.com/sanhansan).
 
 ### How to use the zip package
 
-1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.24.0**);
+1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.24.1**);
 2. Unzip it — you get a `codex-manager/` folder containing `marketplace.json` and this plugin's source (`codex-manager/`);
 3. Open ZCode → **Plugin Marketplace → Add → Add Plugin Marketplace** → select the extracted `codex-manager` folder (the one containing `marketplace.json`);
 4. Under **Personal**, find **Codex Manager** → click **Install**;
@@ -92,6 +92,7 @@ The usage log holds six metadata fields only (timestamp, type, plugin name, skil
 
 ## 版本历史 / Changelog
 
+- **0.24.1**：**修复「任何选项点击都没反应」**。上一版的工作副本注入时，替换串里的 `\n` 被当成转义序列还原成**真换行**，把注入的 `PAYLOAD` JSON 撑成多行 → 整段 `<script>` 报 `Invalid or unexpected token` → 页面看似正常但**所有按钮/视图/弹窗点击都无响应**（事件监听器全都没绑上）。现①改用 `str.replace(marker, payload, 1)` 直接注入并在写盘前**断言 `const PAYLOAD = ...` 只占一整行**；②`commands/codex-flow-edit.md` 增加同款自检与「不要自己另写替换逻辑」的警示；③新增 **`tests/inject-guard.mjs`（4 项）**——校验注入后 PAYLOAD 不跨行、整段主 `<script>` 能被 `vm` 编译、`JSON.parse` 能还原原始 mermaid、含 `</script>` 的 mermaid 不会提前闭合标签。回归测试 **80 项** + 注入守卫 **4 项** + 端到端 **28 项** 全绿。
 - **0.24.0**：**项目维度 + 智能体神经网络**。①**总控流程文字溢出修复**——长节点名按像素宽度截断（CJK≈1em / 西文≈0.56em）并逐节点加 `clipPath`，`#ctlTable` 改固定布局 + 单元格 `overflow-wrap:anywhere`，`.wfcard` 允许任意位置换行且标题省略号；②**画布按项目分组**——从会话 `cwd` 末段推导项目名并写入 `src.project`，左侧列表由三层树改为 **项目芯片 → 智能体大框 → 画布**；③**同项目智能体大框**——每个客户端一个彩色边框「智能体框」，标注 🧠 主智能体 + 🤖 N 子智能体；④**同项目跨智能体协作**——按时间序生成接力链（如 ZCode→Codex→Gemini）并在列表显示 🤝 协作链；⑤**「点击切换与展现」重做**——画布顶部面包屑（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉）+ 全局快速切换面板（🔎 关键字过滤、回车跳转）+ 切换淡入动效；⑥**新增「🧠 智能体总结神经网络」视图**——把项目 / 会话 / 知识压成可缩放芯片脑图：芯片底板 + 引脚 + 神经元 + 突触，三种布局（🔲 芯片阵列 / 🕸 神经网络环 / 🌳 知识树），滚轮缩放（放大后浮现文字）、拖拽平移、点击神经元跳转对应画布、悬停看详情、脉冲光点沿突触流动，右下 HUD 实时统计神经元 / 突触 / 项目数。回归测试 **80 项**（新增 6 项项目维度与神经网络纯函数）、端到端 28 项、i18n 0 缺失。
 - **0.23.0**：修复三处反馈问题——①**Token 使用量此前只显示 ZCode**：多客户端能力可用但未载入时 `tokList()` 不再静默退化为「只有 ZCode」，改为显示加载/重试态，且 `loadHttpClientUsage` 失败后 **8 秒自动重试**（一次瞬时失败不再永久锁死）；②**重新打开会清空历史会话记录**：rev 变化重播种时**保留所有会话/对话画布（`src.session`）与用户手工画布**，不再因工作副本重生成而丢失；③**画布同步节点过少**：每个客户端由「只取最新 1 个会话」改为同步**全部会话**（手动/首载上限 200、6 秒轮询补最新 12），并新增 **WorkBuddy / Gemini / Qwen 三种会话格式解析器**（WorkBuddy `message`+`content[]`、Gemini `USER_INPUT`/`PLANNER_RESPONSE`/`GENERIC`、Qwen 运行时元信息登记为单节点）；同期修复 gemini 未传 `rel` 时自动定位 `transcript.jsonl`、**单客户端异常不再中断其余客户端同步**。本机实测：问答节点 68→**152**，载入会话 7→**62**（58 主会话 + 4 子智能体）。回归测试 74 项、i18n 585 用键 0 缺失。
 - **0.22.0**：新增 **WorkBuddy / Qwen Code / Kimi** 三个适配器，注册表扩至 **7 家**——WorkBuddy 接 `~/.workbuddy/projects/<项目>/<会话>.jsonl`（完整对话 + `providerData.usage` 令牌明细 + 模型名，本机 23 会话 / 5341 万 token / 6 个模型）；Qwen Code 接 `~/.qwen/projects/<项目>/chats/<uuid>.runtime.json`（仅会话元信息）；Kimi 接 `~/.kimi-work`（仅可执行文件，如实标注无会话数据）；⚙ 设置扩至 **9 个数据源目录**；「🔌 已连接智能体」视图按 CLI / IDE / 桌面三组呈现 7 家连接状态。
