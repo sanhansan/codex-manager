@@ -621,6 +621,15 @@ t("flowFromQa：🧠 链 + 🤖 虚线挂载、时间正序、上限与空数据
   eq(small.masters + small.subs, 2, "maxNodes 应限制总量");
   eq(flowFromQa([], {}).code, "", "空数据返回空串");
 });
+t("flowFromQa + parseMermaid 往返：导入画布所需的节点/虚线边完整", () => {
+  const r = flowFromQa(qaFixtures, { maxNodes: 36 });
+  const g = parseMermaid(r.code);
+  eq(g.errors.length, 0, "生成物应可无错解析");
+  eq(g.nodes.length, r.masters + r.subs, "节点数 = 🧠 + 🤖");
+  ok(g.edges.some(e => e.style === "solid"), "总任务链是实线");
+  ok(g.edges.some(e => e.style === "dotted"), "子智能体挂载是虚线");
+  ok(g.nodes.every(n => n.x === 0 && n.y === 0), "解析后待 autoLayout 排版（导入前会重排）");
+});
 t("flowTemplate：英文参数输出英文标签，缺省中文不变", () => {
   const zh = flowTemplate("测试");
   ok(zh.nodes.some(n => /输入/.test(n.label)), "缺省应输出中文标签");

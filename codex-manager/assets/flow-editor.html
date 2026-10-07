@@ -135,6 +135,14 @@
   dialog table { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0; }
   dialog th, dialog td { border:1px solid var(--line); padding:4px 8px; text-align:left; }
   dialog th { color:var(--muted); font-weight:normal; background:var(--bg); }
+  #setDlg .setRow { margin:9px 0; }
+  #setDlg .setRow label { display:block; font-size:12.5px; margin-bottom:2px; }
+  #setDlg .setRow input[type=text] { width:100%; font:12.5px Consolas,Menlo,monospace; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+  #setDlg .setRow input[type=text]:disabled { opacity:.6; }
+  #setDlg .setRow .stat { font-size:11.5px; color:var(--muted); line-height:1.5; margin-top:2px; }
+  #setDlg .setRow .stat code { font-size:11px; background:var(--canvas); padding:0 3px; border-radius:4px; }
+  #setDlg .stat b.ok { color:#059669; font-weight:normal; }
+  #setDlg .stat b.bad { color:#dc2626; font-weight:normal; }
   #overlay { position:absolute; inset:0; background:rgba(148,163,184,.25); display:flex; align-items:center; justify-content:center; }
   #overlay .box { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px 24px; width:min(560px, 90%); }
   #overlay textarea { width:100%; height:180px; font:12.5px Consolas,monospace; border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--panel); color:var(--ink); }
@@ -244,6 +252,7 @@
   <div class="grow"></div>
   <button id="btnLang" class="sbtn" title="切换界面语言 / Switch UI language">🌐 EN</button>
   <button id="btnHelp" class="sbtn" data-i18n="❓ 帮助">❓ 帮助</button>
+  <button id="btnSet" class="sbtn" data-i18n="⚙ 设置" title="设置数据来源目录（usage.jsonl / rollout / agents / Codex / Qoder）">⚙ 设置</button>
   <button id="btnTheme" class="sbtn">🌙 深色</button>
 </nav>
 <div id="content">
@@ -465,6 +474,18 @@
   <li data-i18n="🌐 语言按钮随时切换中文 / English（记住选择）；「📦 使用量」「🪙 Token 使用量（多客户端）」在总控流程视图，flow_serve.py 托管时自动载入——Token 按日/按月切换、悬停看各客户端分解、点数据点出周期明细并可「→ 查看问答」；文件服务断开时每 4 秒自动重连">🌐 语言按钮随时切换中文 / English（记住选择）；「📦 使用量」「🪙 Token 使用量（多客户端）」在总控流程视图，flow_serve.py 托管时自动载入——Token 按日/按月切换、悬停看各客户端分解、点数据点出周期明细并可「→ 查看问答」；文件服务断开时每 4 秒自动重连</li>
   <p class="hint" data-i18n="文本是唯一事实源。导出后可在会话里用 /codex-flow-save 回写项目框架；JSON 最完整，Markdown 适合人读与版本库。">文本是唯一事实源。导出后可在会话里用 /codex-flow-save 回写项目框架；JSON 最完整，Markdown 适合人读与版本库。</p>
   <form method="dialog"><button data-i18n="知道了">知道了</button></form>
+</dialog>
+
+<dialog id="setDlg" style="max-width:720px">
+  <h3 data-i18n="⚙ 设置 · 数据来源目录">⚙ 设置 · 数据来源目录</h3>
+  <p class="hint" data-i18n="改好路径后点「💾 保存」立即生效（持久化到 ~/.zcode/codex-manager/flow-settings.json）；输入框留空 = 使用默认路径；启动参数（--usage / --rollout / --agents / --codex / --qoder）指定的路径优先，不受此处修改影响。">改好路径后点「💾 保存」立即生效（持久化到 ~/.zcode/codex-manager/flow-settings.json）；输入框留空 = 使用默认路径；启动参数（--usage / --rollout / --agents / --codex / --qoder）指定的路径优先，不受此处修改影响。</p>
+  <div id="setBody"></div>
+  <div id="setMsg" class="hint" style="min-height:16px;margin:4px 0"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
+    <button id="setDefaults" data-i18n="↺ 恢复默认值">↺ 恢复默认值</button>
+    <button id="setSave" class="primary" data-i18n="💾 保存">💾 保存</button>
+    <form method="dialog" style="display:inline"><button data-i18n="关闭">关闭</button></form>
+  </div>
 </dialog>
 
 <script>
@@ -2042,7 +2063,39 @@ if (typeof document !== "undefined") var UI = function(){
     '已生成（基于 {0} 条命中问答）': 'Generated from {0} matched Q&A record(s)',
     '得分': 'Score',
     '扫描 ': 'Scanned ',
-    '按会话（{0} 个 · 点行展开明细，可转跳问答）': 'By session ({0} · click a row for details; jump to Q&A)',
+    '按会话（{0} 个 · 点行展开明细，可转跳问答 / 导入画布）': 'By session ({0} · click a row for details; jump to Q&A / import to canvas)',
+    '⤵ 导入画布': '⤵ Import to canvas',
+    '把该会话的问答追加到当前画布（可撤销）': 'Append this session\u2019s Q&A to the current canvas (undoable)',
+    '会话 ID 缺失，无法导入画布': 'Session ID missing; cannot import to canvas',
+    '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
+    '已把会话 {0} 导入画布（🧠 {1} · 🤖 {2}，Ctrl+Z 可撤销）': 'Imported session {0} to canvas (🧠 {1} · 🤖 {2}, Ctrl+Z to undo)',
+    'usage.jsonl 文件（📦 使用量）': 'usage.jsonl file (📦 usage)',
+    'ZCode rollout 目录（🪙 Token / 💬 问答）': 'ZCode rollout directory (🪙 tokens / 💬 Q&A)',
+    'ZCode agents 目录（🤖 子智能体）': 'ZCode agents directory (🤖 subagents)',
+    'Codex CLI 会话目录（💬 问答 / 用量）': 'Codex CLI sessions directory (💬 Q&A / usage)',
+    'Qoder CLI 数据目录（💬 问答 / 用量）': 'Qoder CLI data directory (💬 Q&A / usage)',
+    '正在读取设置…': 'Reading settings…',
+    '读取设置失败（需 flow_serve.py 托管）：': 'Failed to read settings (requires flow_serve.py hosting): ',
+    '当前不是 flow_serve.py 托管（或服务版本过旧），无法修改数据来源目录；用 flow_serve.py 打开编辑器后再来设置。': 'Not hosted by flow_serve.py (or the service is outdated); cannot change data-source directories. Open the editor via flow_serve.py and try again.',
+    '当前生效：': 'In effect: ',
+    '存在': 'exists',
+    '不存在': 'missing',
+    '由启动参数指定，本次不可改': 'set by a startup argument; cannot be changed now',
+    '（已保存覆盖默认）': '(saved override)',
+    '（默认路径，留空即可）': '(default path; leave blank)',
+    '默认：': 'Default: ',
+    '正在保存…': 'Saving…',
+    '保存失败：': 'Save failed: ',
+    '已保存；由启动参数指定的 {0} 已忽略': 'Saved; ignored {0} (set by startup arguments)',
+    '✅ 已保存并立即生效': '✅ Saved and in effect immediately',
+    '✅ 设置已保存并立即生效': '✅ Settings saved and in effect immediately',
+    '已清空为默认路径——点「💾 保存」生效。': 'Cleared to default paths — click “💾 Save” to apply.',
+    '⚙ 设置': '⚙ Settings',
+    '⚙ 设置 · 数据来源目录': '⚙ Settings · Data-source directories',
+    '改好路径后点「💾 保存」立即生效（持久化到 ~/.zcode/codex-manager/flow-settings.json）；输入框留空 = 使用默认路径；启动参数（--usage / --rollout / --agents / --codex / --qoder）指定的路径优先，不受此处修改影响。': 'Click "💾 Save" to apply immediately (persisted to ~/.zcode/codex-manager/flow-settings.json); leave a field blank to use the default; paths given via startup arguments (--usage / --rollout / --agents / --codex / --qoder) take precedence and are not affected here.',
+    '↺ 恢复默认值': '↺ Restore defaults',
+    '💾 保存': '💾 Save',
+    '关闭': 'Close',
     '按插件（ZCode Token 归属）': 'By plugin (ZCode token attribution)',
     '按日': 'Daily',
     '按月': 'Monthly',
@@ -2095,6 +2148,7 @@ if (typeof document !== "undefined") var UI = function(){
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = T(el.dataset.i18nTitle); });
     document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = T(el.dataset.i18nPh); });
     document.querySelectorAll('[data-i18n-html]').forEach(el => { const k = el.dataset.i18nHtml; el.innerHTML = isEn() ? (I18N_HTML[k] || HTML_ZH[k]) : HTML_ZH[k]; });
+    if ($('setDlg') && $('setDlg').open && lastSetView) renderSetDlg(lastSetView, true); // 设置弹窗开着时随语言刷新（保留未保存输入）
     $('btnLang').textContent = isEn() ? '🌐 中文' : '🌐 EN';
     $('btnTheme').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? T('☀️ 浅色') : T('🌙 深色');
     $('btnCodeToggle').textContent = T($('code').classList.contains('hidden') ? '展开' : '收起');
@@ -2693,6 +2747,80 @@ if (typeof document !== "undefined") var UI = function(){
   try { applyTheme(localStorage.getItem('cmflow:theme:v2') || 'light'); } catch(e){ applyTheme('light'); }
   $('btnCodeToggle').addEventListener('click', () => { const c = $('code'); c.classList.toggle('hidden'); $('btnCodeToggle').textContent = c.classList.contains('hidden') ? T('展开') : T('收起'); });
 
+  // ---------- ⚙ 设置：数据来源目录（flow_serve.py 托管下可改，保存即生效） ----------
+  const SET_KEYS = ['usage', 'rollout', 'agents', 'codex', 'qoder'];
+  let lastSetView = null;
+  function setLabel(k){
+    if (k === 'usage') return T('usage.jsonl 文件（📦 使用量）');
+    if (k === 'rollout') return T('ZCode rollout 目录（🪙 Token / 💬 问答）');
+    if (k === 'agents') return T('ZCode agents 目录（🤖 子智能体）');
+    if (k === 'codex') return T('Codex CLI 会话目录（💬 问答 / 用量）');
+    if (k === 'qoder') return T('Qoder CLI 数据目录（💬 问答 / 用量）');
+    return k;
+  }
+  async function openSetDlg(){
+    lastSetView = null;
+    $('setMsg').textContent = '';
+    $('setBody').innerHTML = '<p class="hint">' + T('正在读取设置…') + '</p>';
+    $('setSave').disabled = true; $('setDefaults').disabled = true;
+    $('setDlg').showModal();
+    const capable = (httpCaps && httpCaps.settings) || /^https?:$/.test(location.protocol);
+    if (!capable){
+      $('setBody').innerHTML = '<p class="hint">' + T('当前不是 flow_serve.py 托管（或服务版本过旧），无法修改数据来源目录；用 flow_serve.py 打开编辑器后再来设置。') + '</p>';
+      return;
+    }
+    try {
+      const r = await fetch('__flow_settings?_=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      renderSetDlg(await r.json());
+      $('setSave').disabled = false; $('setDefaults').disabled = false;
+    } catch(e){
+      $('setBody').innerHTML = '<p class="hint">' + escXml(T('读取设置失败（需 flow_serve.py 托管）：') + String(e && e.message || e)) + '</p>';
+    }
+  }
+  function renderSetDlg(v, keepInputs){
+    const vals = {};
+    if (keepInputs) SET_KEYS.forEach(k => { const el = $('setp_' + k); if (el) vals[k] = el.value; });
+    lastSetView = v;
+    const saved = v.saved || {}, cli = v.cli || {}, dflt = v.default || {}, eff = v.effective || {}, ex = v.exists || {};
+    $('setBody').innerHTML = SET_KEYS.map(k => {
+      const locked = !!cli[k];
+      const val = (keepInputs && vals[k] !== undefined) ? vals[k] : (saved[k] || '');
+      const st = [T('当前生效：') + '<code>' + escXml(eff[k] || '—') + '</code> <b class="' + (ex[k] ? 'ok' : 'bad') + '">' + (ex[k] ? '✓ ' + T('存在') : '✗ ' + T('不存在')) + '</b>'];
+      if (locked) st.push('🔒 ' + T('由启动参数指定，本次不可改'));
+      else if (saved[k]) st.push(T('（已保存覆盖默认）'));
+      else st.push(T('（默认路径，留空即可）'));
+      return '<div class="setRow"><label for="setp_' + k + '">' + escXml(setLabel(k)) + '</label>' +
+        '<input type="text" id="setp_' + k + '"' + (locked ? ' disabled' : '') + ' placeholder="' + escXml(T('默认：') + (dflt[k] || '')) + '" value="' + escXml(val) + '">' +
+        '<div class="stat">' + st.join('　') + '</div></div>';
+    }).join('');
+  }
+  $('btnSet').addEventListener('click', openSetDlg);
+  $('setSave').addEventListener('click', async () => {
+    const paths = {};
+    SET_KEYS.forEach(k => { const el = $('setp_' + k); if (el) paths[k] = el.value.trim(); });
+    $('setMsg').textContent = T('正在保存…');
+    try {
+      const r = await fetch('__flow_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths }) });
+      const j = await r.json();
+      if (!j.ok){ $('setMsg').textContent = T('保存失败：') + (j.error || ('HTTP ' + r.status)); return; }
+      renderSetDlg(j.view);
+      const locked = j.locked || [];
+      $('setMsg').textContent = locked.length
+        ? tx('已保存；由启动参数指定的 {0} 已忽略', locked.map(k => setLabel(k)).join('，'))
+        : T('✅ 已保存并立即生效');
+      toast(T('✅ 设置已保存并立即生效'));
+      loadHttpUsage();
+      if (httpCaps && httpCaps.clientUsage) loadHttpClientUsage(true).then(() => { if (curView === 'ctl') renderCtlUsage(); });
+      else if (httpCaps && httpCaps.tokens) loadHttpTokens(true).then(() => { if (curView === 'ctl') renderCtlUsage(); });
+      loadHttpQa(true);
+    } catch(e){ $('setMsg').textContent = T('保存失败：') + String(e && e.message || e); }
+  });
+  $('setDefaults').addEventListener('click', () => {
+    SET_KEYS.forEach(k => { const el = $('setp_' + k); if (el && !el.disabled) el.value = ''; });
+    $('setMsg').textContent = T('已清空为默认路径——点「💾 保存」生效。');
+  });
+
   // ---------- 页签编辑（双向同步） ----------
   let codeTimer = null;
   Object.entries(tas).forEach(([key, el]) => {
@@ -3054,7 +3182,7 @@ if (typeof document !== "undefined") var UI = function(){
         const models = [...mm.values()].sort((a, b) => b.total - a.total || b.calls - a.calls);
         const sess = (c.bySession || []).filter(s => tokSceneDays(s, tokPeriod, tokMode)).slice(0, 12);
         const mRows = models.map(m => '<tr><td>' + escXml(m.model) + '</td><td>' + m.calls + '</td><td>' + fmtN(m.input) + '</td><td>' + fmtN(m.cacheRead) + '</td><td>' + fmtN(m.output) + '</td><td>' + fmtN(m.total || sumT(m)) + '</td></tr>').join('');
-        const sRows = sess.map(s => '<tr><td title="' + escXml(s.session) + '">' + escXml(qaBare(s.session).slice(0, 14)) + '…</td><td class="hint">' + escXml((s.cwd || '').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(sumT(s))) + '</td><td class="hint">' + escXml(s.last || '—') + '</td><td><button class="small" data-gotoqa="' + escXml(cid + '|' + s.session) + '">' + T('→ 查看问答') + '</button></td></tr>').join('');
+        const sRows = sess.map(s => '<tr><td title="' + escXml(s.session) + '">' + escXml(qaBare(s.session).slice(0, 14)) + '…</td><td class="hint">' + escXml((s.cwd || '').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(sumT(s))) + '</td><td class="hint">' + escXml(s.last || '—') + '</td><td><button class="small" data-gotoqa="' + escXml(cid + '|' + s.session) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(cid + '|' + s.session) + '" title="' + T('把该会话的问答追加到当前画布（可撤销）') + '">' + T('⤵ 导入画布') + '</button></td></tr>').join('');
         if (!models.length && !sess.length) return;
         card += '<div style="margin:6px 0 2px"><b style="color:' + ci.color + '">● ' + escXml(ci.label) + '</b>　<span class="hint">' + T('调用') + ' ' + models.reduce((n, m) => n + m.calls, 0) + (c.tokens === false ? ' · ' + T('该客户端不记录令牌数') : ' · ' + fmtN(models.reduce((n, m) => n + (m.total || sumT(m)), 0)) + ' tokens') + '</span></div>' +
           (mRows ? '<table class="stable" style="width:auto"><thead><tr><th>' + T('模型') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th></tr></thead><tbody>' + mRows + '</tbody></table>' : '') +
@@ -3092,16 +3220,16 @@ if (typeof document !== "undefined") var UI = function(){
         '<tr><td>' + escXml(p.plugin) + '</td><td>' + p.calls + '</td><td>' + fmtN(p.input) + '</td><td>' + fmtN(p.cacheRead) + '</td><td>' + fmtN(p.output) + '</td><td>' + fmtN(sumT(p)) + '</td><td>' + (sumT(s) ? (sumT(p) / sumT(s) * 100).toFixed(1) : '0.0') + '%</td></tr>').join('')
         + (s.unattr && s.unattr.calls ? '<tr style="color:var(--muted)"><td>' + T('未归属（内置工具 / 对话）') + '</td><td>' + s.unattr.calls + '</td><td>' + fmtN(s.unattr.input) + '</td><td>' + fmtN(s.unattr.cacheRead) + '</td><td>' + fmtN(s.unattr.output) + '</td><td>' + fmtN(sumT(s.unattr)) + '</td><td>' + (sumT(s) ? (sumT(s.unattr) / sumT(s) * 100).toFixed(1) : '0.0') + '%</td></tr>' : '');
       const detail = open
-        ? '<tr class="sess-detail"><td colspan="8" style="background:var(--canvas);padding:6px 10px 10px">' +
+        ? '<tr class="sess-detail"><td colspan="9" style="background:var(--canvas);padding:6px 10px 10px">' +
             '<div class="hint" style="margin:0 0 4px">' + escXml(ci.label) + ' · ' + T('会话 ') + escXml(s.session) + ' · ' + escXml(s.first || '—') + ' → ' + escXml(s.last || '—') +
-            '　<button class="small" data-gotoqa="' + escXml(k) + '">' + T('→ 查看问答') + '</button></div>' +
+            '　<button class="small" data-gotoqa="' + escXml(k) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(k) + '" title="' + T('把该会话的问答追加到当前画布（可撤销）') + '">' + T('⤵ 导入画布') + '</button></div>' +
             ((s.days || []).length ? '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div><div class="hsec" style="margin:2px 0 0">' + T('按日明细') + '</div><table class="stable" style="width:auto">' +
             '<thead><tr><th>' + T('日期') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th></tr></thead><tbody>' + dayRows + '</tbody></table></div>' : '') +
             (plugRows ? '<div><div class="hsec" style="margin:2px 0 0">' + T('按插件分摊') + '</div><table class="stable" style="width:auto">' +
             '<thead><tr><th>' + T('插件') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('占比') + '</th></tr></thead><tbody>' + plugRows + '</tbody></table></div>' : '') +
             ((s.days || []).length || plugRows ? '</div>' : '') + '</td></tr>'
         : '';
-      return '<tr class="sess-row toksess-row" data-toksess="' + escXml(k) + '" data-sid="' + escXml(s.session) + '"><td><span style="color:' + ci.color + '">●</span> <span class="sarr">' + (open ? '▼' : '▶') + '</span>' + escXml(qaBare(s.session).slice(0, 16)) + '…</td><td class="hint" title="' + escXml(s.cwd || '') + '">' + escXml((s.cwd || '—').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.output)) + '</td><td>' + stot + '</td><td>' + escXml(s.last || '—') + '</td></tr>' + detail;
+      return '<tr class="sess-row toksess-row" data-toksess="' + escXml(k) + '" data-sid="' + escXml(s.session) + '"><td><span style="color:' + ci.color + '">●</span> <span class="sarr">' + (open ? '▼' : '▶') + '</span>' + escXml(qaBare(s.session).slice(0, 16)) + '…</td><td class="hint" title="' + escXml(s.cwd || '') + '">' + escXml((s.cwd || '—').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.output)) + '</td><td>' + stot + '</td><td>' + escXml(s.last || '—') + '</td><td><button class="small" data-importflow="' + escXml(k) + '" title="' + T('把该会话的问答追加到当前画布（可撤销）') + '">' + T('⤵ 导入画布') + '</button></td></tr>' + detail;
     }).join('');
     // ZCode 插件归属（只有 ZCode 有插件归属数据）
     const zc = entries.find(([k]) => k === 'zcode');
@@ -3119,7 +3247,7 @@ if (typeof document !== "undefined") var UI = function(){
       '<p class="hint" style="margin:2px 0 8px">' + (qoderOnly ? '' : T('合计 = 输入 + 输出 + 缓存读（缓存读为命中缓存的输入、单价低）。')) + T('扫描 ') + entries.reduce((n, [, c]) => n + (c.files || 0), 0) + T(' 个会话文件') + (clientUsageAt ? T('，于 ') + escXml(clientUsageAt) + T('（20 秒缓存）') : '') + T('。') + (notes.length ? ' ' + escXml(notes.join('；')) + T('。') : '') + '</p>';
     html += (series.length ? renderTokChart(series, tokMode) : '<p class="hint">' + T('该客户端暂无按日数据。') + '</p>');
     html += periodSec + modelSec + pluginSec +
-      (sessRows ? '<div class="hsec">' + tx('按会话（{0} 个 · 点行展开明细，可转跳问答）', sessAll.length) + '</div><table class="stable"><thead><tr><th>' + T('会话') + '</th><th>' + T('目录') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('最后活动') + '</th></tr></thead><tbody>' + sessRows + '</tbody></table>' : '');
+      (sessRows ? '<div class="hsec">' + tx('按会话（{0} 个 · 点行展开明细，可转跳问答 / 导入画布）', sessAll.length) + '</div><table class="stable"><thead><tr><th>' + T('会话') + '</th><th>' + T('目录') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('最后活动') + '</th><th></th></tr></thead><tbody>' + sessRows + '</tbody></table>' : '');
     return html;
   }
   function renderCtlMap(){
@@ -3606,6 +3734,8 @@ if (typeof document !== "undefined") var UI = function(){
     if (pBtn){ const v = pBtn.dataset.tokperiod; tokPeriod = (v === 'close' || v === tokPeriod) ? '' : v; renderCtlUsage(); return; }
     const gq = ev.target.closest('[data-gotoqa]');
     if (gq){ const parts = gq.dataset.gotoqa.split('|'); gotoQaSession(parts[0], parts.slice(1).join('|')); return; }
+    const imp = ev.target.closest('[data-importflow]');
+    if (imp){ const parts = imp.dataset.importflow.split('|'); importSessionToCanvas(parts[0], parts.slice(1).join('|')); return; }
     const row = ev.target.closest('tr.toksess-row') || ev.target.closest('tr.sess-row');
     if (!row) return;
     const k = row.dataset.toksess || ('zcode|' + row.dataset.sid);
@@ -4128,29 +4258,66 @@ if (typeof document !== "undefined") var UI = function(){
     toast(tx('已生成工作画布（🧠 总任务 {0} · 🤖 子智能体 {1}）', r.masters, r.subs));
   }
   $('qaCanvasBtn').addEventListener('click', genQaCanvas);
+  // 按需从本地服务载入某客户端某会话（转跳问答 / 导入画布共用）；返回新增问答条数
+  async function ensureQaSession(client, sid){
+    const bare = qaBare(sid);
+    if (!bare) return 0;
+    if (qaItems.some(it => qaBare(it.sessionId).indexOf(bare) >= 0 || qaBare(it.parentSession).indexOf(bare) >= 0)) return 0;
+    let added = 0;
+    try {
+      const lst = await (await qaFetch('/__flow_clients')).json();
+      const c = (lst.clients || []).find(x => x.id === client);
+      const s = c && (c.sessions || []).find(x => qaBare(x.session).indexOf(bare) >= 0 || String(x.id || '').indexOf(bare) >= 0 || String(x.name || '').indexOf(bare) >= 0);
+      if (s){
+        const url = '/__flow_client_file?client=' + encodeURIComponent(client) + '&id=' + encodeURIComponent(s.id || s.session) + '&tail=' + (4 * 1024 * 1024);
+        const txt = await (await qaFetch(url)).text();
+        const subInfo = s.sub ? { profile: String(s.name || '').replace(/^agent-/, '').replace(/\.jsonl$/, '').replace(/-[0-9a-f]{16}$/, ''), parentSession: s.parent || '', agentPath: s.id || '' } : null;
+        added = loadQaText(txt, T('会话 ') + qaBare(s.session).slice(0, 12) + (s.sub ? ' · ' + T('子智能体') : ''), client, subInfo, s.session);
+        if (added){ qaDirty = true; }
+      }
+    } catch(e){}
+    return added;
+  }
   // 从用量/详情转跳问答：定位某客户端某会话（未载入时按需从本地服务取）
   async function gotoQaSession(client, sid){
     showView('qa');
     const el = $('qaClient'); if (el) el.value = client || 'all';
     const whoEl = $('qaWho'); if (whoEl) whoEl.value = 'all';
     $('qaKw').value = '';
-    const bare = qaBare(sid);
-    if (bare && !qaItems.some(it => qaBare(it.sessionId).indexOf(bare) >= 0 || qaBare(it.parentSession).indexOf(bare) >= 0)){
-      try {
-        const lst = await (await qaFetch('/__flow_clients')).json();
-        const c = (lst.clients || []).find(x => x.id === client);
-        const s = c && (c.sessions || []).find(x => qaBare(x.session).indexOf(bare) >= 0 || String(x.id || '').indexOf(bare) >= 0 || String(x.name || '').indexOf(bare) >= 0);
-        if (s){
-          const url = '/__flow_client_file?client=' + encodeURIComponent(client) + '&id=' + encodeURIComponent(s.id || s.session) + '&tail=' + (4 * 1024 * 1024);
-          const txt = await (await qaFetch(url)).text();
-          const subInfo = s.sub ? { profile: String(s.name || '').replace(/^agent-/, '').replace(/\.jsonl$/, '').replace(/-[0-9a-f]{16}$/, ''), parentSession: s.parent || '', agentPath: s.id || '' } : null;
-          const n = loadQaText(txt, T('会话 ') + qaBare(s.session).slice(0, 12) + (s.sub ? ' · ' + T('子智能体') : ''), client, subInfo, s.session);
-          if (n){ qaDirty = true; }
-        }
-      } catch(e){}
-    }
-    $('qaKw').value = bare.slice(0, 12);
+    await ensureQaSession(client, sid);
+    $('qaKw').value = qaBare(sid).slice(0, 12);
     renderQa();
+  }
+  // 总控 → 把某会话的问答追加导入当前画布（与「生成工作画布」的整体替换不同，可 Ctrl+Z 撤销）
+  async function importSessionToCanvas(client, sid){
+    const bare = qaBare(sid);
+    if (!bare){ toast(T('会话 ID 缺失，无法导入画布')); return; }
+    await ensureQaSession(client, sid);
+    const items = qaItems.filter(it => (qaBare(it.sessionId).indexOf(bare) >= 0 || qaBare(it.parentSession).indexOf(bare) >= 0)
+      && (String(it.q || '').trim() || String(it.a || '').trim()));
+    if (!items.length){ toast(T('未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布')); return; }
+    const r = flowFromQa(items, { maxNodes: 36 });
+    if (!r.code){ toast(T('没有可用的问答条目')); return; }
+    const tpl = normalize(parseMermaid(r.code));
+    if (tpl.errors && tpl.errors.length && !tpl.nodes.length){ toast(T('生成画布失败：') + tpl.errors[0]); return; }
+    autoLayout(tpl, tpl.dir);
+    pushHistory();
+    const tMinX = Math.min(...tpl.nodes.map(n => n.x)), tMinY = Math.min(...tpl.nodes.map(n => n.y));
+    const offX = g.nodes.length ? Math.max(...g.nodes.map(n => n.x + n.w)) + 80 : 60;
+    const baseY = g.nodes.length ? Math.min(...g.nodes.map(n => n.y)) : 60;
+    const idMap = {};
+    tpl.nodes.forEach(n => {
+      const c = Object.assign({}, n);
+      c.id = newNodeId(g);
+      idMap[n.id] = c.id;
+      c.x = Math.round(n.x - tMinX + offX);
+      c.y = Math.round(n.y - tMinY + baseY);
+      g.nodes.push(c);
+    });
+    tpl.edges.forEach(e => { if (idMap[e.from] && idMap[e.to]) g.edges.push(Object.assign({}, e, { from: idMap[e.from], to: idMap[e.to] })); });
+    setSel(null); refresh(true); markDirty();
+    showView('canvas');
+    toast(tx('已把会话 {0} 导入画布（🧠 {1} · 🤖 {2}，Ctrl+Z 可撤销）', bare.slice(0, 12), r.masters, r.subs));
   }
 
   // ---------- 🌐 本地服务自动同步：最新会话 + 全部子智能体（每 6s 轻量轮询，仅变化时取原文） ----------
@@ -4287,7 +4454,7 @@ if (typeof document !== "undefined") var UI = function(){
   syncCode();
   tryRestoreSync().then(initHttpWatch, initHttpWatch); // 先恢复文件句柄；无句柄时退回 HTTP 自动连接（flow_serve.py）
   // 测试钩子（自动化验证用，不影响正常使用）
-  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
+  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, ensureQaSession, importSessionToCanvas, openSetDlg, renderSetDlg, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

@@ -20,12 +20,17 @@
  11. GET  /__flow_agent?path=sess_x/agent_y → 读该子智能体的 metadata.json 与 output.txt 原文；
  12. GET  /__flow_clients → 列三个代码客户端（ZCode / Codex CLI / Qoder CLI）的会话文件（含 Qoder 子智能体）；
  13. GET  /__flow_client_file?client=&id=&tail= → 读指定客户端会话原文（tail=末尾字节数，大文件增量浏览）；
- 14. GET  /__flow_client_usage → 多客户端用量聚合（ZCode+Codex 令牌明细、Qoder 模型调用数，20s 缓存）。
+ 14. GET  /__flow_client_usage → 多客户端用量聚合（ZCode+Codex 令牌明细、Qoder 模型调用数，20s 缓存）；
+ 15. GET  /__flow_settings → 数据来源目录设置视图（saved/cli/default/effective/exists）；
+ 16. POST /__flow_settings {"paths":{...}} → 保存数据来源目录（usage/rollout/agents/codex/qoder），
+     写入 ~/.zcode/codex-manager/flow-settings.json 并立即生效（空串=清除覆盖；
+     启动参数指定的路径优先，不受设置覆盖）。
 
-安全约束：只绑定 127.0.0.1；写回目标固定为 --watch 指定的单个文件或技能目录下的
-SKILL.md，slug 必须匹配 ^[a-z0-9][a-z0-9-]{0,63}$，会话/子智能体/客户端文件路径按名字
-正则校验且解析后的真实路径必须位于对应根目录之内（防目录穿越）；会话文件与客户端
-文件读取均有字节上限。
+安全约束：只绑定 127.0.0.1；写回目标固定为 --watch 指定的单个文件、技能目录下的
+SKILL.md 或设置文件 flow-settings.json，slug 必须匹配 ^[a-z0-9][a-z0-9-]{0,63}$，
+会话/子智能体/客户端文件路径按名字正则校验且解析后的真实路径必须位于对应根目录之内
+（防目录穿越）；设置键固定为 5 个数据来源目录且值必须为绝对路径字符串；会话文件与
+客户端文件读取均有字节上限。
 """
 import argparse
 import glob
@@ -719,6 +724,39 @@ def default_paths():
             os.path.join(home, ".qoder-cn"))
 
 
+SETTINGS_KEYS = ("usage", "rollout", "agents", "codex", "qoder")
+KEY_ATTR = {"usage": "usage_path", "rollout": "rollout_dir", "agents": "agents_dir",
+            "codex": "codex_dir", "qoder": "qoder_dir"}
+
+
+def settings_file():
+    return os.path.join(os.path.expanduser("~"), ".zcode", "codex-manager", "flow-settings.json")
+
+
+def settings_load():
+    """读取 flow-settings.json 的路径覆盖值；文件缺失/损坏/类型不符时忽略，返回 {}。"""
+    try:
+        with open(settings_file(), encoding="utf-8") as f:
+            obj = json.load(f)
+    except Exception:
+        return {}
+    if not isinstance(obj, dict):
+        return {}
+    return {k: obj[k].strip() for k in SETTINGS_KEYS
+            if isinstance(obj.get(k), str) and obj[k].strip()}
+
+
+def settings_save(saved):
+    path = settings_file()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    text = json.dumps(saved, ensure_ascii=False, indent=2) + "\n"
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(prefix=".flow-settings-", dir=d)
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
 class Handler(SimpleHTTPRequestHandler):
     watch = "flow-source.mmd"
     root = "."
@@ -729,6 +767,9 @@ class Handler(SimpleHTTPRequestHandler):
     skills_install = ""
     codex_dir = ""
     qoder_dir = ""
+    settings_saved = {}      # flow-settings.json 中已保存的覆盖值（内存副本）
+    settings_cli = {}        # 启动参数显式指定的路径（优先级最高，设置不可覆盖）
+    settings_default = {}    # 各键的出厂默认路径
 
     def watch_path(self):
         try:
@@ -882,10 +923,14 @@ class Handler(SimpleHTTPRequestHandler):
                 "codex": bool(self.codex_dir and os.path.isdir(self.codex_dir)),
                 "qoder": bool(self.qoder_dir and os.path.isdir(self.qoder_dir)),
                 "clients": True,  # /__flow_clients 端点存在（多客户端会话列表）
+                "settings": True,  # /__flow_settings 端点存在（数据来源目录设置）
                 "clientUsage": bool((self.rollout_dir and os.path.isdir(self.rollout_dir))
                                     or (self.codex_dir and os.path.isdir(self.codex_dir))
                                     or (self.qoder_dir and os.path.isdir(self.qoder_dir))),
             })
+            return
+        if path == "/__flow_settings":
+            self.send_json(200, self.settings_view())
             return
         if path == "/__flow_usage":
             # 给编辑器自动载入 usage.jsonl（Agent Skills/轨迹查询/总控使用量共用）
@@ -1060,6 +1105,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/__flow_skill":
             self.post_skill()
             return
+        if path == "/__flow_settings":
+            self.post_settings()
+            return
         if path != "/__flow_write":
             self.send_json(404, {"ok": False, "error": "unknown endpoint"})
             return
@@ -1107,6 +1155,65 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json(200, {"ok": True, "path": fp, "target": target,
                              "bytes": len(text.encode("utf-8"))})
 
+    def settings_view(self):
+        """数据来源目录设置视图：saved（文件覆盖）/cli（启动参数锁定）/default/effective/exists。"""
+        effective = {k: getattr(self, KEY_ATTR[k]) for k in SETTINGS_KEYS}
+        exists = {}
+        for k in SETTINGS_KEYS:
+            p = effective.get(k) or ""
+            exists[k] = os.path.isfile(p) if k == "usage" else os.path.isdir(p)
+        return {"ok": True, "file": settings_file(),
+                "saved": dict(self.settings_saved), "cli": dict(self.settings_cli),
+                "default": dict(self.settings_default), "effective": effective, "exists": exists}
+
+    def post_settings(self):
+        """保存数据来源目录：键固定 5 个、值须为绝对路径字符串（空=清除覆盖）；
+        CLI 锁定的键保持不变；未锁定的立即生效并原子落盘。"""
+        try:
+            body = self.read_body()
+            paths = body.get("paths")
+            if not isinstance(paths, dict):
+                raise ValueError("缺少 paths 字段")
+        except Exception as e:
+            self.send_json(400, {"ok": False, "error": "请求体解析失败：%s" % e})
+            return
+        saved = dict(self.settings_saved)
+        locked, bad, resolved = [], [], {}
+        for k in SETTINGS_KEYS:
+            if k not in paths:
+                continue
+            v = paths[k]
+            if not isinstance(v, str):
+                bad.append(k)
+                continue
+            v = os.path.expandvars(os.path.expanduser(v.strip()))
+            if v and not os.path.isabs(v):
+                bad.append(k)
+                continue
+            resolved[k] = v
+        if bad:
+            self.send_json(400, {"ok": False, "error": "以下路径无效（需为绝对路径）：%s" % ", ".join(bad)})
+            return
+        applied = {}
+        for k, v in resolved.items():
+            if v and k in self.settings_cli:
+                locked.append(k)
+                continue
+            if v:
+                saved[k] = v
+            else:
+                saved.pop(k, None)
+            applied[k] = v or (self.settings_cli.get(k) or self.settings_default.get(k) or "")
+        try:
+            settings_save(saved)
+        except Exception as e:
+            self.send_json(500, {"ok": False, "error": "设置写入失败：%s" % e})
+            return
+        for k, v in applied.items():
+            setattr(type(self), KEY_ATTR[k], v)  # 改类属性：后续所有请求立即用新路径
+        type(self).settings_saved = saved
+        self.send_json(200, {"ok": True, "locked": locked, "view": self.settings_view()})
+
     def log_message(self, fmt, *args):
         line = fmt % args
         if "__flow_ping" in line or "GET /flow-" in line:
@@ -1139,15 +1246,20 @@ def main():
         print("目录不存在：%s" % root, file=sys.stderr)
         sys.exit(2)
     d_usage, d_rollout, d_agents, d_skills, d_skills_install, d_codex, d_qoder = default_paths()
+    cli_paths = {k: v for k, v in (("usage", a.usage), ("rollout", a.rollout), ("agents", a.agents),
+                                   ("codex", a.codex), ("qoder", a.qoder)) if v}
+    defaults = {"usage": d_usage, "rollout": d_rollout, "agents": d_agents,
+                "codex": d_codex, "qoder": d_qoder}
+    saved = settings_load()
     Handler.root = root
     Handler.watch = a.watch
-    Handler.usage_path = a.usage or d_usage
-    Handler.rollout_dir = a.rollout or d_rollout
-    Handler.agents_dir = a.agents or d_agents
+    Handler.settings_cli = cli_paths
+    Handler.settings_default = defaults
+    Handler.settings_saved = saved
+    for k in SETTINGS_KEYS:
+        setattr(Handler, KEY_ATTR[k], cli_paths.get(k) or saved.get(k) or defaults[k])
     Handler.skills_dir = a.skills or d_skills
     Handler.skills_install = a.skills_install or d_skills_install
-    Handler.codex_dir = a.codex or d_codex
-    Handler.qoder_dir = a.qoder or d_qoder
 
     httpd = None
     for port in range(a.port, a.port + 12):
@@ -1170,6 +1282,8 @@ def main():
     print("  skills-install=%s（%s）" % (Handler.skills_install, "存在" if os.path.isdir(Handler.skills_install) else "缺失，安装技能时自动创建"))
     print("  codex=%s（%s）" % (Handler.codex_dir, "存在" if os.path.isdir(Handler.codex_dir) else "缺失"))
     print("  qoder=%s（%s）" % (Handler.qoder_dir, "存在" if os.path.isdir(Handler.qoder_dir) else "缺失"))
+    print("  设置文件=%s（%s）" % (settings_file(),
+          ("已保存覆盖：" + ", ".join(sorted(saved))) if saved else "无覆盖，可在编辑器 ⚙ 设置中修改"))
     print("FLOW_SERVE_URL=%s" % url)
     if a.open:
         import webbrowser
