@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -27,6 +27,7 @@ const core = await import(pathToFileURL(corePath).href);
   extractKeywords, parseQaTurns, parseAgentRecords, qaFilter, qaLabel,
   parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa,
   suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts,
+  fmtWfWhen, taskCanvasName, wfTree, isQaContinuation,
 } = core;
 
 let pass = 0, fail = 0;
@@ -629,6 +630,48 @@ t("flowFromQa + parseMermaid 往返：导入画布所需的节点/虚线边完�
   ok(g.edges.some(e => e.style === "solid"), "总任务链是实线");
   ok(g.edges.some(e => e.style === "dotted"), "子智能体挂载是虚线");
   ok(g.nodes.every(n => n.x === 0 && n.y === 0), "解析后待 autoLayout 排版（导入前会重排）");
+});
+t("flowFromQa：turns 小对话元数据（节点 / 时间 / 子智能体挂载）", () => {
+  const r = flowFromQa(qaFixtures, { maxNodes: 36 });
+  ok(Array.isArray(r.turns), "应返回 turns 数组");
+  eq(r.turns.length, 2, "两条提问 = 两个小对话");
+  eq(r.turns.map(x => x.node), ["m1", "m2"], "小对话按时间正序对应节点");
+  ok(r.turns[0].q && r.turns[0].ts === 2000, "小对话带提问摘要与时间");
+  eq(r.turns.reduce((n, x) => n + x.subs.length, 0), r.subs, "子智能体全部挂到某条小对话上");
+  ok(r.turns.some(x => x.subs.length), "至少一条小对话带子智能体");
+  eq(flowFromQa([], {}).turns, [], "空数据返回空 turns");
+});
+t("fmtWfWhen：MM-DD HH:mm 固定格式", () => {
+  eq(fmtWfWhen(new Date(2026, 9, 7, 9, 5).getTime()), "10-07 09:05", "两位数补零");
+  ok(/^\d{2}-\d{2} \d{2}:\d{2}$/.test(fmtWfWhen(Date.now())), "当前时间格式稳定");
+});
+t("taskCanvasName：时间+任务命名，重名自动加序号", () => {
+  eq(taskCanvasName("10-07 14:30", "修复导出 bug", []), "主流程（10-07 14:30，修复导出 bug）");
+  const taken = ["主流程（10-07 14:30，修复导出 bug）", "主流程（10-07 14:30，修复导出 bug 2）"];
+  eq(taskCanvasName("10-07 14:30", "修复导出 bug", taken), "主流程（10-07 14:30，修复导出 bug 3）");
+  eq(taskCanvasName("10-07 14:30", "", []), "主流程（10-07 14:30，对话）", "空任务名回落「对话」");
+});
+t("wfTree：对话画布挂父画布下；父缺失/自挂回落顶层", () => {
+  const list = [
+    { name: "主流程", data: {} },
+    { name: "主流程（10-07 14:30，部署）", src: { parent: "主流程" } },
+    { name: "孤儿画布", src: { parent: "不存在的父" } },
+    { name: "主流程（10-07 15:00，测试）", src: { parent: "主流程" } },
+    { name: "自挂画布", src: { parent: "自挂画布" } },
+  ];
+  const tree = wfTree(list);
+  eq(tree.length, 3, "根 = 主流程 + 孤儿 + 自挂");
+  eq(tree[0].w.name, "主流程");
+  eq(tree[0].children.map(c => c.name), ["主流程（10-07 14:30，部署）", "主流程（10-07 15:00，测试）"], "子画布保持原顺序");
+  eq(tree[1].children.length + tree[2].children.length, 0, "孤儿与自挂没有子画布");
+  eq(wfTree([]).length, 0, "空列表返回空树");
+});
+t("qaLabel / isQaContinuation：上下文续接注入不当任务名", () => {
+  ok(isQaContinuation("This session is being continued from a previous conversation that ran out of context."), "识别续接注入");
+  ok(!isQaContinuation("打开 8380 查看新版效果"), "普通提问不误判");
+  ok(!isQaContinuation(""), "空串安全");
+  eq(qaLabel({ who: "master", q: "This session is being continued from a previous conversation that ran out of context.\nThe summary below covers the earlier portion." }), "(上下文续接)");
+  eq(qaLabel({ who: "master", q: "把会话转成流程图" }), "把会话转成流程图", "普通条目标签不受影响");
 });
 t("flowTemplate：英文参数输出英文标签，缺省中文不变", () => {
   const zh = flowTemplate("测试");

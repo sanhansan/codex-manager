@@ -41,6 +41,24 @@
   #side .wfitem span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #side .wfitem.active { border-color:var(--accent); color:var(--accent); }
   #side .wfitem .cnt { color:var(--muted); font-size:11px; flex-shrink:0; }
+  #side .wfrow { text-align:left; border:1px solid transparent; background:transparent; padding:4px 8px; border-radius:8px; display:flex; justify-content:flex-start; align-items:center; gap:5px; max-width:100%; cursor:pointer; font-size:12.5px; }
+  #side .wfrow:hover { background:rgba(120,130,160,.12); }
+  #side .wfrow.active { border-color:var(--accent); color:var(--accent); }
+  #side .wfrow .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #side .wfrow .cnt { color:var(--muted); font-size:10.5px; flex-shrink:0; }
+  #side .wftog { width:13px; flex-shrink:0; text-align:center; color:var(--muted); cursor:pointer; user-select:none; font-size:10px; }
+  #side .wftog:hover { color:var(--accent); }
+  #side .wfchild { padding-left:13px; border-left:1px dashed var(--line); margin-left:9px; }
+  #side .wfdot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  #side .wfchild .wfrow { padding:3px 8px 0; align-items:flex-start; }
+  #side .wfchild .wfrow .nm { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
+  #side .wfmeta { color:var(--muted); font-size:10px; padding:1px 3px 3px 26px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; border-radius:0 0 8px 8px; }
+  #side .wfmeta:hover { color:var(--accent); background:rgba(120,130,160,.10); }
+  #side .wfturn { padding:2px 6px 2px 30px; font-size:11px; color:var(--muted); cursor:pointer; display:flex; gap:4px; align-items:baseline; border-radius:6px; }
+  #side .wfturn:hover { color:var(--accent); background:rgba(120,130,160,.10); }
+  #side .wfturn .tq { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nd-flash { animation:ndflash 1.5s ease-out; }
+  @keyframes ndflash { 0%,55% { filter:drop-shadow(0 0 7px var(--accent)) brightness(1.35); } 100% { filter:none; } }
   #side .grow { flex:1; }
   #side .sbtn { font-size:12.5px; padding:5px 10px; text-align:left; }
   #content { flex:1; display:flex; flex-direction:column; min-width:0; }
@@ -1485,9 +1503,12 @@ function qaCleanText(s){
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/```[\s\S]*?```/g, ' ');
 }
+// 上下文压缩后的续接注入消息（"This session is being continued…"）不算任务名
+function isQaContinuation(q){ return /^This session is being continued from a previous conversation/i.test(String(q || '').trim()); }
 function qaLabel(it){
   if (!it) return '(无提问)';
   if (it.who === 'sub' && it.description) return String(it.description).trim();
+  if (isQaContinuation(it.q)) return '(上下文续接)';
   const lines = qaCleanText(it.q).split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const isCodey = ln => /^[{}<>#\]()]/.test(ln)
     || /^(const|let|var|function|import|export|def|class|public|private|async|await|select|curl|npm|git|cd|python|node|pip)\b/i.test(ln)
@@ -1666,14 +1687,16 @@ function flowFromQa(items, opt){
   const mPick = masters.length > maxNodes ? masters.slice(masters.length - maxNodes) : masters;
   const budget = Math.max(0, maxNodes - mPick.length);
   const sPick = subs.length > budget ? subs.slice(subs.length - budget) : subs;
-  if (!mPick.length && !sPick.length) return { code: '', masters: 0, subs: 0 };
+  if (!mPick.length && !sPick.length) return { code: '', masters: 0, subs: 0, turns: [] };
   const clean = s => String(s == null ? '' : s).replace(/["\[\]{}()\r\n]/g, ' ').replace(/\s+/g, ' ').trim();
   const lab = (icon, it, n) => { const t = clean(qaLabel(it)); return icon + ' ' + (t.length > n ? t.slice(0, n) + '…' : (t || '…')); };
   const L = ['flowchart TD'];
   const mId = new Map(), sId = new Map();
+  const turnList = [];
   mPick.forEach((it, i) => {
     const id = 'm' + (i + 1); mId.set(it, id);
     L.push('  ' + id + '["' + lab('🧠', it, 14) + '"]');
+    turnList.push({ q: qaLabel(it), ts: it.ts || 0, node: id, subs: [] });
   });
   sPick.forEach((it, i) => {
     const id = 's' + (i + 1); sId.set(it, id);
@@ -1683,11 +1706,38 @@ function flowFromQa(items, opt){
   let prevSub = null;
   sPick.forEach(it => {
     const anchor = [...mPick].reverse().find(m => (m.ts || 0) <= (it.ts || 0)) || mPick[0] || null;
-    if (anchor) L.push('  ' + mId.get(anchor) + ' -.-> ' + sId.get(it));
-    else if (prevSub) L.push('  ' + sId.get(prevSub) + ' -.-> ' + sId.get(it));
+    if (anchor){
+      L.push('  ' + mId.get(anchor) + ' -.-> ' + sId.get(it));
+      const t = turnList[mPick.indexOf(anchor)];
+      if (t) t.subs.push(sId.get(it));
+    } else if (prevSub) L.push('  ' + sId.get(prevSub) + ' -.-> ' + sId.get(it));
     prevSub = it;
   });
-  return { code: L.join('\n'), masters: mPick.length, subs: sPick.length };
+  return { code: L.join('\n'), masters: mPick.length, subs: sPick.length, turns: turnList };
+}
+
+// ---------- 对话画布：命名 / 树结构（纯函数；画布名 = 数据，不参与 i18n） ----------
+function fmtWfWhen(ts){
+  const d = new Date(ts || Date.now());
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function taskCanvasName(when, task, taken){
+  const base = '主流程（' + when + '，' + (task || '对话') + '）';
+  let nn = base, i = 2;
+  while ((taken || []).indexOf(nn) >= 0) nn = '主流程（' + when + '，' + (task || '对话') + ' ' + (i++) + '）';
+  return nn;
+}
+// 工作流列表 → 树：带 src.parent 的对话画布挂到其父画布下；父不存在时回落顶层
+function wfTree(list){
+  const names = {}; (list || []).forEach(w => { names[w.name] = true; });
+  const roots = [], kids = {};
+  (list || []).forEach(w => {
+    const p = w.src && w.src.parent;
+    if (p && p !== w.name && names[p]) (kids[p] = kids[p] || []).push(w);
+    else roots.push(w);
+  });
+  return roots.map(w => ({ w: w, children: kids[w.name] || [] }));
 }
 
 // ---------- 从提示词生成 Agent Skill 草稿（纯函数：问答/任务模式 → SKILL.md，双语） ----------
@@ -2056,19 +2106,31 @@ if (typeof document !== "undefined") var UI = function(){
     '客户端': 'Client',
     '客户端 ': 'Client ',
     '客户端模型用量': 'Model usage by client',
-    '将用问答生成的画布替换当前 {0} 个节点（可 Ctrl+Z 撤销），继续？': 'Replace the current {0} nodes with the Q&A-generated canvas (Ctrl+Z to undo)?',
     '已刷新 Token / 多客户端用量': 'Token / multi-client usage refreshed',
     '已导出 highlights-{0}.md': 'Exported highlights-{0}.md',
-    '已生成工作画布（🧠 总任务 {0} · 🤖 子智能体 {1}）': 'Canvas generated (🧠 {0} master tasks · 🤖 {1} subagents)',
     '已生成（基于 {0} 条命中问答）': 'Generated from {0} matched Q&A record(s)',
     '得分': 'Score',
     '扫描 ': 'Scanned ',
     '按会话（{0} 个 · 点行展开明细，可转跳问答 / 导入画布）': 'By session ({0} · click a row for details; jump to Q&A / import to canvas)',
     '⤵ 导入画布': '⤵ Import to canvas',
-    '把该会话的问答追加到当前画布（可撤销）': 'Append this session\u2019s Q&A to the current canvas (undoable)',
+    '把该会话的问答生成为独立对话画布（当前画布不受影响，同一会话重复导入会合并更新）': 'Generate this session\u2019s Q&A as an independent conversation canvas (the current canvas is unaffected; re-importing the same session merges updates)',
     '会话 ID 缺失，无法导入画布': 'Session ID missing; cannot import to canvas',
     '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
-    '已把会话 {0} 导入画布（🧠 {1} · 🤖 {2}，Ctrl+Z 可撤销）': 'Imported session {0} to canvas (🧠 {1} · 🤖 {2}, Ctrl+Z to undo)',
+    '问答画布': 'Q&A canvas',
+    '对话': 'Conversation',
+    '对话 · ': 'Conversation · ',
+    '任务 / 会话': 'Task / Session',
+    '展开对话画布': 'Expand conversation canvases',
+    '展开小对话': 'Expand the conversation\u2019s turns',
+    '{0} 对话': '{0} conversation(s)',
+    '已更新对话画布「{0}」（🧠 {1} · 🤖 {2}）': 'Updated conversation canvas “{0}” (🧠 {1} · 🤖 {2})',
+    '已新建对话画布「{0}」（挂在「{1}」下，展开左侧列表可点击跳转）': 'Created conversation canvas “{0}” (nested under “{1}”; expand the left list to jump)',
+    '该提问的节点在此画布中不存在（画布可能已被修改）': 'This turn\u2019s node no longer exists on this canvas (it may have been modified)',
+    '对话画布': 'Conversation canvas',
+    '{0} 小对话': '{0} turn(s)',
+    '挂在：': 'Nested under: ',
+    '文件同步仅作用于「': 'File sync applies only to \u201c',
+    '」；当前画布是对话画布，改动只存本地': '\u201d; the current canvas is a conversation canvas \u2014 its changes are kept locally only',
     'usage.jsonl 文件（📦 使用量）': 'usage.jsonl file (📦 usage)',
     'ZCode rollout 目录（🪙 Token / 💬 问答）': 'ZCode rollout directory (🪙 tokens / 💬 Q&A)',
     'ZCode agents 目录（🤖 子智能体）': 'ZCode agents directory (🤖 subagents)',
@@ -2184,12 +2246,77 @@ if (typeof document !== "undefined") var UI = function(){
     scheduleSyncWrite();
   }
   function entryNames(){ return WF.list.map(w => w.name); }
+  const wfCollapsed = new Set();  // 收起的根画布（默认展开，展开可见对话画布）
+  const wfExpanded = new Set();   // 展开小对话的对话画布（默认收起）
   function fillWfSel(){
     const box = $('wfList');
-    box.innerHTML = WF.list.map(w =>
-      '<button class="wfitem' + (w.name === WF.active ? ' active' : '') + '" data-wf="' + escXml(w.name) + '" title="' + escXml(w.name) + '">' +
-      '<span>' + escXml(w.name) + '</span><span class="cnt">' + tx('{0} 节点', ((w.data && w.data.nodes) || []).length) + '</span></button>').join('');
-    box.querySelectorAll('[data-wf]').forEach(b => b.addEventListener('click', () => switchWorkflow(b.dataset.wf)));
+    const rows = [];
+    wfTree(WF.list).forEach(node => {
+      const w = node.w, isActive = w.name === WF.active;
+      const kids = node.children;
+      const open = kids.length > 0 && !wfCollapsed.has(w.name);
+      rows.push('<div class="wfrow' + (isActive ? ' active' : '') + '" data-wf="' + escXml(w.name) + '" title="' + escXml(w.name) + '">' +
+        '<span class="wftog"' + (kids.length ? ' data-tog="r" data-name="' + escXml(w.name) + '" title="' + T('展开对话画布') + '"' : '') + '>' + (kids.length ? (open ? '▾' : '▸') : '') + '</span>' +
+        '<span class="nm">' + escXml(w.name) + (isActive ? T('（当前）') : '') + '</span>' +
+        '<span class="cnt">' + tx('{0} 节点', ((w.data && w.data.nodes) || []).length) + (kids.length ? ' · ' + tx('{0} 对话', kids.length) : '') + '</span></div>');
+      if (open) kids.forEach(k => {
+        const ci = qaClientInfo((k.src && k.src.client) || '');
+        const turns = (k.src && k.src.turns) || [];
+        const subsN = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
+        const ko = wfExpanded.has(k.name);
+        const ka = k.name === WF.active;
+        const when = (k.src && k.src.ts) ? fmtWfWhen(k.src.ts) : '';
+        const meta = ci.label.replace(/ CLI$/, '') + (when ? ' · ' + when.slice(6) : '');
+        const tip = ((k.src && k.src.session) || '') + '　' + k.name + (when ? '　' + when : '') + '　💬' + turns.length + (subsN ? ' · 🤖' + subsN : '');
+        rows.push('<div class="wfchild"><div class="wfrow' + (ka ? ' active' : '') + '" data-wf="' + escXml(k.name) + '" title="' + escXml(tip) + '">' +
+          '<span class="wftog"' + (turns.length ? ' data-tog="c" data-name="' + escXml(k.name) + '" title="' + T('展开小对话') + '"' : '') + '>' + (turns.length ? (ko ? '▾' : '▸') : '') + '</span>' +
+          '<span class="wfdot" style="background:' + ci.color + '" title="' + escXml(ci.label) + '"></span>' +
+          '<span class="nm">' + escXml((k.src && k.src.task) || k.name) + '</span></div>' +
+          '<div class="wfmeta" data-wf="' + escXml(k.name) + '">' + escXml(meta) + '</div></div>');
+        if (ko) turns.forEach(t => rows.push(
+          '<div class="wfturn" data-cw="' + escXml(k.name) + '" data-cn="' + escXml(t.node) + '" title="' + escXml(String(t.q)) + '">💬 <span class="tq">' + escXml(String(t.q).slice(0, 46)) + '</span>' +
+          ((t.subs && t.subs.length) ? '<span class="hint">🤖' + t.subs.length + '</span>' : '') + '</div>'));
+      });
+    });
+    box.innerHTML = rows.join('');
+    box.querySelectorAll('.wfrow[data-wf], .wfmeta[data-wf]').forEach(r => r.addEventListener('click', () => switchWorkflow(r.dataset.wf)));
+    box.querySelectorAll('.wftog[data-tog]').forEach(t => t.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const set = t.dataset.tog === 'r' ? wfCollapsed : wfExpanded;
+      if (set.has(t.dataset.name)) set.delete(t.dataset.name); else set.add(t.dataset.name);
+      fillWfSel();
+    }));
+    box.querySelectorAll('.wfturn[data-cw]').forEach(t => t.addEventListener('click', () => gotoCanvasTurn(t.dataset.cw, t.dataset.cn)));
+  }
+  function flashNodes(ids){
+    (ids || []).forEach(id => {
+      const el = world.querySelector('[data-node="' + id + '"]');
+      if (!el) return;
+      el.classList.remove('nd-flash');
+      void el.getBoundingClientRect();
+      el.classList.add('nd-flash');
+      setTimeout(() => el.classList.remove('nd-flash'), 1700);
+    });
+  }
+  // 小对话点击：切到对应对话画布并把该提问的节点（含子智能体）居中高亮
+  function gotoCanvasTurn(canvasName, nodeId){
+    const entry = WF.list.find(w => w.name === canvasName);
+    if (!entry) return toast(T('工作流不存在：') + canvasName);
+    if (WF.active !== canvasName) switchWorkflow(canvasName);
+    const n = nodeById(nodeId);
+    if (!n){ toast(T('该提问的节点在此画布中不存在（画布可能已被修改）')); return; }
+    const tn = ((entry.src && entry.src.turns) || []).find(t => t.node === nodeId);
+    const ids = [nodeId].concat((tn && tn.subs) || []).filter(x => nodeById(x));
+    const ns = ids.map(nodeById);
+    const x1 = Math.min.apply(null, ns.map(x => x.x)), y1 = Math.min.apply(null, ns.map(x => x.y));
+    const x2 = Math.max.apply(null, ns.map(x => x.x + x.w)), y2 = Math.max.apply(null, ns.map(x => x.y + x.h));
+    const r = svg.getBoundingClientRect();
+    view.z = Math.max(.55, Math.min(1.5, view.z || 1));
+    view.x = r.width / 2 - (x1 + x2) / 2 * view.z;
+    view.y = r.height * .45 - (y1 + y2) / 2 * view.z;
+    applyView();
+    setSel({ type: 'node', id: nodeId });
+    flashNodes(ids);
   }
   function switchWorkflow(name){
     const entry = WF.list.find(w => w.name === name);
@@ -2198,8 +2325,9 @@ if (typeof document !== "undefined") var UI = function(){
     WF.active = name;
     g = normalize(JSON.parse(JSON.stringify(entry.data)));
     if (!g.errors) g.errors = [];
+    $('dirSel').value = g.dir;
     hist.past.length = 0; hist.future.length = 0;
-    fillWfSel(); setSel(null); refresh(true); updateSrcInfo(); saveAll();
+    fillWfSel(); setSel(null); refresh(true); updateSrcInfo(); refreshSyncHint(); saveAll();
     showView('canvas');
   }
   function markDirtyNow(){ clearTimeout(saveTimer); const e = WF.list.find(w => w.name === WF.active); if (e) e.data = { dir:g.dir, nodes:g.nodes, edges:g.edges, subs:g.subs, name:WF.active }; saveAll(); }
@@ -2921,6 +3049,8 @@ if (typeof document !== "undefined") var UI = function(){
     if (WF.active === name) WF.active = nn;
     // 同步所有工作流里指向旧名的子流程引用
     WF.list.forEach(w => ((w.data && w.data.nodes) || []).forEach(n => { if (n.subflow === name) n.subflow = nn; }));
+    // 对话画布挂在被改名画布下时，同步 parent（否则树里会丢失挂载关系）
+    WF.list.forEach(w => { if (w.src && w.src.parent === name) w.src.parent = nn; });
     g.nodes.forEach(n => { if (n.subflow === name) n.subflow = nn; });
     if (g.name === name) g.name = nn;
     fillWfSel(); markDirtyNow(); toast(tx('已重命名为「{0}」', nn));
@@ -2929,6 +3059,8 @@ if (typeof document !== "undefined") var UI = function(){
     if (WF.list.length <= 1) return toast(T('至少保留一个工作流'));
     if (!confirm(tx('删除工作流「{0}」？', name))) return;
     WF.list = WF.list.filter(w => w.name !== name);
+    // 被删画布下的对话画布提升为顶层，避免悬空挂载
+    WF.list.forEach(w => { if (w.src && w.src.parent === name) w.src.parent = ''; });
     if (WF.active === name){
       WF.active = WF.list[0].name;
       g = normalize(JSON.parse(JSON.stringify(WF.list[0].data)));
@@ -2960,8 +3092,9 @@ if (typeof document !== "undefined") var UI = function(){
       const d = w.data || {};
       const gates = [...new Set((d.nodes||[]).filter(n=>n.gate).map(n=>n.gate))];
       const subs = [...new Set((d.nodes||[]).filter(n=>n.subflow).map(n=>n.subflow))];
+      const convMeta = w.src ? '<div class="meta">🗂 ' + T('对话画布') + (w.src.client ? ' · ' + escXml(qaClientInfo(w.src.client).label) : '') + (w.src.task ? ' · ' + escXml(w.src.task) : '') + ' · ' + tx('{0} 小对话', (w.src.turns || []).length) + (w.src.parent ? ' · ' + T('挂在：') + escXml(w.src.parent) : '') + '</div>' : '';
       return '<div class="wfcard"><h5><span>' + escXml(w.name) + '</span>' + (w.name === WF.active ? '<span class="cur">' + T('当前') + '</span>' : '') + '</h5>' +
-        '<div class="meta">' + tx('节点 {0} · 连线 {1}', (d.nodes||[]).length, (d.edges||[]).length) + (gates.length ? ' · ' + T('门') + ' ' + escXml(gates.join(',')) : '') + (subs.length ? '<br>' + T('子流程 → ') + escXml(subs.join('、')) : '') + '</div>' +
+        '<div class="meta">' + tx('节点 {0} · 连线 {1}', (d.nodes||[]).length, (d.edges||[]).length) + (gates.length ? ' · ' + T('门') + ' ' + escXml(gates.join(',')) : '') + (subs.length ? '<br>' + T('子流程 → ') + escXml(subs.join('、')) : '') + '</div>' + convMeta +
         '<div class="ops"><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button><button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button><button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button><button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button></div></div>';
     }).join('');
     bindWfOps(grid);
@@ -2976,7 +3109,8 @@ if (typeof document !== "undefined") var UI = function(){
       const gates = [...new Set((d.nodes||[]).filter(n=>n.gate).map(n=>n.gate))];
       const subs = [...new Set((d.nodes||[]).filter(n=>n.subflow).map(n=>n.subflow))];
       const refBy = (refs[w.name] || []).filter(x => x !== w.name);
-      return '<tr><td>' + escXml(w.name) + (w.name === WF.active ? ' <span class="hint">' + T('（当前）') + '</span>' : '') + '</td><td>' + (d.nodes||[]).length + '</td><td>' + (d.edges||[]).length + '</td><td>' + (gates.length ? escXml(gates.join(',')) : '—') + '</td><td>' + (subs.length ? escXml(subs.join('、')) : '—') + '</td><td>' + (refBy.length ? escXml(refBy.join('、')) : '—') + '</td>' +
+      const conv = w.src ? ' <span class="hint">🗂 ' + escXml(w.src.task || T('对话画布')) + (w.src.parent ? ' · ' + T('挂在：') + escXml(w.src.parent) : '') + '</span>' : '';
+      return '<tr><td>' + escXml(w.name) + (w.name === WF.active ? ' <span class="hint">' + T('（当前）') + '</span>' : '') + conv + '</td><td>' + (d.nodes||[]).length + '</td><td>' + (d.edges||[]).length + '</td><td>' + (gates.length ? escXml(gates.join(',')) : '—') + '</td><td>' + (subs.length ? escXml(subs.join('、')) : '—') + '</td><td>' + (refBy.length ? escXml(refBy.join('、')) : '—') + '</td>' +
         '<td><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button> <button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button> <button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button> <button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button></td></tr>';
     }).join('');
     bindWfOps($('ctlTable').querySelector('tbody'));
@@ -3182,7 +3316,7 @@ if (typeof document !== "undefined") var UI = function(){
         const models = [...mm.values()].sort((a, b) => b.total - a.total || b.calls - a.calls);
         const sess = (c.bySession || []).filter(s => tokSceneDays(s, tokPeriod, tokMode)).slice(0, 12);
         const mRows = models.map(m => '<tr><td>' + escXml(m.model) + '</td><td>' + m.calls + '</td><td>' + fmtN(m.input) + '</td><td>' + fmtN(m.cacheRead) + '</td><td>' + fmtN(m.output) + '</td><td>' + fmtN(m.total || sumT(m)) + '</td></tr>').join('');
-        const sRows = sess.map(s => '<tr><td title="' + escXml(s.session) + '">' + escXml(qaBare(s.session).slice(0, 14)) + '…</td><td class="hint">' + escXml((s.cwd || '').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(sumT(s))) + '</td><td class="hint">' + escXml(s.last || '—') + '</td><td><button class="small" data-gotoqa="' + escXml(cid + '|' + s.session) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(cid + '|' + s.session) + '" title="' + T('把该会话的问答追加到当前画布（可撤销）') + '">' + T('⤵ 导入画布') + '</button></td></tr>').join('');
+        const sRows = sess.map(s => '<tr><td title="' + escXml(s.session) + '">' + escXml(sessionTaskName(s.session) || (qaBare(s.session).slice(0, 14) + '…')) + '</td><td class="hint">' + escXml((s.cwd || '').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(sumT(s))) + '</td><td class="hint">' + escXml(s.last || '—') + '</td><td><button class="small" data-gotoqa="' + escXml(cid + '|' + s.session) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(cid + '|' + s.session) + '" title="' + T('把该会话的问答生成为独立对话画布（当前画布不受影响，同一会话重复导入会合并更新）') + '">' + T('⤵ 导入画布') + '</button></td></tr>').join('');
         if (!models.length && !sess.length) return;
         card += '<div style="margin:6px 0 2px"><b style="color:' + ci.color + '">● ' + escXml(ci.label) + '</b>　<span class="hint">' + T('调用') + ' ' + models.reduce((n, m) => n + m.calls, 0) + (c.tokens === false ? ' · ' + T('该客户端不记录令牌数') : ' · ' + fmtN(models.reduce((n, m) => n + (m.total || sumT(m)), 0)) + ' tokens') + '</span></div>' +
           (mRows ? '<table class="stable" style="width:auto"><thead><tr><th>' + T('模型') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th></tr></thead><tbody>' + mRows + '</tbody></table>' : '') +
@@ -3213,6 +3347,7 @@ if (typeof document !== "undefined") var UI = function(){
       const ci = qaClientInfo(cid);
       const k = cid + '|' + s.session;
       const open = tokSessOpen.has(k);
+      const tname = sessionTaskName(s.session);
       const stot = c.tokens === false ? '—' : fmtN(sumT(s));
       const dayRows = (s.days || []).map(d =>
         '<tr><td>' + escXml(d.day) + '</td><td>' + d.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(d.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(d.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(d.output)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(sumT(d))) + '</td></tr>').join('');
@@ -3222,14 +3357,14 @@ if (typeof document !== "undefined") var UI = function(){
       const detail = open
         ? '<tr class="sess-detail"><td colspan="9" style="background:var(--canvas);padding:6px 10px 10px">' +
             '<div class="hint" style="margin:0 0 4px">' + escXml(ci.label) + ' · ' + T('会话 ') + escXml(s.session) + ' · ' + escXml(s.first || '—') + ' → ' + escXml(s.last || '—') +
-            '　<button class="small" data-gotoqa="' + escXml(k) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(k) + '" title="' + T('把该会话的问答追加到当前画布（可撤销）') + '">' + T('⤵ 导入画布') + '</button></div>' +
+            '　<button class="small" data-gotoqa="' + escXml(k) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(k) + '" title="' + T('把该会话的问答生成为独立对话画布（当前画布不受影响，同一会话重复导入会合并更新）') + '">' + T('⤵ 导入画布') + '</button></div>' +
             ((s.days || []).length ? '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div><div class="hsec" style="margin:2px 0 0">' + T('按日明细') + '</div><table class="stable" style="width:auto">' +
             '<thead><tr><th>' + T('日期') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th></tr></thead><tbody>' + dayRows + '</tbody></table></div>' : '') +
             (plugRows ? '<div><div class="hsec" style="margin:2px 0 0">' + T('按插件分摊') + '</div><table class="stable" style="width:auto">' +
             '<thead><tr><th>' + T('插件') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('占比') + '</th></tr></thead><tbody>' + plugRows + '</tbody></table></div>' : '') +
             ((s.days || []).length || plugRows ? '</div>' : '') + '</td></tr>'
         : '';
-      return '<tr class="sess-row toksess-row" data-toksess="' + escXml(k) + '" data-sid="' + escXml(s.session) + '"><td><span style="color:' + ci.color + '">●</span> <span class="sarr">' + (open ? '▼' : '▶') + '</span>' + escXml(qaBare(s.session).slice(0, 16)) + '…</td><td class="hint" title="' + escXml(s.cwd || '') + '">' + escXml((s.cwd || '—').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.output)) + '</td><td>' + stot + '</td><td>' + escXml(s.last || '—') + '</td><td><button class="small" data-importflow="' + escXml(k) + '" title="' + T('把该会话的问答追加到当前画布（可撤销）') + '">' + T('⤵ 导入画布') + '</button></td></tr>' + detail;
+      return '<tr class="sess-row toksess-row" data-toksess="' + escXml(k) + '" data-sid="' + escXml(s.session) + '"><td title="' + escXml(s.session) + '"><span style="color:' + ci.color + '">●</span> <span class="sarr">' + (open ? '▼' : '▶') + '</span>' + escXml(tname || (T('对话 · ') + String(s.last || '').slice(5, 16))) + '</td><td class="hint" title="' + escXml(s.cwd || '') + '">' + escXml((s.cwd || '—').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(s.output)) + '</td><td>' + stot + '</td><td>' + escXml(s.last || '—') + '</td><td><button class="small" data-importflow="' + escXml(k) + '" title="' + T('把该会话的问答生成为独立对话画布（当前画布不受影响，同一会话重复导入会合并更新）') + '">' + T('⤵ 导入画布') + '</button></td></tr>' + detail;
     }).join('');
     // ZCode 插件归属（只有 ZCode 有插件归属数据）
     const zc = entries.find(([k]) => k === 'zcode');
@@ -3247,7 +3382,7 @@ if (typeof document !== "undefined") var UI = function(){
       '<p class="hint" style="margin:2px 0 8px">' + (qoderOnly ? '' : T('合计 = 输入 + 输出 + 缓存读（缓存读为命中缓存的输入、单价低）。')) + T('扫描 ') + entries.reduce((n, [, c]) => n + (c.files || 0), 0) + T(' 个会话文件') + (clientUsageAt ? T('，于 ') + escXml(clientUsageAt) + T('（20 秒缓存）') : '') + T('。') + (notes.length ? ' ' + escXml(notes.join('；')) + T('。') : '') + '</p>';
     html += (series.length ? renderTokChart(series, tokMode) : '<p class="hint">' + T('该客户端暂无按日数据。') + '</p>');
     html += periodSec + modelSec + pluginSec +
-      (sessRows ? '<div class="hsec">' + tx('按会话（{0} 个 · 点行展开明细，可转跳问答 / 导入画布）', sessAll.length) + '</div><table class="stable"><thead><tr><th>' + T('会话') + '</th><th>' + T('目录') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('最后活动') + '</th><th></th></tr></thead><tbody>' + sessRows + '</tbody></table>' : '');
+      (sessRows ? '<div class="hsec">' + tx('按会话（{0} 个 · 点行展开明细，可转跳问答 / 导入画布）', sessAll.length) + '</div><table class="stable"><thead><tr><th>' + T('任务 / 会话') + '</th><th>' + T('目录') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('最后活动') + '</th><th></th></tr></thead><tbody>' + sessRows + '</tbody></table>' : '');
     return html;
   }
   function renderCtlMap(){
@@ -3405,6 +3540,16 @@ if (typeof document !== "undefined") var UI = function(){
 
   // ---------- 文件双向同步（code ↔ 网页：AI 改文件、人改画布，实时互通；句柄存 IndexedDB 可恢复） ----------
   let fh = null, syncKind = 'mermaid', lastFileText = '', lastWritten = '', syncTimer = null, writeTimer = null, applyingFile = false, pendingFh = null;
+  // 文件同步归属画布：HTTP 自动通道归属主流程（无 src 的根画布），手动「连接文件」归属连接时所在画布。
+  // 对话画布是派生快照：改动只存本地不写回文件；文件更新等回到归属画布再应用（避免互相覆盖）。
+  let syncOwner = null;
+  function pickSyncOwner(){ if (syncOwner && WF.list.some(w => w.name === syncOwner)) return syncOwner; const root = WF.list.find(w => !w.src); syncOwner = (root && root.name) || WF.active; return syncOwner; }
+  function refreshSyncHint(){
+    if (!fh && !httpWatch) return;
+    if (WF.active !== pickSyncOwner()){ syncStatus('⏸ ' + T('文件同步仅作用于「') + pickSyncOwner() + T('」；当前画布是对话画布，改动只存本地')); return; }
+    if (fh) syncStatus('🔗 ' + (fh.name || '') + T('（双向同步中）'));
+    else syncStatus((httpWritable ? '🌐 ' : '👁 ') + httpWatch.name + (httpWritable ? T('（HTTP 自动连接 · 双向）') : T('（HTTP 只读：用 flow_serve.py 启动可写回）')));
+  }
   function syncStatus(t){ $('syncStat').textContent = t; }
   const FH_DB = 'cmflow-sync';
   function idbOpen(){
@@ -3435,6 +3580,8 @@ if (typeof document !== "undefined") var UI = function(){
     const fenced = syncKind === 'mermaid' && /```mermaid/.test(txt);
     fh = h; pendingFh = null;
     stopHttpWatch(); // 已连文件句柄时 HTTP 自动连接让位，避免双通道写回
+    syncOwner = null; pickSyncOwner();
+    if (WF.active !== syncOwner) switchWorkflow(syncOwner);   // 文件同步归属主流程：先回到它再应用
     lastFileText = lastWritten = txt;
     applyingFile = true;
     setTab(syncKind);
@@ -3513,6 +3660,7 @@ if (typeof document !== "undefined") var UI = function(){
       const f = await fh.getFile();
       const txt = await f.text();
       if (txt === lastFileText) return;
+      if (WF.active !== pickSyncOwner()) return;   // 不在归属画布：先不动，等回到归属画布再应用
       lastFileText = txt;
       await applyIncomingText(txt, f.name);
     } catch(e){}
@@ -3550,7 +3698,8 @@ if (typeof document !== "undefined") var UI = function(){
       httpWatch = { name: w, fileUrl: base, writeUrl: (info && info.ok && info.watch === w) ? '__flow_write' : null };
       httpWritable = !!httpWatch.writeUrl;
       syncKind = guessKind(txt);
-      if (txt !== httpFileText){
+      syncOwner = null; pickSyncOwner();           // 自动通道归属主流程（无 src 的根画布）
+      if (txt !== httpFileText && WF.active === syncOwner){
         httpFileText = lastFileText = lastWritten = txt;
         applyingFile = true;
         setTab(syncKind);
@@ -3558,7 +3707,7 @@ if (typeof document !== "undefined") var UI = function(){
         applyingFile = false;
       }
       if (!httpTimer) httpTimer = setInterval(pollHttpFile, 1500);
-      syncStatus((httpWritable ? '🌐 ' : '👁 ') + w + (httpWritable ? T('（HTTP 自动连接 · 双向）') : T('（HTTP 只读：用 flow_serve.py 启动可写回）')));
+      refreshSyncHint();
       ok = true;
     } catch(e){
       syncStatus('⚠ ' + T('本地服务未连接：画布不会自动同步。启动 ') + 'python flow_serve.py --dir <流程目录>' + T(' 后每 4 秒自动重连'));
@@ -3577,6 +3726,7 @@ if (typeof document !== "undefined") var UI = function(){
       httpFailN = 0;
       const txt = await r.text();
       if (txt === httpFileText) return;
+      if (WF.active !== pickSyncOwner()) return;   // 不在归属画布（对话画布）：文件更新等回到主流程再应用
       httpFileText = lastFileText = txt;
       await applyIncomingText(txt, httpWatch.name);
     } catch(e){
@@ -3593,6 +3743,7 @@ if (typeof document !== "undefined") var UI = function(){
     if (applyingFile || (!fh && !httpWritable)) return;
     clearTimeout(writeTimer);
     writeTimer = setTimeout(async () => {
+      if (WF.active !== pickSyncOwner()) return;   // 对话画布改动只存本地，不写回同步文件
       try {
         let out;
         if (syncKind === 'json') out = JSON.stringify(graphToJSON(g), null, 2);
@@ -3950,6 +4101,16 @@ if (typeof document !== "undefined") var UI = function(){
   const QA_CLIENTS = { zcode: { label: 'ZCode', color: '#2563eb' }, codex: { label: 'Codex CLI', color: '#0d9488' }, qoder: { label: 'Qoder CLI', color: '#7c3aed' } };
   function qaClientInfo(c){ return QA_CLIENTS[c] || QA_CLIENTS.zcode; }
   function qaBare(s){ return String(s || '').replace(/^sess_/, ''); }
+  // 会话任务名：已建的对话画布记录的任务名优先，其次问答数据中该会话首条提问（供「按会话」表等展示）
+  function sessionTaskName(sid){
+    const bare = qaBare(sid);
+    if (!bare) return '';
+    const w = WF.list.find(x => x.src && x.src.session && qaBare(x.src.session) === bare);
+    if (w && w.src.task) return w.src.task;
+    const it = qaItems.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0))
+      .find(x => x.who !== 'sub' && (qaBare(x.sessionId) === bare || qaBare(x.parentSession) === bare) && String(x.q || '').trim() && !isQaContinuation(x.q));
+    return it ? (qaLabel(it).replace(/\s+/g, ' ').trim().slice(0, 22) || '') : '';
+  }
   function qaAddTurns(parsed, src, client, subInfo){
     client = client || 'zcode';
     if (subInfo && parsed.turns.length){
@@ -4243,19 +4404,18 @@ if (typeof document !== "undefined") var UI = function(){
     if (!items.length){ toast(T('先载入问答数据再生成画布')); return; }
     const r = flowFromQa(items, { maxNodes: 36 });
     if (!r.code){ toast(T('没有可用的问答条目')); return; }
-    if (g.nodes.length && !window.confirm(tx('将用问答生成的画布替换当前 {0} 个节点（可 Ctrl+Z 撤销），继续？', g.nodes.length))) return;
-    pushHistory();
     const parsed = parseMermaid(r.code);
     if (parsed.errors && parsed.errors.length && !parsed.nodes.length){ toast(T('生成画布失败：') + parsed.errors[0]); return; }
-    const old = {}; g.nodes.forEach(n => old[n.id] = n);
-    parsed.name = g.name;
-    g = normalize(parsed);
-    autoLayout(g, g.dir);
-    const entry = WF.list.find(w => w.name === WF.active);
-    if (entry) entry.data = { dir: g.dir, nodes: g.nodes, edges: g.edges, subs: g.subs, name: WF.active };
-    setSel(null); refresh(true); saveAll();
-    showView('canvas');
-    toast(tx('已生成工作画布（🧠 总任务 {0} · 🤖 子智能体 {1}）', r.masters, r.subs));
+    autoLayout(parsed, parsed.dir);
+    const masters = items.filter(it => it.who !== 'sub' && qaBare(it.sessionId || ''));
+    const sids = [...new Set((masters.length ? masters : items).map(it => qaBare(it.sessionId || '')).filter(Boolean))];
+    const sorted = items.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const first = sorted.find(it => it.who !== 'sub' && String(it.q || '').trim() && !isQaContinuation(it.q))
+      || sorted.find(it => it.who !== 'sub' && String(it.q || '').trim()) || items[0] || {};
+    const single = sids.length === 1;
+    const task = single ? (qaLabel(first).replace(/\s+/g, ' ').trim().slice(0, 18) || T('对话')) : T('问答画布');
+    const name = storeConversationCanvas({ client: single ? (first.client || '') : '', session: single ? sids[0] : '' }, task, parsed, r);
+    if (name) switchWorkflow(name);
   }
   $('qaCanvasBtn').addEventListener('click', genQaCanvas);
   // 按需从本地服务载入某客户端某会话（转跳问答 / 导入画布共用）；返回新增问答条数
@@ -4288,7 +4448,44 @@ if (typeof document !== "undefined") var UI = function(){
     $('qaKw').value = qaBare(sid).slice(0, 12);
     renderQa();
   }
-  // 总控 → 把某会话的问答追加导入当前画布（与「生成工作画布」的整体替换不同，可 Ctrl+Z 撤销）
+  // 对话画布落盘：同一会话合并为一个「任务大对话」条目不重复；否则新建独立画布（挂在当前主流程下，当前画布内容不受影响）
+  function storeConversationCanvas(scope, task, tpl, r){
+    const exist = scope.session ? WF.list.find(w => w.src && w.src.session && qaBare(w.src.session) === qaBare(scope.session)) : null;
+    markDirtyNow();
+    if (exist){
+      exist.data = { name: exist.name, dir: tpl.dir, nodes: tpl.nodes, edges: tpl.edges, subs: tpl.subs };
+      exist.src.turns = r.turns; exist.src.task = task; exist.src.updated = Date.now();
+      if (!exist.src.client && scope.client) exist.src.client = scope.client;
+      if (WF.active === exist.name){
+        g = normalize(JSON.parse(JSON.stringify(exist.data)));
+        if (!g.errors) g.errors = [];
+        $('dirSel').value = g.dir;
+        hist.past.length = 0; hist.future.length = 0;
+        setSel(null); refresh(true); updateSrcInfo();
+      }
+      saveAll(); fillWfSel(); wfCollapsed.delete(exist.src.parent || '');
+      if (curView === 'dist') renderDist();
+      if (curView === 'ctl') renderCtl();
+      toast(tx('已更新对话画布「{0}」（🧠 {1} · 🤖 {2}）', exist.name, r.masters, r.subs));
+      return exist.name;
+    }
+    const name = taskCanvasName(fmtWfWhen(Date.now()), task, entryNames());
+    // 挂到当前画布所在链的根：若当前已是对话画布，仍挂在主流程下（树只展开两层，避免悬空不可见）
+    let parent = WF.active;
+    for (let i = 0; i < 20; i++){
+      const e = WF.list.find(x => x.name === parent);
+      if (!e || !e.src || !e.src.parent || !WF.list.some(x => x.name === e.src.parent)) break;
+      parent = e.src.parent;
+    }
+    WF.list.push({ name, data: { name, dir: tpl.dir, nodes: tpl.nodes, edges: tpl.edges, subs: tpl.subs },
+      src: { parent, client: scope.client || '', session: scope.session || '', task, ts: Date.now(), turns: r.turns } });
+    saveAll(); wfCollapsed.delete(parent); fillWfSel();
+    if (curView === 'dist') renderDist();
+    if (curView === 'ctl') renderCtl();
+    toast(tx('已新建对话画布「{0}」（挂在「{1}」下，展开左侧列表可点击跳转）', name, parent));
+    return name;
+  }
+  // 总控 → 把某会话导入为独立对话画布（同一会话合并更新；当前画布不受影响）
   async function importSessionToCanvas(client, sid){
     const bare = qaBare(sid);
     if (!bare){ toast(T('会话 ID 缺失，无法导入画布')); return; }
@@ -4301,23 +4498,11 @@ if (typeof document !== "undefined") var UI = function(){
     const tpl = normalize(parseMermaid(r.code));
     if (tpl.errors && tpl.errors.length && !tpl.nodes.length){ toast(T('生成画布失败：') + tpl.errors[0]); return; }
     autoLayout(tpl, tpl.dir);
-    pushHistory();
-    const tMinX = Math.min(...tpl.nodes.map(n => n.x)), tMinY = Math.min(...tpl.nodes.map(n => n.y));
-    const offX = g.nodes.length ? Math.max(...g.nodes.map(n => n.x + n.w)) + 80 : 60;
-    const baseY = g.nodes.length ? Math.min(...g.nodes.map(n => n.y)) : 60;
-    const idMap = {};
-    tpl.nodes.forEach(n => {
-      const c = Object.assign({}, n);
-      c.id = newNodeId(g);
-      idMap[n.id] = c.id;
-      c.x = Math.round(n.x - tMinX + offX);
-      c.y = Math.round(n.y - tMinY + baseY);
-      g.nodes.push(c);
-    });
-    tpl.edges.forEach(e => { if (idMap[e.from] && idMap[e.to]) g.edges.push(Object.assign({}, e, { from: idMap[e.from], to: idMap[e.to] })); });
-    setSel(null); refresh(true); markDirty();
-    showView('canvas');
-    toast(tx('已把会话 {0} 导入画布（🧠 {1} · 🤖 {2}，Ctrl+Z 可撤销）', bare.slice(0, 12), r.masters, r.subs));
+    const sorted = items.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const first = sorted.find(it => it.who !== 'sub' && String(it.q || '').trim() && !isQaContinuation(it.q))
+      || sorted.find(it => it.who !== 'sub' && String(it.q || '').trim()) || items[0] || {};
+    const task = qaLabel(first).replace(/\s+/g, ' ').trim().slice(0, 18) || T('对话');
+    storeConversationCanvas({ client: client || '', session: sid }, task, tpl, r);
   }
 
   // ---------- 🌐 本地服务自动同步：最新会话 + 全部子智能体（每 6s 轻量轮询，仅变化时取原文） ----------

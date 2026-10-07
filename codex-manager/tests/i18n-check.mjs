@@ -1,11 +1,11 @@
 // i18n 覆盖率检查：找出 T()/tx()/data-i18n 用到但 I18N 字典里缺少英文条目的键
-// 运行：node tests/i18n-check.mjs（在插件目录下执行）
+// 运行：node tests/i18n-check.mjs [可选: flow-editor.html 路径]（默认插件 assets/flow-editor.html）
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(here, "..", "assets", "flow-editor.html"), "utf8");
+const html = readFileSync(process.argv[2] || join(here, "..", "assets", "flow-editor.html"), "utf8");
 
 const used = new Set();
 for (const m of html.matchAll(/(?:^|[^A-Za-z_$])T\('((?:[^'\\]|\\.)*)'\)/g)) used.add(m[1].replace(/\\'/g, "'"));
