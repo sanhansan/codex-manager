@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnBuildGraph, nnLayout };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -30,6 +30,8 @@ const core = await import(pathToFileURL(corePath).href);
   fmtWfWhen, taskCanvasName, wfTree, isQaContinuation,
   fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries,
   priceFor, costOfModel, fmtCost,
+  projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration,
+  nnBuildGraph, nnLayout,
 } = core;
 
 let pass = 0, fail = 0;
@@ -38,6 +40,7 @@ function t(name, fn) {
   catch (e) { console.error("FAIL-", name, "::", e.message); fail++; }
 }
 function eq(a, b, msg) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((msg || "eq") + "：got " + JSON.stringify(a) + " want " + JSON.stringify(b)); }
+function okTest(cond, msg) { if (!cond) throw new Error(msg || "expected truthy"); }
 function ok(v, msg) { if (!v) throw new Error(msg || "断言为假"); }
 
 // ---------- mermaid 解析与往返 ----------
@@ -868,6 +871,96 @@ t("fmtCost：四档格式与无效值", () => {
   eq(fmtCost(0), "");
   eq(fmtCost(-1), "");
   eq(fmtCost(NaN), "");
+});
+
+// ---------- v0.24.0 项目维度 / 神经网络 ----------
+t("projectOf / projectKeyOf：取路径末段；显式 project 优先", () => {
+  eq(projectOf("C:\\Users\\me\\proj\\codex-manager"), "codex-manager");
+  eq(projectOf("/home/me/work/app/"), "app");
+  eq(projectOf(""), "未标注项目");
+  eq(projectOf(null), "未标注项目");
+  eq(projectKeyOf({ src: { cwd: "/a/b/alpha" } }), "alpha");
+  eq(projectKeyOf({ src: { cwd: "/a/b/alpha", project: "显式项目" } }), "显式项目", "显式 project 优先于 cwd");
+});
+
+t("groupByProject：对话画布按项目归组，非会话归入「流程框架」", () => {
+  const list = [
+    { name: "主流程", data: { nodes: [] } },
+    { name: "c1", src: { session: "s1", cwd: "/w/p1" }, data: { nodes: [] } },
+    { name: "c2", src: { session: "s2", cwd: "/w/p1" }, data: { nodes: [] } },
+    { name: "c3", src: { session: "s3", cwd: "/w/p2" }, data: { nodes: [] } },
+  ];
+  const gs = groupByProject(list);
+  const p1 = gs.find(g => g.project === "p1");
+  eq(p1.convs.length, 2);
+  const fw = gs.find(g => g.project === "流程框架");
+  eq(fw.others.length, 1);
+  eq(fw.convs.length, 0);
+  eq(gs[0].project, "p1", "按会话数降序：p1(2) 在前");
+});
+
+t("agentsInProject：同项目内按客户端聚合，统计主/子智能体数", () => {
+  const list = [
+    { name: "a1", src: { session: "s1", client: "zcode", cwd: "/w/p1", turns: [{ node: "n1", subs: ["x", "y"] }] }, data: { nodes: [] } },
+    { name: "a2", src: { session: "s2", client: "codex", cwd: "/w/p1", turns: [{ node: "n2", subs: [] }] }, data: { nodes: [] } },
+    { name: "b1", src: { session: "s3", client: "zcode", cwd: "/w/p2" }, data: { nodes: [] } },
+  ];
+  const ag = agentsInProject(list, "p1");
+  eq(ag.length, 2);
+  const z = ag.find(a => a.client === "zcode");
+  eq(z.canvases.length, 1);
+  eq(z.masters, 1);
+  eq(z.subs, 2);
+  eq(agentsInProject(list, "p2").length, 1, "只统计指定项目");
+});
+
+t("projectCollaboration：跨智能体按时间序生成接力链", () => {
+  const list = [
+    { name: "a1", src: { session: "s1", client: "zcode", cwd: "/w/p1", ts: 100 }, data: { nodes: [] } },
+    { name: "b1", src: { session: "s2", client: "codex", cwd: "/w/p1", ts: 200 }, data: { nodes: [] } },
+    { name: "a2", src: { session: "s3", client: "zcode", cwd: "/w/p1", ts: 300 }, data: { nodes: [] } },
+  ];
+  const c = projectCollaboration(list, "p1");
+  eq(c.clients.sort(), ["codex", "zcode"]);
+  eq(c.links.map(l => l.from + "→" + l.to), ["zcode→codex", "codex→zcode"]);
+  eq(projectCollaboration(list, "p2").links.length, 0);
+});
+
+t("nnBuildGraph：项目→会话→子智能体三层 + 协作/关键词突触", () => {
+  const list = [
+    { name: "主流程", data: { nodes: [{ id: "a" }] } },
+    { name: "a1", src: { session: "s1", client: "zcode", cwd: "/w/p1", ts: 100, turns: [{ node: "n1", q: "任务一", ts: 100, subs: ["x"] }] }, data: { nodes: [] } },
+    { name: "b1", src: { session: "s2", client: "codex", cwd: "/w/p1", ts: 200, turns: [{ node: "n2", q: "任务二", ts: 200, subs: [] }] }, data: { nodes: [] } },
+  ];
+  const graph = nnBuildGraph(list, [], { a1: ["导出", "统计"] });
+  eq(graph.groups.length, 1);
+  const kinds = graph.nodes.reduce((m, n) => { m[n.kind] = (m[n.kind] || 0) + 1; return m; }, {});
+  eq(kinds.hub, 1, "一个汇总中心");
+  eq(kinds.proj, 1, "一个项目芯片");
+  eq(kinds.sess, 2, "两个会话神经元");
+  eq(kinds.skill, 1, "一个流程框架神经元");
+  okTest(graph.nodes.some(n => n.kind === "kw" && n.sub === "子智能体"), "含子智能体知识神经元");
+  okTest(graph.nodes.some(n => n.kind === "kw" && n.label === "导出"), "含关键词知识神经元");
+  okTest(graph.edges.some(e => e.kind === "coop"), "含跨智能体协作突触");
+  okTest(graph.edges.every(e => graph.nodes.some(n => n.id === e.from) && graph.nodes.some(n => n.id === e.to)), "所有突触两端都存在");
+  const ids = graph.nodes.map(n => n.id);
+  eq(new Set(ids).size, ids.length, "神经元 id 唯一");
+});
+
+t("nnLayout：三种布局均给全部神经元坐标，无重叠堆原点", () => {
+  const list = [
+    { name: "主流程", data: { nodes: [] } },
+    { name: "a1", src: { session: "s1", client: "zcode", cwd: "/w/p1", ts: 1, turns: [{ node: "n1", q: "q1", ts: 1, subs: [] }] }, data: { nodes: [] } },
+    { name: "b1", src: { session: "s2", client: "codex", cwd: "/w/p2", ts: 2, turns: [{ node: "n2", q: "q2", ts: 2, subs: [] }] }, data: { nodes: [] } },
+  ];
+  const graph = nnBuildGraph(list, [], {});
+  ["chip", "net", "tree"].forEach(mode => {
+    const pos = nnLayout(graph, mode, 1200, 760);
+    eq([...pos.keys()].length, graph.nodes.length, mode + "：每个神经元都有坐标");
+    const uniq = new Set([...pos.values()].map(p => Math.round(p.x) + "," + Math.round(p.y)));
+    okTest(uniq.size > graph.nodes.length * 0.6, mode + "：坐标不应大面积重合");
+    [...pos.values()].forEach(p => okTest(Number.isFinite(p.x) && Number.isFinite(p.y), mode + "：坐标有限"));
+  });
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

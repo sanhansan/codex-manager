@@ -63,6 +63,95 @@
   #side .wfturn:hover { color:var(--accent); background:rgba(120,130,150,.10); }
   #side .wfturn .tq { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #side .wfturn .dur { margin-left:auto; flex-shrink:0; font-size:10px; font-family:Consolas,Menlo,monospace; }
+  /* ---- v0.24.0 项目分组 / 项目内智能体大框 ---- */
+  #side .wfproj { margin:6px 6px 8px; border:1px solid var(--line); border-radius:4px; background:rgba(120,130,150,.05); overflow:hidden; }
+  #side .wfproj > .wfph { display:flex; align-items:center; gap:5px; padding:5px 8px; cursor:pointer; font-size:12px; font-weight:600; border-bottom:1px solid var(--line); background:rgba(120,130,150,.07); }
+  #side .wfproj > .wfph:hover { background:rgba(120,130,150,.14); }
+  #side .wfproj > .wfph .pj { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #side .wfproj > .wfph .cnt { color:var(--muted); font-size:10px; font-weight:400; flex-shrink:0; }
+  #side .wfproj.collapsed > .wfpbody { display:none; }
+  #side .wfproj.collapsed > .wfph .pcar { transform:rotate(-90deg); }
+  #side .wfproj .wfph .pcar { transition:transform .15s; font-size:9px; color:var(--muted); }
+  #side .wfpbody { padding:4px 5px 6px; }
+  #side .wfpanc { font-size:10.5px; color:var(--muted); padding:2px 8px 5px; }
+  #side .wfpanc b { color:var(--accent); font-weight:600; }
+  #side .wfcoop { display:flex; flex-wrap:wrap; gap:3px; padding:2px 8px 6px; align-items:center; }
+  #side .wfcoop .lk { font-size:10px; padding:1px 5px; border:1px solid var(--line); border-radius:8px; color:var(--muted); background:rgba(120,130,150,.08); display:inline-flex; align-items:center; gap:3px; }
+  #side .wfcoop .lbl { font-size:10px; color:var(--muted); }
+  /* 项目内「智能体分组大框」：把同一项目的多个智能体画布圈在一起 */
+  #side .wfagrp { border:1px solid color-mix(in srgb, var(--agc, var(--accent)) 45%, var(--line)); border-left:3px solid var(--agc, var(--accent)); border-radius:3px; margin:4px 3px; background:color-mix(in srgb, var(--agc, var(--accent)) 6%, transparent); }
+  #side .wfagrp > .wfah { display:flex; align-items:center; gap:5px; padding:3px 7px; font-size:11.5px; cursor:pointer; }
+  #side .wfagrp > .wfah:hover { background:rgba(120,130,150,.10); }
+  #side .wfagrp > .wfah .an { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #side .wfagrp > .wfah .tag { font-size:9.5px; padding:0 4px; border-radius:7px; border:1px solid color-mix(in srgb, var(--agc, var(--accent)) 50%, var(--line)); color:var(--agc, var(--accent)); flex-shrink:0; }
+  #side .wfagrp > .wfah .mst { font-size:9.5px; color:var(--muted); flex-shrink:0; }
+  /* ---- v0.24.0 画布面包屑 + 切换动画 ---- */
+  #cvCrumb { position:absolute; top:6px; left:8px; right:8px; z-index:6; display:flex; flex-wrap:wrap; gap:4px; align-items:center; pointer-events:none; font-size:11px; }
+  #cvCrumb .cb { pointer-events:auto; display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter:blur(3px); color:var(--muted); cursor:pointer; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #cvCrumb .cb:hover { color:var(--accent); border-color:var(--accent); }
+  #cvCrumb .cb.pj { font-weight:600; color:var(--fg); }
+  #cvCrumb .cb.ag { border-left:3px solid var(--cb-c, var(--accent)); }
+  #cvCrumb .cb.cur { color:var(--accent); border-color:var(--accent); cursor:default; }
+  #cvCrumb .sep { color:var(--muted); opacity:.5; }
+  #cvCrumb .cbmenu { pointer-events:auto; position:absolute; top:26px; left:0; max-height:52vh; overflow:auto; min-width:260px; background:var(--panel); border:1px solid var(--line); border-radius:4px; box-shadow:0 6px 22px rgba(0,0,0,.18); padding:4px; }
+  #cvCrumb .cbmenu .mi { display:flex; gap:6px; align-items:center; padding:4px 7px; border-radius:3px; cursor:pointer; font-size:11.5px; }
+  #cvCrumb .cbmenu .mi:hover { background:rgba(120,130,150,.14); }
+  #cvCrumb .cbmenu .mi.cur { color:var(--accent); }
+  #cvCrumb .cbmenu .mh { font-size:10px; color:var(--muted); padding:5px 7px 2px; letter-spacing:.05em; }
+  #cvCrumb .cbmenu .mi .nmx { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #cvCrumb .cbmenu .mi .mt { color:var(--muted); font-size:10px; flex-shrink:0; }
+  .cv-flip { animation:cvFlip .26s ease-out; }
+  @keyframes cvFlip { from { opacity:0; transform:translateY(6px) scale(.994); } to { opacity:1; transform:none; } }
+  /* ================= v0.24.0 智能体总结神经网络（芯片脑图） ================= */
+  #viewNn .vbody { overflow:hidden; flex:1; min-height:0; display:flex; }
+  #nnSvg { width:100%; height:100%; display:block; background:
+      radial-gradient(circle at 22% 18%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 46%),
+      radial-gradient(circle at 78% 82%, color-mix(in srgb, #7c3aed 8%, transparent), transparent 46%),
+      var(--canvas);
+    cursor:grab; }
+  #nnSvg.drag { cursor:grabbing; }
+  #nnSvg .nnbg { fill:transparent; }
+  /* 芯片底板 */
+  #nnSvg .chip { fill:var(--panel); stroke:var(--line); stroke-width:1; }
+  #nnSvg .chiphdr { font:600 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #nnSvg .chipmeta { font:10.5px/1 system-ui,-apple-system,sans-serif; }
+  #nnSvg .chipcty { fill:var(--muted); font:10px/1 system-ui,-apple-system,sans-serif; }
+  /* 引脚 */
+  #nnSvg .pin { stroke:color-mix(in srgb, var(--accent) 55%, var(--line)); stroke-width:1.4; stroke-linecap:round; opacity:.55; }
+  /* 神经元 */
+  #nnSvg .nrn { transition:opacity .3s; }
+  #nnSvg .nrn circle { transition:r .18s, fill .2s; }
+  #nnSvg .nrn .core { fill:var(--nnc, var(--accent)); opacity:.9; }
+  #nnSvg .nrn .halo { fill:none; stroke:var(--nnc, var(--accent)); stroke-width:1; opacity:.35; }
+  #nnSvg .nrn .txt { font:10.5px/1 system-ui,-apple-system,sans-serif; fill:var(--ink); pointer-events:none; }
+  #nnSvg .nrn .sub { font:9.5px/1 system-ui,-apple-system,sans-serif; fill:var(--muted); pointer-events:none; }
+  #nnSvg .nrn.g1 circle { opacity:.55; }
+  #nnSvg .nrn.g2 circle { opacity:.35; }
+  #nnSvg .nrn:hover .core, #nnSvg .nrn.hot .core { opacity:1; }
+  #nnSvg .nrn.hot .halo { opacity:.8; stroke-width:2; }
+  #nnSvg .nrn.clickable { cursor:pointer; }
+  /* 突触 */
+  #nnSvg .syn { stroke:var(--line); stroke-width:1; fill:none; }
+  #nnSvg .syn.l1 { stroke:color-mix(in srgb, var(--accent) 50%, var(--line)); stroke-width:1.6; }
+  #nnSvg .syn.l2 { opacity:.6; }
+  #nnSvg .pulse { fill:var(--accent); filter:drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 70%, transparent)); }
+  #nnSvg .pulse.k2 { fill:#7c3aed; }
+  #nnSvg .pulse.k3 { fill:#0d9488; }
+  /* 汇总中心 */
+  #nnSvg .hubring { fill:none; stroke:var(--accent); stroke-width:2; opacity:.5; }
+  #nnSvg .hub { fill:var(--accent); }
+  #nnSvg .hubtxt { fill:var(--canvas); font:600 12px/1 system-ui,sans-serif; text-anchor:middle; }
+  #nnSvg .lbl-hi { font:600 11.5px/1 system-ui,-apple-system,sans-serif; fill:var(--ink); }
+  .nntip { position:absolute; left:0; top:0; pointer-events:none; display:none; max-width:340px; padding:7px 10px; border-radius:4px; border:1px solid var(--line); background:var(--panel); box-shadow:0 6px 20px rgba(0,0,0,.16); font-size:12px; z-index:8; }
+  .nntip b { display:block; margin-bottom:3px; }
+  .nntip .row { color:var(--muted); font-size:11px; }
+  .nnhud { position:absolute; right:10px; bottom:10px; display:flex; flex-direction:column; gap:3px; align-items:flex-end; pointer-events:none; font-size:11px; color:var(--muted); }
+  .nnhud .chip2 { padding:2px 8px; border-radius:9px; border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 88%, transparent); }
+  .nnzoom { position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:4px; }
+  .nnzoom button { width:28px; height:28px; border-radius:4px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; font-size:14px; line-height:1; }
+  .nnzoom button:hover { border-color:var(--accent); color:var(--accent); }
+  @keyframes nnIn { from { opacity:0; } to { opacity:1; } }
+  #nnSvg .fadein { animation:nnIn .5s ease-out; }
   .nd-dur { font-size:9px; fill:var(--muted); pointer-events:none; }
   .suboutbox { border:1px dashed var(--line); border-radius:2px; padding:6px 8px; margin:6px 0 2px; }
   #subDlg pre { white-space:pre-wrap; word-break:break-word; max-height:52vh; overflow:auto; font:12.5px/1.55 Consolas,Menlo,monospace; background:var(--canvas); padding:8px 10px; border:1px solid var(--line); border-radius:2px; margin:0 0 8px; }
@@ -77,8 +166,9 @@
   .vhead b { font-size:14px; margin-right:4px; }
   .vbody { overflow:auto; padding:14px; }
   #wfGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(235px,1fr)); gap:12px; }
-  .wfcard { border:1px solid var(--line); border-radius:2px; padding:12px; background:var(--panel); }
-  .wfcard h5 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+  .wfcard { border:1px solid var(--line); border-radius:2px; padding:12px; background:var(--panel); overflow-wrap:anywhere; min-width:0; }
+  .wfcard h5 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .wfcard h5 > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
   .wfcard h5 .cur { font-size:11px; color:var(--accent); font-weight:normal; }
   .wfcard .meta { color:var(--muted); font-size:12px; margin-bottom:8px; line-height:1.7; }
   .wfcard .ops { display:flex; gap:6px; flex-wrap:wrap; }
@@ -91,7 +181,13 @@
   #ctlMap .mnd .mcnt { fill:var(--muted); font-size:11px; }
   #ctlMap .medge { fill:none; stroke:var(--edge); stroke-width:1.5; stroke-dasharray:5,4; }
   .stable { width:100%; border-collapse:collapse; font-size:12.5px; margin:6px 0; }
-  .stable th, .stable td { border:1px solid var(--line); padding:3px 8px; text-align:left; }
+  .stable th, .stable td { border:1px solid var(--line); padding:3px 8px; text-align:left; vertical-align:top; }
+  /* 总控关系表：长工作流名/子流程列表此前会撑破对话框 → 允许换行并限制单元格宽度 */
+  #ctlTable { table-layout:fixed; }
+  #ctlTable th, #ctlTable td { overflow-wrap:anywhere; word-break:break-word; }
+  #ctlTable th:nth-child(1), #ctlTable td:nth-child(1) { width:22%; }
+  #ctlTable th:nth-child(5), #ctlTable td:nth-child(5),
+  #ctlTable th:nth-child(6), #ctlTable td:nth-child(6) { width:15%; }
   .stable th { color:var(--muted); font-weight:normal; background:var(--canvas); font-size:12px; letter-spacing:.03em; }
   .stable tr.sess-row { cursor:pointer; }
   .stable tr.sess-row:hover td { background:var(--canvas); }
@@ -349,7 +445,10 @@
   <button class="vbtn" data-view="skills" data-i18n="🧩 Agent Skills">🧩 Agent Skills</button>
   <button class="vbtn" data-view="trace" data-i18n="📜 轨迹查询">📜 轨迹查询</button>
   <button class="vbtn" data-view="qa" data-i18n="💬 问答">💬 问答</button>
-  <div class="ssec" data-i18n="工作流（点击切换）">工作流（点击切换）</div>
+  <button class="vbtn" data-view="nn" data-i18n="🧠 智能体神经网络" title="智能体总结神经网络：芯片式知识脑图，放大见知识节点、点击跳转">🧠 智能体神经网络</button>
+  <div class="ssec"><span data-i18n="工作流（按项目分组）">工作流（按项目分组）</span>
+    <button id="wfQuickBtn" title="快速切换画布" data-i18n-title="按项目 / 智能体快速切换画布" style="float:right;font-size:10px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:0 6px;cursor:pointer">🔎 <span data-i18n="快速切换">快速切换</span></button>
+  </div>
   <div id="wfList" style="display:flex;flex-direction:column;gap:2px"></div>
   <button id="btnNewWf" class="sbtn" data-i18n="＋ 新建流程框架" data-i18n-title="创建带 输入→Agent→条件→合并→输出 骨架的流程框架" title="创建带 输入→Agent→条件→合并→输出 骨架的流程框架">＋ 新建流程框架</button>
   <button id="btnImportWf" class="sbtn" data-i18n="⬆ 导入 JSON">⬆ 导入 JSON</button>
@@ -383,6 +482,7 @@
   </div>
   <div style="display:flex;flex:1;min-height:0">
   <div id="cvwrap">
+    <div id="cvCrumb"></div>
     <svg id="cv"><defs id="defs"></defs><g id="world"></g></svg>
     <div id="zoomer">
       <button id="zIn" title="放大" data-i18n-title="放大">＋</button>
@@ -520,6 +620,23 @@
   <div class="vbody">
     <textarea id="traceTA" placeholder="或把 usage.jsonl 内容粘贴到这里（每行一个 JSON）" data-i18n-ph="或把 usage.jsonl 内容粘贴到这里（每行一个 JSON）" style="width:100%;height:70px"></textarea>
     <div id="traceOut"><p class="hint">先选择文件或粘贴数据，即可按时间倒序回放每次调用。</p></div>
+  </div>
+</div>
+<div id="viewNn" class="view">
+  <div class="vhead">
+    <b data-i18n="🧠 智能体总结神经网络">🧠 智能体总结神经网络</b>
+    <span class="hint" data-i18n="把已连接智能体的项目/会话/知识压成一张可缩放的神经网络芯片：滚轮缩放（放大后浮现文字），点击神经元跳转对应画布，拖拽平移。">把已连接智能体的项目/会话/知识压成一张可缩放的神经网络芯片：滚轮缩放（放大后浮现文字），点击神经元跳转对应画布，拖拽平移。</span>
+    <span style="flex:1"></span>
+    <select id="nnLayout" title="布局"><option value="chip" data-i18n="🔲 芯片阵列">🔲 芯片阵列</option><option value="net" data-i18n="🕸 神经网络">🕸 神经网络</option><option value="tree" data-i18n="🌳 知识树">🌳 知识树</option></select>
+    <button id="nnReplay" data-i18n="▶ 重播脉冲">▶ 重播脉冲</button>
+    <button id="nnFit" data-i18n="适应视图">适应视图</button>
+    <button id="nnRefresh" data-i18n="🔄 重建">🔄 重建</button>
+  </div>
+  <div class="vbody" style="position:relative;padding:0">
+    <svg id="nnSvg"></svg>
+    <div id="nnTip" class="nntip"></div>
+    <div id="nnHud" class="nnhud"></div>
+    <div id="nnZoom" class="nnzoom"><button id="nnIn" title="放大">＋</button><button id="nnOut" title="缩小">－</button><button id="nnFit2" title="适应视图">⊙</button></div>
   </div>
 </div>
 <div id="viewQa" class="view">
@@ -1916,6 +2033,66 @@ function taskCanvasName(when, task, taken){
   while ((taken || []).indexOf(nn) >= 0) nn = '主流程（' + when + '，' + (task || '对话') + ' ' + (i++) + '）';
   return nn;
 }
+// ---------- v0.24.0 项目维度（同项目分组 / 同项目内多智能体协作） ----------
+// 工作目录 → 项目名（取最后一段目录名；无 cwd 时回落 '未标注项目'）
+function projectOf(cwd){
+  const s = String(cwd == null ? '' : cwd).replace(/[\\/]+$/, '');
+  if (!s) return '未标注项目';
+  const seg = s.split(/[\\/]/).filter(Boolean);
+  return seg.length ? seg[seg.length - 1] : '未标注项目';
+}
+// 项目键：优先 cwd 归一化，其次显式 project 字段
+function projectKeyOf(entry){
+  if (!entry) return '未标注项目';
+  const src = entry.src || {};
+  return src.project || projectOf(src.cwd || '');
+}
+// 把画布列表按项目分组（对话画布按 src 项目归组；主流程/手工画布归入「流程框架」）
+function groupByProject(list){
+  const map = new Map();
+  (list || []).forEach(w => {
+    const isConv = !!(w.src && w.src.session);
+    const key = isConv ? projectKeyOf(w) : '流程框架';
+    if (!map.has(key)) map.set(key, { project: key, convs: [], others: [] });
+    const g = map.get(key);
+    if (isConv) g.convs.push(w); else g.others.push(w);
+  });
+  return [...map.values()].sort((a, b) => (b.convs.length - a.convs.length) || (a.project < b.project ? -1 : 1));
+}
+// 同一项目内的智能体（客户端）清单：主智能体（master）与子智能体（sub）
+function agentsInProject(list, project){
+  const byClient = new Map();
+  (list || []).forEach(w => {
+    if (!(w.src && w.src.session)) return;
+    if (projectKeyOf(w) !== project) return;
+    const cid = w.src.client || 'zcode';
+    if (!byClient.has(cid)) byClient.set(cid, { client: cid, canvases: [], subs: 0, masters: 0 });
+    const g = byClient.get(cid);
+    g.canvases.push(w);
+    (w.src.turns || []).forEach(t => { g.masters++; g.subs += (t.subs || []).length; });
+  });
+  return [...byClient.values()].sort((a, b) => b.canvases.length - a.canvases.length);
+}
+// 同一项目内不同智能体之间的协作（谁先谁后 / 谁与谁同行）：按时间排序相邻不同客户端的窗口
+function projectCollaboration(list, project){
+  const evts = [];
+  (list || []).forEach(w => {
+    if (!(w.src && w.src.session)) return;
+    if (projectKeyOf(w) !== project) return;
+    evts.push({ client: w.src.client || 'zcode', ts: w.src.ts || 0, name: w.name });
+  });
+  evts.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const links = []; const seen = new Set();
+  for (let i = 1; i < evts.length; i++){
+    const a = evts[i - 1], b = evts[i];
+    if (a.client === b.client) continue;
+    const k = a.client + '→' + b.client;
+    if (!seen.has(k)){ seen.add(k); links.push({ from: a.client, to: b.client, ts: b.ts }); }
+  }
+  // 参与协作的客户端集合（用于画布大框圈出）
+  const clients = [...new Set(evts.map(e => e.client))];
+  return { links, clients, events: evts };
+}
 // 工作流列表 → 树：带 src.parent 的对话画布挂到其父画布下；父不存在时回落顶层
 function wfTree(list){
   const names = {}; (list || []).forEach(w => { names[w.name] = true; });
@@ -2067,6 +2244,8 @@ function wfTreeParse(text){
         session: String(s.session || '').slice(0, 120),
         task: String(s.task || '').slice(0, 200),
         ts: +s.ts || 0,
+        cwd: String(s.cwd || '').slice(0, 300),
+        project: String(s.project || '').slice(0, 120),
         turns: (Array.isArray(s.turns) ? s.turns : []).slice(0, 500).map(t => ({
           q: String((t && t.q) || '').slice(0, 400),
           ts: +(t && t.ts) || 0,
@@ -2140,6 +2319,160 @@ function fmtCost(v){
   if (v < 1) return '$' + v.toFixed(3);
   if (v < 100) return '$' + v.toFixed(2);
   return '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+// ---------- v0.24.0 智能体总结神经网络：图构建 / 布局（纯函数，DOM 无关，便于单测） ----------
+// 节点：{ id, kind:'hub'|'proj'|'sess'|'kw'|'skill', label, sub, client, canvas, ts, score, proj }
+// 边：  { from, to, kind:'branch'|'coop'|'kw'|'sub', k:1|2|3 }
+function nnBuildGraph(list, qaArr, kwPerSess){
+  const nodes = [], edges = [];
+  const add = n => { nodes.push(n); return n; };
+  const seen = new Set();
+  const push = (a, b, kind, k) => {
+    if (a === b) return;
+    const key = a + '>' + b + '>' + kind;
+    if (seen.has(key)) return;
+    seen.add(key);
+    edges.push({ from: a, to: b, kind: kind, k: k || 1 });
+  };
+  const L = (list || []).filter(w => w && w.data);
+  const convs = L.filter(w => w.src && w.src.session);
+  const frameworks = L.filter(w => !(w.src && w.src.session));
+  const groups = groupByProject(L).filter(g => g.convs.length);
+  const hubId = 'hub';
+  add({ id: hubId, kind: 'hub', label: '智能体总结', sub: (groups.length || 1) + ' 项目 · ' + convs.length + ' 画布', score: convs.length });
+  groups.forEach(grp => {
+    const pid = 'p:' + grp.project;
+    const agents = agentsInProject(L, grp.project);
+    const collab = projectCollaboration(L, grp.project);
+    const nSub = agents.reduce((a, g) => a + g.subs, 0);
+    add({ id: pid, kind: 'proj', label: grp.project,
+      sub: agents.length + ' 智能体 · ' + grp.convs.length + ' 对话' + (nSub ? ' · 🤖' + nSub : ''),
+      score: grp.convs.length });
+    push(hubId, pid, 'branch', 1);
+    grp.convs.forEach(w => {
+      const cid = (w.src && w.src.client) || 'zcode';
+      const ci = (typeof QA_CLIENTS !== 'undefined' && QA_CLIENTS[cid]) || { label: cid, color: '#2563eb' };
+      const turns = (w.src && w.src.turns) || [];
+      const nS = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
+      const sid = 's:' + w.name;
+      add({ id: sid, kind: 'sess', label: String((w.src && w.src.task) || w.name).slice(0, 22),
+        sub: String(ci.label).replace(/ CLI$/, '') + ' · 💬' + turns.length + (nS ? ' · 🤖' + nS : ''),
+        client: cid, color: ci.color, canvas: w.name, ts: (w.src && w.src.ts) || 0,
+        score: turns.length, proj: grp.project });
+      push(pid, sid, 'branch', 2);
+      turns.forEach(t => {
+        (t.subs || []).forEach((subNode, k) => {
+          const kid = 'k:' + w.name + ':' + subNode + ':' + k;
+          add({ id: kid, kind: 'kw', label: '🤖 ' + String(t.q || '').slice(0, 16), sub: '子智能体',
+            color: '#7c3aed', canvas: w.name, ts: t.ts || 0, score: 1, proj: grp.project, kwnode: subNode });
+          push(sid, kid, 'sub', 3);
+        });
+      });
+    });
+    collab.links.forEach(l => {
+      const pickOf = c => grp.convs.filter(w => ((w.src && w.src.client) || 'zcode') === c)
+        .sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0))[0];
+      const a = pickOf(l.from), b = pickOf(l.to);
+      if (a && b) push('s:' + a.name, 's:' + b.name, 'coop', 1);
+    });
+  });
+  // 关键词层：同项目跨会话共现 → 知识突触
+  if (kwPerSess && typeof kwPerSess === 'object'){
+    const byKw = new Map();
+    Object.keys(kwPerSess).forEach(canvas => {
+      const e = L.find(w => w.name === canvas);
+      if (!e || !(e.src && e.src.session)) return;
+      const proj = projectKeyOf(e);
+      (kwPerSess[canvas] || []).slice(0, 4).forEach(kw => {
+        const kid = 'w:' + proj + ':' + kw;
+        if (!nodes.some(n => n.id === kid)) add({ id: kid, kind: 'kw', label: String(kw).slice(0, 14), sub: '知识', color: '#0d9488', proj: proj, score: 1 });
+        push('s:' + canvas, kid, 'kw', 2);
+        const key = proj + '|' + kw;
+        if (byKw.has(key)) push(byKw.get(key), 's:' + canvas, 'kw', 2);
+        else byKw.set(key, 's:' + canvas);
+      });
+    });
+  }
+  // 流程框架直接挂 hub
+  frameworks.forEach(w => {
+    add({ id: 'f:' + w.name, kind: 'skill', label: String(w.name).slice(0, 22),
+      sub: ((w.data && w.data.nodes) || []).length + ' 节点', canvas: w.name, color: '#ca8a04',
+      score: ((w.data && w.data.nodes) || []).length });
+    push(hubId, 'f:' + w.name, 'branch', 1);
+  });
+  // 会话时间流：同项目相邻会话弱突触（学习的时间序）
+  groups.forEach(grp => {
+    const arr = grp.convs.slice().sort((a, b) => ((a.src && a.src.ts) || 0) - ((b.src && b.src.ts) || 0));
+    for (let i = 1; i < arr.length && i <= 8; i++) push('s:' + arr[i - 1].name, 's:' + arr[i].name, 'kw', 3);
+  });
+  return { nodes: nodes, edges: edges, groups: groups };
+}
+// 三布局（chip 芯片阵列 / net 神经网络环 / tree 知识树）→ id → {x,y}
+function nnLayout(graph, mode, W, H){
+  W = W || 1200; H = H || 760;
+  const pos = new Map();
+  const nodes = (graph && graph.nodes) || [];
+  const hub = nodes.find(n => n.kind === 'hub');
+  const projs = nodes.filter(n => n.kind === 'proj');
+  const cx = W / 2, cy = H / 2;
+  if (hub) pos.set(hub.id, { x: cx, y: cy });
+  if (mode === 'net'){
+    projs.forEach((p, i) => {
+      const ang = -Math.PI / 2 + (i / Math.max(1, projs.length)) * Math.PI * 2;
+      const R = Math.min(W, H) * 0.30;
+      pos.set(p.id, { x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R });
+      const kids = nodes.filter(n => n.kind === 'sess' && n.proj === p.label);
+      kids.forEach((k, j) => {
+        const a2 = ang + ((j - (kids.length - 1) / 2) / Math.max(1, kids.length)) * 1.5;
+        const r2 = 70 + (j % 2) * 26;
+        pos.set(k.id, { x: pos.get(p.id).x + Math.cos(a2) * r2, y: pos.get(p.id).y + Math.sin(a2) * r2 });
+      });
+    });
+  } else if (mode === 'tree'){
+    const colW = Math.min(320, (W - 120) / 3);
+    let y = 60;
+    projs.forEach(p => {
+      pos.set(p.id, { x: 80, y: y + 40 });
+      const kids = nodes.filter(n => n.kind === 'sess' && n.proj === p.label);
+      kids.forEach((k, j) => pos.set(k.id, { x: 80 + colW, y: y + j * 54 }));
+      y += Math.max(120, kids.length * 54 + 40);
+    });
+    if (hub) pos.set(hub.id, { x: 80, y: Math.max(40, y / 2) });
+  } else {
+    const cols = Math.max(1, Math.ceil(Math.sqrt(projs.length)));
+    const cw = (W - 200) / cols, ch = (H - 200) / Math.max(1, Math.ceil(projs.length / cols));
+    projs.forEach((p, i) => {
+      const gx = 100 + (i % cols) * cw + cw / 2;
+      const gy = 100 + Math.floor(i / cols) * ch + ch / 2;
+      pos.set(p.id, { x: gx, y: gy });
+      const kids = nodes.filter(n => n.kind === 'sess' && n.proj === p.label);
+      const kc = Math.max(1, Math.ceil(Math.sqrt(kids.length)));
+      kids.forEach((k, j) => {
+        const dx = ((j % kc) - (kc - 1) / 2) * Math.min(cw * 0.42, 190);
+        const dy = (Math.floor(j / kc) - (Math.ceil(kids.length / kc) - 1) / 2) * Math.min(ch * 0.34, 96);
+        pos.set(k.id, { x: gx + dx, y: gy + dy });
+      });
+      // 项目内知识神经元：贴着芯片内缘一圈（不外溢，避免跨芯片碰撞）
+      const kws = nodes.filter(n => n.kind === 'kw' && n.proj === p.label);
+      const R = 150 + Math.min(120, kids.length * 16);
+      kws.forEach((k, j) => {
+        const ang = -Math.PI / 2 + (j / Math.max(1, kws.length)) * Math.PI * 2;
+        pos.set(k.id, { x: gx + Math.cos(ang) * R * 1.25, y: gy + Math.sin(ang) * R * 0.68 });
+      });
+    });
+  }
+  // 关键词 / 框架等未定位节点：以锚点为心按「黄金角螺旋」紧凑外扩（半径收敛在锚点附近）
+  nodes.forEach(n => {
+    if (pos.has(n.id)) return;
+    const anchor = n.proj ? nodes.find(m => m.kind === 'proj' && m.label === n.proj) : hub;
+    const ap = (anchor && pos.get(anchor.id)) || { x: cx, y: cy };
+    const sibs = nodes.filter(m => !pos.has(m.id) && (n.proj ? m.proj === n.proj : !m.proj));
+    const j = Math.max(0, sibs.indexOf(n));
+    const ang = j * 2.399963;
+    const R = 104 + 34 * Math.sqrt(j + 1);
+    pos.set(n.id, { x: ap.x + Math.cos(ang) * R, y: ap.y + Math.sin(ang) * R * 0.8 });
+  });
+  return pos;
 }
 //__CORE_END__
 
@@ -2579,6 +2912,38 @@ if (typeof document !== "undefined") var UI = function(){
     '参考价仅供参考，实际以各模型官网价目为准。': 'Reference prices only; check each model vendor\'s official pricing.',
     '已填入 {0} 个模型的参考价（请核对后点「💾 保存」）': 'Filled reference prices for {0} models (verify, then click "💾 Save")',
     '没有可匹配参考价的模型（可手工填写）': 'No models matched the reference list (fill in manually)',
+    // ---- v0.24.0 项目分组 / 神经网络 ----
+    '工作流（按项目分组）': 'Workflows (grouped by project)',
+    '快速切换': 'Quick switch',
+    '按项目 / 智能体快速切换画布': 'Quickly switch canvases by project / agent',
+    '流程框架': 'Flow frameworks',
+    '按智能体分组': 'grouped by agent',
+    '主智能体': 'Master agent',
+    '协作链': 'Collaboration chain',
+    '协作': 'Collaboration',
+    '协作下游': 'Collaboration downstream',
+    '（同一项目并行/交替）': ' (parallel/alternating in the same project)',
+    '快速切换画布': 'Quick canvas switch',
+    '输入项目 / 智能体 / 任务关键字…': 'Type project / agent / task keyword…',
+    '没有匹配的画布': 'No matching canvas',
+    '已跳转：{0}': 'Jumped to: {0}',
+    '智能体总结': 'Agent Summary',
+    '🧠 智能体总结神经网络': '🧠 Agent Summary Neural Network',
+    '🧠 智能体神经网络': '🧠 Agent Neural Network',
+    '把已连接智能体的项目/会话/知识压成一张可缩放的神经网络芯片：滚轮缩放（放大后浮现文字），点击神经元跳转对应画布，拖拽平移。': 'Compress connected agents\' projects/sessions/knowledge into a zoomable neural-network chip: scroll to zoom (text appears when magnified), click a neuron to jump to its canvas, drag to pan.',
+    '🔲 芯片阵列': '🔲 Chip array',
+    '🕸 神经网络': '🕸 Neural network',
+    '🌳 知识树': '🌳 Knowledge tree',
+    '▶ 重播脉冲': '▶ Replay pulses',
+    '🔄 重建': '🔄 Rebuild',
+    '🧠 神经元 {0}': '🧠 Neurons {0}',
+    '突触 {0}': 'Synapses {0}',
+    '📁 项目 {0}': '📁 Projects {0}',
+    '滚轮缩放 · 拖拽平移 · 点击跳转': 'Scroll zoom · drag pan · click to jump',
+    '点击跳转画布 →': 'Click to jump to canvas →',
+    '项目：': 'Project: ',
+    '{0} 智能体 · {1} 对话': '{0} agents · {1} conversations',
+    '{0} 子智能体': '{0} sub-agents',
   };
   const I18N_HTML = {
     'help-mermaid': 'mermaid subset: <code>flowchart TD / LR</code>; nodes <code>A[rect]</code> <code>A{diamond}</code> <code>A(rounded)</code>; edges <code>--&gt;</code> / <code>-.-&gt;</code> with labels <code>--&gt;|text|</code>; <code>subgraph</code> grouping',
@@ -2609,7 +2974,7 @@ if (typeof document !== "undefined") var UI = function(){
     LANG = l === 'en' ? 'en' : 'zh';
     try { localStorage.setItem('cmflow:lang:v1', LANG); } catch(e){}
     applyLang();
-    fillWfSel(); updateSrcInfo();
+    fillWfSel(); renderCrumb(); updateSrcInfo();
     if (curView === 'skills') renderSkills();
     if (curView === 'ctl') renderCtl();
     if (curView === 'dist') renderDist();
@@ -2684,43 +3049,93 @@ if (typeof document !== "undefined") var UI = function(){
   function entryNames(){ return WF.list.map(w => w.name); }
   const wfCollapsed = new Set();  // 收起的根画布（默认展开，展开可见对话画布）
   const wfExpanded = new Set();   // 展开小对话的对话画布（默认收起）
+  const wfProjCollapsed = new Set(); // v0.24.0 收起的项目分组
+  // 单个对话画布行（含小对话展开）——被「项目分组」与「流程框架根」共用
+  function wfChildRows(k, indent){
+    const ci = qaClientInfo((k.src && k.src.client) || '');
+    const turns = (k.src && k.src.turns) || [];
+    const subsN = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
+    const ko = wfExpanded.has(k.name);
+    const ka = k.name === WF.active;
+    const when = (k.src && k.src.ts) ? fmtWfWhen(k.src.ts) : '';
+    const meta = ci.label.replace(/ CLI$/, '') + (when ? ' · ' + when.slice(6) : '');
+    const tip = ((k.src && k.src.session) || '') + '　' + k.name + (when ? '　' + when : '') + '　💬' + turns.length + (subsN ? ' · 🤖' + subsN : '');
+    const out = [];
+    out.push('<div class="wfchild' + (indent ? ' wfci' : '') + '"><div class="wfrow' + (ka ? ' active' : '') + '" data-wf="' + escXml(k.name) + '" title="' + escXml(tip) + '">' +
+      '<span class="wftog"' + (turns.length ? ' data-tog="c" data-name="' + escXml(k.name) + '" title="' + T('展开小对话') + '"' : '') + '>' + (turns.length ? (ko ? '▾' : '▸') : '') + '</span>' +
+      '<span class="wfdot" style="background:' + ci.color + '" title="' + escXml(ci.label) + '"></span>' +
+      '<span class="nm">' + escXml((k.src && k.src.task) || k.name) + '</span></div>' +
+      '<div class="wfmeta" data-wf="' + escXml(k.name) + '">' + escXml(meta) + '</div></div>');
+    if (ko){
+      const gaps = wfDurOfTurns(turns).gaps;
+      turns.forEach((t, ti) => {
+        const durTxt = fmtDurMs(gaps[ti], LANG);
+        out.push(
+          '<div class="wfturn" data-cw="' + escXml(k.name) + '" data-cn="' + escXml(t.node) + '" title="' + escXml(String(t.q)) + '">💬 <span class="tq">' + escXml(String(t.q).slice(0, 46)) + '</span>' +
+          ((t.subs && t.subs.length) ? '<span class="hint">🤖' + t.subs.length + '</span>' : '') +
+          (durTxt ? '<span class="dur" title="' + escXml(T('距下一次提问') + ' · ' + durTxt) + '">⏱ ' + durTxt + '</span>' : '') + '</div>');
+      });
+    }
+    return out.join('');
+  }
+  // 根画布行（主流程/手工画布）：点击切换 + 展开其下的对话画布
+  function wfRootRow(w, kids){
+    const isActive = w.name === WF.active;
+    const open = kids.length > 0 && !wfCollapsed.has(w.name);
+    const r = ['<div class="wfrow' + (isActive ? ' active' : '') + '" data-wf="' + escXml(w.name) + '" title="' + escXml(w.name) + '">' +
+      '<span class="wftog"' + (kids.length ? ' data-tog="r" data-name="' + escXml(w.name) + '" title="' + T('展开对话画布') + '"' : '') + '>' + (kids.length ? (open ? '▾' : '▸') : '') + '</span>' +
+      '<span class="nm">' + escXml(w.name) + (isActive ? T('（当前）') : '') + '</span>' +
+      '<span class="cnt">' + tx('{0} 节点', ((w.data && w.data.nodes) || []).length) + (kids.length ? ' · ' + tx('{0} 对话', kids.length) : '') + '</span></div>'];
+    if (open) kids.forEach(k => r.push(wfChildRows(k, false)));
+    return r.join('');
+  }
+  // v0.24.0 左侧列表：先按「项目」分组（同项目智能体画布由大框圈出 + 协作关系），再列「流程框架」
   function fillWfSel(){
     const box = $('wfList');
     const rows = [];
-    wfTree(WF.list).forEach(node => {
-      const w = node.w, isActive = w.name === WF.active;
-      const kids = node.children;
-      const open = kids.length > 0 && !wfCollapsed.has(w.name);
-      rows.push('<div class="wfrow' + (isActive ? ' active' : '') + '" data-wf="' + escXml(w.name) + '" title="' + escXml(w.name) + '">' +
-        '<span class="wftog"' + (kids.length ? ' data-tog="r" data-name="' + escXml(w.name) + '" title="' + T('展开对话画布') + '"' : '') + '>' + (kids.length ? (open ? '▾' : '▸') : '') + '</span>' +
-        '<span class="nm">' + escXml(w.name) + (isActive ? T('（当前）') : '') + '</span>' +
-        '<span class="cnt">' + tx('{0} 节点', ((w.data && w.data.nodes) || []).length) + (kids.length ? ' · ' + tx('{0} 对话', kids.length) : '') + '</span></div>');
-      if (open) kids.forEach(k => {
-        const ci = qaClientInfo((k.src && k.src.client) || '');
-        const turns = (k.src && k.src.turns) || [];
-        const subsN = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
-        const ko = wfExpanded.has(k.name);
-        const ka = k.name === WF.active;
-        const when = (k.src && k.src.ts) ? fmtWfWhen(k.src.ts) : '';
-        const meta = ci.label.replace(/ CLI$/, '') + (when ? ' · ' + when.slice(6) : '');
-        const tip = ((k.src && k.src.session) || '') + '　' + k.name + (when ? '　' + when : '') + '　💬' + turns.length + (subsN ? ' · 🤖' + subsN : '');
-        rows.push('<div class="wfchild"><div class="wfrow' + (ka ? ' active' : '') + '" data-wf="' + escXml(k.name) + '" title="' + escXml(tip) + '">' +
-          '<span class="wftog"' + (turns.length ? ' data-tog="c" data-name="' + escXml(k.name) + '" title="' + T('展开小对话') + '"' : '') + '>' + (turns.length ? (ko ? '▾' : '▸') : '') + '</span>' +
-          '<span class="wfdot" style="background:' + ci.color + '" title="' + escXml(ci.label) + '"></span>' +
-          '<span class="nm">' + escXml((k.src && k.src.task) || k.name) + '</span></div>' +
-          '<div class="wfmeta" data-wf="' + escXml(k.name) + '">' + escXml(meta) + '</div></div>');
-        if (ko){
-          const gaps = wfDurOfTurns(turns).gaps;
-          turns.forEach((t, ti) => {
-            const durTxt = fmtDurMs(gaps[ti], LANG);
-            rows.push(
-              '<div class="wfturn" data-cw="' + escXml(k.name) + '" data-cn="' + escXml(t.node) + '" title="' + escXml(String(t.q)) + '">💬 <span class="tq">' + escXml(String(t.q).slice(0, 46)) + '</span>' +
-              ((t.subs && t.subs.length) ? '<span class="hint">🤖' + t.subs.length + '</span>' : '') +
-              (durTxt ? '<span class="dur" title="' + escXml(T('距下一次提问') + ' · ' + durTxt) + '">⏱ ' + durTxt + '</span>' : '') + '</div>');
-          });
-        }
+    const groups = groupByProject(WF.list);
+    // 与项目无关的根画布（主流程/手工/未挂载）走原树视图
+    const frameworkRoots = wfTree(WF.list.filter(w => !(w.src && w.src.session)));
+    const convOnly = WF.list.filter(w => w.src && w.src.session);
+    groups.forEach(grp => {
+      if (!grp.convs.length) return;
+      const collapsed = wfProjCollapsed.has(grp.project);
+      const collab = projectCollaboration(WF.list, grp.project);
+      const agents = agentsInProject(WF.list, grp.project);
+      const subsN = agents.reduce((a, g) => a + g.subs, 0);
+      const turnsN = agents.reduce((a, g) => a + g.masters, 0);
+      rows.push('<div class="wfproj' + (collapsed ? ' collapsed' : '') + '" data-proj="' + escXml(grp.project) + '">' +
+        '<div class="wfph" data-projtog="' + escXml(grp.project) + '" title="' + escXml(grp.project) + '">' +
+        '<span class="pcar">▾</span><span class="nm pj">📁 ' + escXml(grp.project) + '</span>' +
+        '<span class="cnt">' + tx('{0} 智能体 · {1} 对话', agents.length, grp.convs.length) + (subsN ? ' · 🤖' + subsN : '') + '</span></div>' +
+        '<div class="wfpbody">');
+      // 同项目内多智能体协作：谁与谁接力（时间序）
+      if (collab.links.length > 1 || (collab.links.length === 1 && collab.clients.length > 1)){
+        rows.push('<div class="wfpanc">🤝 ' + T('协作链') + '：<b>' + escXml(collab.links.map(l => qaClientInfo(l.from).label.replace(/ CLI$/, '') + '→' + qaClientInfo(l.to).label.replace(/ CLI$/, '')).join(' · ')) + '</b></div>');
+      } else if (collab.clients.length > 1){
+        rows.push('<div class="wfpanc">🤝 ' + T('协作') + '：<b>' + escXml(collab.clients.map(c => qaClientInfo(c).label.replace(/ CLI$/, '')).join(' · ')) + '</b> ' + T('（同一项目并行/交替）') + '</div>');
+      }
+      // 按智能体（客户端）大框圈出：主智能体 + 其子智能体画布
+      agents.forEach(a => {
+        const ci = a.canvases[0] && a.canvases[0].src ? qaClientInfo(a.canvases[0].src.client || a.client) : qaClientInfo(a.client);
+        const role = a.subs > 0 ? ('🧠 ' + T('主智能体') + ' + 🤖 ' + tx('{0} 子智能体', a.subs)) : ('🧠 ' + T('主智能体'));
+        rows.push('<div class="wfagrp" style="--agc:' + ci.color + '">' +
+          '<div class="wfah" data-agrp="' + escXml(a.client) + '">' +
+          '<span class="wfdot" style="background:' + ci.color + '"></span>' +
+          '<span class="an">' + escXml(ci.label) + '</span>' +
+          '<span class="tag">' + escXml(role) + '</span>' +
+          '<span class="mst">' + tx('{0} 对话', a.canvases.length) + '</span></div>');
+        a.canvases.slice().sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0))
+          .forEach(k => rows.push(wfChildRows(k, true)));
+        rows.push('</div>');
       });
+      rows.push('</div></div>');
     });
+    // 「流程框架」区块：主流程 + 未归入项目的画布
+    if (frameworkRoots.length){
+      rows.push('<div class="wfpanc" style="padding:8px 8px 3px;font-weight:600;color:var(--fg)">🗂 ' + T('流程框架') + '</div>');
+      frameworkRoots.forEach(node => rows.push(wfRootRow(node.w, node.children)));
+    }
     box.innerHTML = rows.join('');
     box.querySelectorAll('.wfrow[data-wf], .wfmeta[data-wf]').forEach(r => r.addEventListener('click', () => switchWorkflow(r.dataset.wf)));
     box.querySelectorAll('.wftog[data-tog]').forEach(t => t.addEventListener('click', ev => {
@@ -2730,6 +3145,20 @@ if (typeof document !== "undefined") var UI = function(){
       fillWfSel();
     }));
     box.querySelectorAll('.wfturn[data-cw]').forEach(t => t.addEventListener('click', () => gotoCanvasTurn(t.dataset.cw, t.dataset.cn)));
+    // 项目分组折叠 / 展开
+    box.querySelectorAll('.wfph[data-projtog]').forEach(h => h.addEventListener('click', () => {
+      const p = h.dataset.projtog;
+      if (wfProjCollapsed.has(p)) wfProjCollapsed.delete(p); else wfProjCollapsed.add(p);
+      fillWfSel();
+    }));
+    // 点击智能体大框标题：跳到该项目该智能体的最新画布
+    box.querySelectorAll('.wfah[data-agrp]').forEach(h => h.addEventListener('click', () => {
+      const cid = h.dataset.agrp;
+      const cand = WF.list.filter(w => w.src && w.src.session && (w.src.client || 'zcode') === cid);
+      if (!cand.length) return;
+      cand.sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0));
+      switchWorkflow(cand[0].name);
+    }));
   }
   function flashNodes(ids){
     (ids || []).forEach(id => {
@@ -2770,6 +3199,7 @@ if (typeof document !== "undefined") var UI = function(){
   function switchWorkflow(name){
     const entry = WF.list.find(w => w.name === name);
     if (!entry) return toast(T('工作流不存在：') + name);
+    const same = WF.active === name;
     markDirtyNow();
     WF.active = name;
     g = normalize(JSON.parse(JSON.stringify(entry.data)));
@@ -2777,7 +3207,84 @@ if (typeof document !== "undefined") var UI = function(){
     $('dirSel').value = g.dir;
     hist.past.length = 0; hist.future.length = 0;
     fillWfSel(); setSel(null); refresh(true); updateSrcInfo(); refreshSyncHint(); saveAll();
+    renderCrumb();
+    // v0.24.0 切换动效：画布轻微上浮淡入（同画布重入不重播）
+    if (!same){
+      const w = $('cvwrap');
+      if (w){ w.classList.remove('cv-flip'); void w.offsetWidth; w.classList.add('cv-flip'); }
+    }
     showView('canvas');
+  }
+  // v0.24.0 画布面包屑：项目 › 智能体 › 画布；点击可展开切换（重做「点击切换与展现」）
+  function renderCrumb(){
+    const el = $('cvCrumb');
+    if (!el) return;
+    const e = WF.list.find(w => w.name === WF.active);
+    const parts = [];
+    if (e && e.src && e.src.session){
+      const proj = projectKeyOf(e);
+      const ci = qaClientInfo(e.src.client || 'zcode');
+      const grp = groupByProject(WF.list).find(x => x.project === proj);
+      const agents = grp ? agentsInProject(WF.list, proj) : [];
+      const collab = grp ? projectCollaboration(WF.list, proj) : { links: [] };
+      parts.push('<span class="cb pj" data-cbm="proj" title="' + escXml(proj) + '">📁 ' + escXml(proj) + ' <span style="opacity:.6">▾</span></span>');
+      parts.push('<span class="sep">›</span>');
+      parts.push('<span class="cb ag" style="--cb-c:' + ci.color + '" data-cbm="agent" title="' + escXml(ci.label) + '"><span class="wfdot" style="background:' + ci.color + '"></span>' + escXml(ci.label.replace(/ CLI$/, '')) + ' <span style="opacity:.6">▾</span></span>');
+      if (collab.links.length){
+        const fromTo = collab.links.filter(l => l.from === (e.src.client || 'zcode')).map(l => qaClientInfo(l.to).label.replace(/ CLI$/, ''));
+        if (fromTo.length) parts.push('<span class="cb" style="opacity:.85" title="' + T('协作下游') + '">🤝 → ' + escXml([...new Set(fromTo)].join(' / ')) + '</span>');
+      }
+      parts.push('<span class="sep">›</span>');
+      parts.push('<span class="cb cur" title="' + escXml(e.name) + '">🧩 ' + escXml((e.src.task || e.name).slice(0, 26)) + '</span>');
+    } else {
+      parts.push('<span class="cb cur">🗂 ' + escXml(WF.active) + '</span>');
+    }
+    el.innerHTML = parts.join('');
+    el.querySelectorAll('.cb[data-cbm]').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      openCrumbMenu(b, b.dataset.cbm);
+    }));
+  }
+  // 面包屑下拉：项目 → 该项目所有画布；智能体 → 该项目内该智能体的画布
+  function openCrumbMenu(anchor, kind){
+    const old = $('cvCrumb').querySelector('.cbmenu'); if (old) old.remove();
+    const e = WF.list.find(w => w.name === WF.active);
+    if (!e || !(e.src && e.src.session)) return;
+    const proj = projectKeyOf(e);
+    const cid = e.src.client || 'zcode';
+    const menu = document.createElement('div');
+    menu.className = 'cbmenu';
+    const add = (label, hint, targetName) => {
+      const cur = targetName === WF.active;
+      const mi = document.createElement('div');
+      mi.className = 'mi' + (cur ? ' cur' : '');
+      mi.innerHTML = '<span class="nmx">' + label + '</span><span class="mt">' + escXml(hint || '') + '</span>';
+      mi.addEventListener('click', () => { menu.remove(); if (!cur) switchWorkflow(targetName); });
+      menu.appendChild(mi);
+    };
+    if (kind === 'proj'){
+      const h = document.createElement('div'); h.className = 'mh';
+      h.textContent = '📁 ' + proj + ' · ' + T('按智能体分组');
+      menu.appendChild(h);
+      agentsInProject(WF.list, proj).forEach(a => {
+        const ci = qaClientInfo(a.client);
+        const gh = document.createElement('div'); gh.className = 'mh';
+        gh.innerHTML = '<span class="wfdot" style="display:inline-block;background:' + ci.color + ';margin-right:5px"></span>' + escXml(ci.label) + ' · ' + tx('{0} 对话', a.canvases.length);
+        menu.appendChild(gh);
+        a.canvases.slice().sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0))
+          .forEach(k => add('🧩 ' + escXml((k.src.task || k.name).slice(0, 30)), fmtWfWhen(k.src.ts).slice(6), k.name));
+      });
+    } else {
+      const h = document.createElement('div'); h.className = 'mh';
+      h.textContent = '🤖 ' + (qaClientInfo(cid).label) + ' · ' + proj;
+      menu.appendChild(h);
+      WF.list.filter(w => w.src && w.src.session && projectKeyOf(w) === proj && (w.src.client || 'zcode') === cid)
+        .sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0))
+        .forEach(k => add('🧩 ' + escXml((k.src.task || k.name).slice(0, 30)), fmtWfWhen(k.src.ts).slice(6), k.name));
+    }
+    anchor.appendChild(menu);
+    const close = ev => { if (!menu.contains(ev.target)){ menu.remove(); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
   }
   function markDirtyNow(){ clearTimeout(saveTimer); const e = WF.list.find(w => w.name === WF.active); if (e) e.data = { dir:g.dir, nodes:g.nodes, edges:g.edges, subs:g.subs, name:WF.active }; saveAll(); }
 
@@ -3674,7 +4181,7 @@ if (typeof document !== "undefined") var UI = function(){
     curView = name;
     document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
     clearTimeout(viewEnterTimer);
-    ['canvas','agents','dist','ctl','skills','trace','qa'].forEach(v => {
+    ['canvas','agents','dist','ctl','skills','trace','qa','nn'].forEach(v => {
       const el = $('view' + v.charAt(0).toUpperCase() + v.slice(1));
       if (!el) return;
       const on = v === name;
@@ -3690,6 +4197,7 @@ if (typeof document !== "undefined") var UI = function(){
     if (name === 'skills') renderSkills();
     if (name === 'trace') renderTrace();
     if (name === 'qa') renderQa();
+    if (name === 'nn') renderNn();
     if (name === 'canvas') applyView();
   }
   document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
@@ -4224,12 +4732,30 @@ if (typeof document !== "undefined") var UI = function(){
       const mx = (x1 + x2) / 2;
       return '<path class="medge" d="M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2 + '" marker-end="url(#arr2)"/>';
     }).join('');
-    html += Object.entries(L.nodes).map(([name, p]) =>
-      '<g class="mnd" data-mwf="' + escXml(name) + '">' +
-      '<rect x="' + p.x + '" y="' + p.y + '" width="' + p.w + '" height="' + p.h + '" rx="2"/>' +
-      '<text x="' + (p.x + p.w/2) + '" y="' + (p.y + 19) + '" text-anchor="middle">' + escXml(name) + '</text>' +
-      '<text class="mcnt" x="' + (p.x + p.w/2) + '" y="' + (p.y + 35) + '" text-anchor="middle">' + tx('{0} 节点', counts[name] || 0) + (name === WF.active ? ' · ' + T('当前') : '') + '</text></g>').join('');
-    svg.innerHTML = html;
+    // 文字超出对话框修复：SVG <text> 不会自动换行/裁切，长工作流名会溢出方框 →
+    // 用二分测量按像素宽度截断（省略号），并给 <text>/<rect> 加裁剪路径双保险。
+    const TRUNC = (txt, maxPx, fs) => {
+      txt = String(txt == null ? '' : txt);
+      const ew = c => (c.charCodeAt(0) > 0x2e80) ? fs : fs * 0.56;   // 中日韩全角≈1em，西文≈0.56em
+      let total = 0; for (const c of txt) total += ew(c);
+      if (total <= maxPx) return txt;
+      const dots = '…'; let acc = ew(dots[0]); let out = '';
+      for (const c of txt){ const w = ew(c); if (acc + w > maxPx) break; out += c; acc += w; }
+      return out + dots;
+    };
+    const pad = 8, fsName = 13, fsCnt = 11;
+    let clipDefs = '';
+    html += Object.entries(L.nodes).map(([name, p], i) => {
+      const cid = 'mclip' + i;
+      clipDefs += '<clipPath id="' + cid + '"><rect x="' + (p.x + pad) + '" y="' + (p.y + 4) + '" width="' + Math.max(0, p.w - pad * 2) + '" height="' + (p.h - 8) + '"/></clipPath>';
+      const nameTxt = TRUNC(name, p.w - pad * 2, fsName);
+      const cntTxt = TRUNC(tx('{0} 节点', counts[name] || 0) + (name === WF.active ? ' · ' + T('当前') : ''), p.w - pad * 2, fsCnt);
+      return '<g class="mnd" data-mwf="' + escXml(name) + '" clip-path="url(#' + cid + ')">' +
+        '<rect x="' + p.x + '" y="' + p.y + '" width="' + p.w + '" height="' + p.h + '" rx="2"/>' +
+        '<text x="' + (p.x + p.w/2) + '" y="' + (p.y + 19) + '" text-anchor="middle">' + escXml(nameTxt) + '</text>' +
+        '<text class="mcnt" x="' + (p.x + p.w/2) + '" y="' + (p.y + 35) + '" text-anchor="middle">' + escXml(cntTxt) + '</text></g>';
+    }).join('');
+    svg.innerHTML = '<defs>' + clipDefs + '</defs>' + html;
     svg.setAttribute('width', L.w); svg.setAttribute('height', L.h);
     svg.setAttribute('viewBox', '0 0 ' + L.w + ' ' + L.h);
     svg.querySelectorAll('[data-mwf]').forEach(nd => nd.addEventListener('click', () => switchWorkflow(nd.dataset.mwf)));
@@ -4248,10 +4774,84 @@ if (typeof document !== "undefined") var UI = function(){
     g = normalize(JSON.parse(JSON.stringify(tg)));
     if (!g.errors) g.errors = [];
     hist.past.length = 0; hist.future.length = 0;
-    fillWfSel(); setSel(null); refresh(true); updateSrcInfo(); saveAll();
+    fillWfSel(); renderCrumb(); setSel(null); refresh(true); updateSrcInfo(); saveAll();
     showView('canvas');
     toast(T('已创建流程框架：输入 → Agent → 条件 →（是/否）→ 合并 → 输出，含反馈修正环'));
   });
+  // v0.24.0 快速切换：全局命令面板（项目 › 智能体 › 画布），支持关键字过滤
+  $('wfQuickBtn').addEventListener('click', () => openQuickSwitch());
+  function openQuickSwitch(){
+    let dlg = $('quickDlg');
+    if (!dlg){
+      dlg = document.createElement('dialog');
+      dlg.id = 'quickDlg';
+      dlg.style.maxWidth = '600px';
+      dlg.innerHTML = '<h3>' + T('快速切换画布') + '</h3>' +
+        '<input id="quickQ" placeholder="' + T('输入项目 / 智能体 / 任务关键字…') + '" style="width:100%;margin:4px 0 8px" autocomplete="off">' +
+        '<div id="quickBody" style="max-height:52vh;overflow:auto"></div>' +
+        '<div style="text-align:right;margin-top:10px"><button id="quickClose">' + T('关闭') + '</button></div>';
+      document.body.appendChild(dlg);
+      dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
+      dlg.addEventListener('close', () => { const m = $('cvCrumb') && $('cvCrumb').querySelector('.cbmenu'); if (m) m.remove(); });
+      $('quickClose').addEventListener('click', () => dlg.close());
+      $('quickQ').addEventListener('input', () => paintQuick($('quickQ').value));
+      $('quickQ').addEventListener('keydown', ev => {
+        if (ev.key === 'Enter'){ const first = $('quickBody').querySelector('[data-qs]'); if (first) first.click(); }
+      });
+    }
+    $('quickQ').value = '';
+    paintQuick('');
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    setTimeout(() => $('quickQ').focus(), 30);
+  }
+  function paintQuick(q){
+    const body = $('quickBody');
+    if (!body) return;
+    const kw = String(q || '').toLowerCase();
+    const groups = groupByProject(WF.list).filter(g => g.convs.length);
+    const rows = [];
+    groups.forEach(grp => {
+      const agents = agentsInProject(WF.list, grp.project);
+      const collab = projectCollaboration(WF.list, grp.project);
+      const hitC = !kw || grp.project.toLowerCase().indexOf(kw) >= 0;
+      const items = [];
+      agents.forEach(a => {
+        const ci = qaClientInfo(a.client);
+        const hitA = hitC || ci.label.toLowerCase().indexOf(kw) >= 0;
+        a.canvases.slice().sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0)).forEach(k => {
+          const task = String((k.src && k.src.task) || k.name);
+          if (!hitA && task.toLowerCase().indexOf(kw) < 0) return;
+          items.push({ a: a, ci: ci, k: k, task: task });
+        });
+      });
+      if (!items.length) return;
+      rows.push('<div class="mh" style="font-weight:600;color:var(--fg);padding:7px 6px 3px">📁 ' + escXml(grp.project) +
+        (collab.links.length ? ' <span style="font-weight:400;color:var(--muted);font-size:10px">🤝 ' + escXml(collab.links.map(l => qaClientInfo(l.from).label.replace(/ CLI$/, '') + '→' + qaClientInfo(l.to).label.replace(/ CLI$/, '')).join(' · ')) + '</span>' : '') + '</div>');
+      items.forEach(it => {
+        const cur = it.k.name === WF.active;
+        rows.push('<div class="mi' + (cur ? ' cur' : '') + '" data-qs="' + escXml(it.k.name) + '" style="display:flex;gap:7px;align-items:center;padding:5px 8px;border-radius:3px;cursor:pointer">' +
+          '<span class="wfdot" style="background:' + it.ci.color + ';flex-shrink:0"></span>' +
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escXml(it.task) + '</span>' +
+          '<span style="color:var(--muted);font-size:10px;flex-shrink:0">' + escXml(it.ci.label.replace(/ CLI$/, '')) + ' · ' + escXml(fmtWfWhen(it.k.src && it.k.src.ts).slice(6)) + '</span></div>');
+      });
+    });
+    const framework = WF.list.filter(w => !(w.src && w.src.session));
+    if (framework.length && (!kw || framework.some(w => w.name.toLowerCase().indexOf(kw) >= 0))){
+      rows.push('<div class="mh" style="font-weight:600;color:var(--fg);padding:7px 6px 3px">🗂 ' + T('流程框架') + '</div>');
+      framework.filter(w => !kw || w.name.toLowerCase().indexOf(kw) >= 0).forEach(w => {
+        const cur = w.name === WF.active;
+        rows.push('<div class="mi' + (cur ? ' cur' : '') + '" data-qs="' + escXml(w.name) + '" style="display:flex;gap:7px;align-items:center;padding:5px 8px;border-radius:3px;cursor:pointer">' +
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🗂 ' + escXml(w.name) + '</span>' +
+          '<span style="color:var(--muted);font-size:10px;flex-shrink:0">' + tx('{0} 节点', ((w.data && w.data.nodes) || []).length) + '</span></div>');
+      });
+    }
+    body.innerHTML = rows.length ? rows.join('') : '<div style="padding:14px;color:var(--muted)">' + T('没有匹配的画布') + '</div>';
+    body.querySelectorAll('[data-qs]').forEach(el => el.addEventListener('click', () => {
+      const nm = el.dataset.qs;
+      const d = $('quickDlg'); if (d && d.close) d.close();
+      if (nm !== WF.active) switchWorkflow(nm);
+    }));
+  }
   $('btnImportWf').addEventListener('click', () => { importMode = 'wf'; $('fileIn').value = ''; $('fileIn').click(); });
   $('btnExpTree').addEventListener('click', exportWfTree);
   $('btnImpTree').addEventListener('click', () => { importMode = 'wftree'; $('fileIn').value = ''; $('fileIn').click(); });
@@ -4934,6 +5534,15 @@ if (typeof document !== "undefined") var UI = function(){
   const QA_CLIENTS = { zcode: { label: 'ZCode', color: '#2563eb' }, codex: { label: 'Codex CLI', color: '#0d9488' }, qoder: { label: 'Qoder CLI', color: '#7c3aed' }, gemini: { label: 'Gemini (Antigravity)', color: '#ea580c' }, wb: { label: 'WorkBuddy', color: '#db2777' }, qwen: { label: 'Qwen Code', color: '#ca8a04' }, kimi: { label: 'Kimi', color: '#0e7490' } };
   function qaClientInfo(c){ return QA_CLIENTS[c] || QA_CLIENTS.zcode; }
   function qaBare(s){ return String(s || '').replace(/^sess_/, ''); }
+  // 从问答条目推断所属项目工作目录：优先子智能体/主会话的 cwd，取出现次数最多者
+  function qaCwdOf(items){
+    const cnt = {};
+    (items || []).forEach(it => { const c = String((it && it.cwd) || '').trim(); if (c) cnt[c] = (cnt[c] || 0) + 1; });
+    const ks = Object.keys(cnt);
+    if (!ks.length) return '';
+    ks.sort((a, b) => cnt[b] - cnt[a]);
+    return ks[0];
+  }
   // 会话任务名：已建的对话画布记录的任务名优先，其次问答数据中该会话首条提问（供「按会话」表等展示）
   function sessionTaskName(sid){
     const bare = qaBare(sid);
@@ -5247,7 +5856,8 @@ if (typeof document !== "undefined") var UI = function(){
       || sorted.find(it => it.who !== 'sub' && String(it.q || '').trim()) || items[0] || {};
     const single = sids.length === 1;
     const task = single ? (qaLabel(first).replace(/\s+/g, ' ').trim().slice(0, 18) || T('对话')) : T('问答画布');
-    const name = storeConversationCanvas({ client: single ? (first.client || '') : '', session: single ? sids[0] : '' }, task, parsed, r);
+    const cwd = qaCwdOf(items);
+    const name = storeConversationCanvas({ client: single ? (first.client || '') : '', session: single ? sids[0] : '', cwd: cwd, project: projectOf(cwd) }, task, parsed, r);
     if (name) switchWorkflow(name);
   }
   $('qaCanvasBtn').addEventListener('click', genQaCanvas);
@@ -5289,6 +5899,8 @@ if (typeof document !== "undefined") var UI = function(){
       exist.data = { name: exist.name, dir: tpl.dir, nodes: tpl.nodes, edges: tpl.edges, subs: tpl.subs };
       exist.src.turns = r.turns; exist.src.task = task; exist.src.updated = Date.now();
       if (!exist.src.client && scope.client) exist.src.client = scope.client;
+      if (!exist.src.cwd && scope.cwd) exist.src.cwd = scope.cwd;
+      if (!exist.src.project && scope.project) exist.src.project = scope.project;
       if (WF.active === exist.name){
         g = normalize(JSON.parse(JSON.stringify(exist.data)));
         if (!g.errors) g.errors = [];
@@ -5311,7 +5923,8 @@ if (typeof document !== "undefined") var UI = function(){
       parent = e.src.parent;
     }
     WF.list.push({ name, data: { name, dir: tpl.dir, nodes: tpl.nodes, edges: tpl.edges, subs: tpl.subs },
-      src: { parent, client: scope.client || '', session: scope.session || '', task, ts: Date.now(), turns: r.turns } });
+      src: { parent, client: scope.client || '', session: scope.session || '', task, ts: Date.now(), turns: r.turns,
+             cwd: scope.cwd || '', project: scope.project || projectOf(scope.cwd || '') } });
     saveAll(); wfCollapsed.delete(parent); fillWfSel();
     if (curView === 'dist') renderDist();
     if (curView === 'ctl') renderCtl();
@@ -5335,7 +5948,8 @@ if (typeof document !== "undefined") var UI = function(){
     const first = sorted.find(it => it.who !== 'sub' && String(it.q || '').trim() && !isQaContinuation(it.q))
       || sorted.find(it => it.who !== 'sub' && String(it.q || '').trim()) || items[0] || {};
     const task = qaLabel(first).replace(/\s+/g, ' ').trim().slice(0, 18) || T('对话');
-    storeConversationCanvas({ client: client || '', session: sid }, task, tpl, r);
+    const cwd = qaCwdOf(items);
+    storeConversationCanvas({ client: client || '', session: sid, cwd: cwd, project: projectOf(cwd) }, task, tpl, r);
   }
 
   // ---------- 🌐 本地服务自动同步：最新会话 + 全部子智能体（每 6s 轻量轮询，仅变化时取原文） ----------
@@ -5475,6 +6089,256 @@ if (typeof document !== "undefined") var UI = function(){
   }
   $('qaHttpLoad').addEventListener('click', () => loadHttpQa(false));
 
+  // =====================================================================
+  // 🧠 v0.24.0 智能体总结神经网络（芯片脑图）
+  //   把 WF 树 + 问答关键词，压成一张可缩放/可点击跳转的神经元芯片：
+  //   芯片(项目) → 神经元(会话/知识) → 突触(协作/继承/关键词共现) + 脉冲动画
+  // =====================================================================
+  // ---- 渲染（DOM 层） ----
+  let nnState = null, nnZ = 1, nnX = 0, nnY = 0, nnRaf = 0, nnPulses = [];
+  function nnKwPerSess(){
+    const out = {};
+    const bySess = new Map();
+    (qaItems || []).forEach(it => {
+      const sid = qaBare(it.sessionId || '');
+      if (!sid) return;
+      const e = WF.list.find(w => w.src && w.src.session && qaBare(w.src.session) === sid);
+      if (!e) return;
+      const kws = (it.kw || []).filter(k => k && String(k).length >= 2);
+      const arr = bySess.get(e.name) || [];
+      kws.forEach(k => arr.push(String(k)));
+      bySess.set(e.name, arr);
+    });
+    bySess.forEach((arr, name) => {
+      const cnt = {};
+      arr.forEach(k => cnt[k] = (cnt[k] || 0) + 1);
+      out[name] = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 6);
+    });
+    return out;
+  }
+  function nnSvgEl(tag, attrs){
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (attrs) Object.keys(attrs).forEach(k => el.setAttribute(k, attrs[k]));
+    return el;
+  }
+  function renderNn(){
+    const svg = $('nnSvg');
+    if (!svg) return;
+    const box = svg.parentElement;
+    const W = Math.max(680, box.clientWidth || 900), H = Math.max(420, box.clientHeight || 620);
+    const mode = ($('nnLayout') && $('nnLayout').value) || 'chip';
+    const graph = nnBuildGraph(WF.list, qaItems, nnKwPerSess());
+    const pos = nnLayout(graph, mode, W, H);
+    nnState = { W: W, H: H, graph: graph, pos: pos, mode: mode };
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', W); svg.setAttribute('height', H);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const defs = nnSvgEl('defs');
+    const gl = nnSvgEl('radialGradient', { id: 'nnGlow' });
+    gl.innerHTML = '<stop offset="0%" stop-color="var(--accent)" stop-opacity=".55"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>';
+    defs.appendChild(gl); svg.appendChild(defs);
+    const gW = nnSvgEl('g', { id: 'nnWorld' });
+    svg.appendChild(gW);
+    // 网格底纹（工程感）
+    const grid = nnSvgEl('g', { opacity: '.35' });
+    for (let x = 0; x <= W; x += 40) grid.appendChild(nnSvgEl('line', { x1: x, y1: 0, x2: x, y2: H, stroke: 'var(--line)', 'stroke-width': '.5' }));
+    for (let y = 0; y <= H; y += 40) grid.appendChild(nnSvgEl('line', { x1: 0, y1: y, x2: W, y2: y, stroke: 'var(--line)', 'stroke-width': '.5' }));
+    gW.appendChild(grid);
+    // 芯片底板（每个项目）
+    graph.groups.forEach(grp => {
+      const p = graph.nodes.find(n => n.id === 'p:' + grp.project);
+      if (!p) return;
+      const pp = pos.get(p.id);
+      const kids = graph.nodes.filter(n => (n.kind === 'sess' || n.kind === 'kw') && n.proj === grp.project);
+      let x1 = pp.x, y1 = pp.y, x2 = pp.x, y2 = pp.y;
+      kids.forEach(k => { const kp = pos.get(k.id); if (!kp) return; x1 = Math.min(x1, kp.x); y1 = Math.min(y1, kp.y); x2 = Math.max(x2, kp.x); y2 = Math.max(y2, kp.y); });
+      const pad = 56;
+      const bx = x1 - pad, by = y1 - pad - 22, bw = Math.max(150, x2 - x1 + pad * 2), bh = Math.max(110, y2 - y1 + pad * 2 + 22);
+      const chip = nnSvgEl('g', { class: 'fadein' });
+      chip.appendChild(nnSvgEl('rect', { class: 'chip', x: bx, y: by, width: bw, height: bh, rx: 8 }));
+      // 引脚（左右各 6 根，芯片封装感）
+      for (let i = 0; i < 6; i++){
+        const yy = by + 18 + i * ((bh - 36) / 5);
+        chip.appendChild(nnSvgEl('line', { class: 'pin', x1: bx - 12, y1: yy, x2: bx, y2: yy }));
+        chip.appendChild(nnSvgEl('line', { class: 'pin', x1: bx + bw, y1: yy, x2: bx + bw + 12, y2: yy }));
+      }
+      const txEl = nnSvgEl('text', { class: 'chiphdr', x: bx + 10, y: by + 18, fill: 'var(--ink)' });
+      txEl.textContent = '📁 ' + grp.project;
+      chip.appendChild(txEl);
+      const mt = nnSvgEl('text', { class: 'chipcty', x: bx + 10, y: by + 33 });
+      const collab = projectCollaboration(WF.list, grp.project);
+      mt.textContent = tx('{0} 智能体 · {1} 对话', agentsInProject(WF.list, grp.project).length, grp.convs.length) +
+        (collab.links.length ? ' · 🤝 ' + collab.links.map(l => qaClientInfo(l.from).label.replace(/ CLI$/, '') + '→' + qaClientInfo(l.to).label.replace(/ CLI$/, '')).join(' ') : '');
+      chip.appendChild(mt);
+      gW.appendChild(chip);
+    });
+    // 突触
+    const ge = nnSvgEl('g');
+    graph.edges.forEach((e, i) => {
+      const a = pos.get(e.from), b = pos.get(e.to);
+      if (!a || !b) return;
+      const cls = 'syn ' + (e.k === 1 ? 'l1' : (e.k === 2 ? 'l2' : 'l3'));
+      let d;
+      if (e.kind === 'coop'){
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - Math.abs(b.x - a.x) * 0.18 - 24;
+        d = 'M' + a.x + ',' + a.y + ' Q' + mx + ',' + my + ' ' + b.x + ',' + b.y;
+      } else if (e.kind === 'sub' || e.kind === 'kw'){
+        d = 'M' + a.x + ',' + a.y + ' L' + b.x + ',' + b.y;
+      } else {
+        const mx = (a.x + b.x) / 2;
+        d = 'M' + a.x + ',' + a.y + ' C' + mx + ',' + a.y + ' ' + mx + ',' + b.y + ' ' + b.x + ',' + b.y;
+      }
+      const path = nnSvgEl('path', { class: cls, d: d, 'data-eg': i });
+      ge.appendChild(path);
+    });
+    gW.appendChild(ge);
+    // 神经元
+    const gn = nnSvgEl('g');
+    graph.nodes.forEach(n => {
+      const p = pos.get(n.id); if (!p) return;
+      const g1 = nnSvgEl('g', { class: 'nrn clickable', transform: 'translate(' + p.x + ',' + p.y + ')', 'data-nn': n.id });
+      const col = n.color || (n.kind === 'hub' ? 'var(--accent)' : (n.kind === 'proj' ? '#2563eb' : 'var(--accent)'));
+      if (n.id !== 'hub') g1.appendChild(nnSvgEl('circle', { class: 'halo', r: (n.w || 20) / 2 + 6 }));
+      g1.appendChild(nnSvgEl('circle', { class: 'core', r: (n.w || 20) / 2 }));
+      if (n.kind === 'hub'){
+        g1.setAttribute('class', 'nrn clickable hub');
+        g1.appendChild(nnSvgEl('circle', { class: 'hubring', r: (n.w || 46) / 2 + 9 }));
+        const t1 = nnSvgEl('text', { class: 'hubtxt', y: -2 });
+        t1.textContent = '🧠';
+        g1.appendChild(t1);
+        const t2 = nnSvgEl('text', { class: 'hubtxt', y: 13 });
+        t2.setAttribute('style', 'font-size:9.5px');
+        t2.textContent = T('智能体总结');
+        g1.appendChild(t2);
+      } else {
+        const t = nnSvgEl('text', { class: 'txt', x: (n.w || 20) / 2 + 6, y: -1 });
+        t.textContent = n.label;
+        g1.appendChild(t);
+        const s = nnSvgEl('text', { class: 'sub', x: (n.w || 20) / 2 + 6, y: 11 });
+        s.textContent = n.sub || '';
+        g1.appendChild(s);
+      }
+      g1.style.setProperty('--nnc', col);
+      gn.appendChild(g1);
+    });
+    gW.appendChild(gn);
+    nnApplyView();
+    if (!nnRaf) nnTick();
+    // HUD
+    const hud = $('nnHud');
+    if (hud) hud.innerHTML =
+      '<span class="chip2">' + tx('🧠 神经元 {0}', graph.nodes.length) + '</span>' +
+      '<span class="chip2">' + tx('突触 {0}', graph.edges.length) + '</span>' +
+      '<span class="chip2">' + tx('📁 项目 {0}', graph.groups.length) + '</span>' +
+      '<span class="chip2">' + T('滚轮缩放 · 拖拽平移 · 点击跳转') + '</span>';
+    bindNnEvents(svg, gW);
+  }
+  function nnApplyView(){
+    const g = document.getElementById('nnWorld');
+    if (g) g.setAttribute('transform', 'translate(' + nnX + ',' + nnY + ') scale(' + nnZ + ')');
+    // 放大后浮现文字：低缩放时弱化标签
+    const svg = $('nnSvg');
+    if (svg) svg.style.setProperty('--nnz', String(nnZ));
+    document.querySelectorAll('#nnSvg .nrn').forEach(el => {
+      const t = el.querySelector('.txt'), s = el.querySelector('.sub');
+      const show = nnZ > 0.72;
+      if (t) t.style.opacity = show ? '' : '0';
+      if (s) s.style.opacity = nnZ > 1.05 ? '' : '0';
+    });
+  }
+  function bindNnEvents(svg, gW){
+    if (svg.dataset.bound) return;
+    svg.dataset.bound = '1';
+    svg.addEventListener('wheel', ev => {
+      ev.preventDefault();
+      const r = svg.getBoundingClientRect();
+      const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+      const f = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const nz = Math.max(0.32, Math.min(6, nnZ * f));
+      const k = nz / nnZ;
+      nnX = mx - (mx - nnX) * k; nnY = my - (my - nnY) * k; nnZ = nz;
+      nnApplyView();
+    }, { passive: false });
+    let drag = null;
+    svg.addEventListener('mousedown', ev => { drag = { x: ev.clientX - nnX, y: ev.clientY - nnY, moved: false }; svg.classList.add('drag'); });
+    window.addEventListener('mousemove', ev => {
+      if (!drag) return;
+      if (Math.abs(ev.clientX - nnX - drag.x) + Math.abs(ev.clientY - nnY - drag.y) > 3) drag.moved = true;
+      nnX = ev.clientX - drag.x; nnY = ev.clientY - drag.y; nnApplyView();
+    });
+    window.addEventListener('mouseup', () => { if (drag){ setTimeout(() => { drag = null; }, 0); } svg.classList.remove('drag'); });
+    svg.addEventListener('click', ev => {
+      const g1 = ev.target.closest && ev.target.closest('.nrn');
+      if (!g1) return;
+      if (drag && drag.moved) return;
+      const n = nnState && nnState.graph.nodes.find(x => x.id === g1.dataset.nn);
+      if (!n) return;
+      if (n.canvas){ switchWorkflow(n.canvas); toast(tx('已跳转：{0}', n.canvas)); }
+      else { toast(n.label + (n.sub ? ' · ' + n.sub : '')); }
+    });
+    svg.addEventListener('mousemove', ev => {
+      const g1 = ev.target.closest && ev.target.closest('.nrn');
+      const tip = $('nnTip');
+      document.querySelectorAll('#nnSvg .nrn.hot').forEach(x => x.classList.remove('hot'));
+      if (!g1){ if (tip) tip.style.display = 'none'; return; }
+      g1.classList.add('hot');
+      const n = nnState && nnState.graph.nodes.find(x => x.id === g1.dataset.nn);
+      if (!n || !tip) return;
+      const r = svg.parentElement.getBoundingClientRect();
+      tip.innerHTML = '<b>' + (n.kind === 'hub' ? '🧠 ' : (n.kind === 'proj' ? '📁 ' : '🧩 ')) + escXml(n.label) + '</b>' +
+        '<div class="row">' + escXml(n.sub || '') + '</div>' +
+        (n.proj ? '<div class="row">' + T('项目：') + escXml(n.proj) + '</div>' : '') +
+        (n.canvas ? '<div class="row">' + T('点击跳转画布 →') + '</div>' : '');
+      tip.style.display = 'block';
+      tip.style.left = Math.min(r.width - 350, ev.clientX - r.left + 14) + 'px';
+      tip.style.top = Math.min(r.height - 90, ev.clientY - r.top + 14) + 'px';
+    });
+  }
+  // 脉冲动画：沿突触流动的光点（神经网络「学习」的视觉）
+  function nnSpawnPulses(){
+    const svg = $('nnSvg');
+    if (!svg || !nnState) return;
+    const gW = document.getElementById('nnWorld');
+    if (!gW) return;
+    gW.querySelectorAll('.pulse').forEach(p => p.remove());
+    nnPulses = [];
+    const paths = [...gW.querySelectorAll('path.syn')];
+    if (!paths.length) return;
+    const n = Math.min(14, Math.max(5, Math.round(paths.length / 6)));
+    for (let i = 0; i < n; i++){
+      const path = paths[Math.floor(Math.random() * paths.length)];
+      let len = 100; try { len = path.getTotalLength(); } catch(e){ continue; }
+      const dot = nnSvgEl('circle', { class: 'pulse k' + (1 + (i % 3)), r: 3 });
+      gW.appendChild(dot);
+      nnPulses.push({ el: dot, path: path, len: len, t: Math.random(), sp: 0.006 + Math.random() * 0.008 });
+    }
+  }
+  function nnTick(){
+    nnRaf = requestAnimationFrame(nnTick);
+    if (!nnPulses.length || !nnState || curView !== 'nn') return;
+    if (document.hidden) return;
+    nnPulses.forEach(p => {
+      p.t += p.sp; if (p.t > 1) p.t = 0;
+      let pt; try { pt = p.path.getPointAtLength(p.len * p.t); } catch(e){ return; }
+      p.el.setAttribute('cx', pt.x); p.el.setAttribute('cy', pt.y);
+      p.el.setAttribute('opacity', String(Math.sin(Math.PI * p.t)));
+    });
+  }
+  if ($('nnLayout')) $('nnLayout').addEventListener('change', () => { nnZ = 1; nnX = 0; nnY = 0; renderNn(); });
+  if ($('nnRefresh')) $('nnRefresh').addEventListener('click', () => renderNn());
+  if ($('nnReplay')) $('nnReplay').addEventListener('click', () => nnSpawnPulses());
+  if ($('nnFit')) $('nnFit').addEventListener('click', () => { nnZ = 1; nnX = 0; nnY = 0; nnApplyView(); });
+  if ($('nnFit2')) $('nnFit2').addEventListener('click', () => { nnZ = 1; nnX = 0; nnY = 0; nnApplyView(); });
+  if ($('nnIn')) $('nnIn').addEventListener('click', () => { nnZoomBy(1.2); });
+  if ($('nnOut')) $('nnOut').addEventListener('click', () => { nnZoomBy(1 / 1.2); });
+  function nnZoomBy(f){
+    const svg = $('nnSvg'); if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const mx = r.width / 2, my = r.height / 2;
+    const nz = Math.max(0.32, Math.min(6, nnZ * f)); const k = nz / nnZ;
+    nnX = mx - (mx - nnX) * k; nnY = my - (my - nnY) * k; nnZ = nz; nnApplyView();
+  }
+
   // ---------- 启动 ----------
   $('defs').innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>' +
     '<marker id="arrFb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-fb" d="M0,0 L10,5 L0,10 z"/></marker>';
@@ -5522,7 +6386,7 @@ if (typeof document !== "undefined") var UI = function(){
     }
   }
   applyLang();
-  fillWfSel();
+  fillWfSel(); renderCrumb();
   const first = WF.list.find(w => w.name === WF.active) || WF.list[0];
   g = normalize(JSON.parse(JSON.stringify(first.data)));
   if (!g.errors) g.errors = [];
@@ -5534,8 +6398,9 @@ if (typeof document !== "undefined") var UI = function(){
   tryRestoreSync().then(initHttpWatch, initHttpWatch); // 先恢复文件句柄；无句柄时退回 HTTP 自动连接（flow_serve.py）
   // 测试钩子（自动化验证用，不影响正常使用）
   window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, ensureQaSession, importSessionToCanvas, openSetDlg, renderSetDlg, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }),
-    wf: () => WF, exportWfTree, importWfTreeText, pushWfBackup, restoreWfBackup, wfTreeObj, fillWfSel, activeDurs, openSubDlg, subItemForNode,
-    fmtDurMs, wfDurOfTurns, wfTreeParse, wfMergeEntries, subNodeLabel, costOfModel, priceFor, fmtCost, priceCfg: () => priceCfg, loadHttpSettings };
+    wf: () => WF, exportWfTree, importWfTreeText, pushWfBackup, restoreWfBackup, wfTreeObj, fillWfSel, renderCrumb, activeDurs, openSubDlg, subItemForNode,
+    fmtDurMs, wfDurOfTurns, wfTreeParse, wfMergeEntries, subNodeLabel, costOfModel, priceFor, fmtCost, priceCfg: () => priceCfg, loadHttpSettings,
+    projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnBuildGraph, nnLayout, renderNn, openQuickSwitch, paintQuick };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

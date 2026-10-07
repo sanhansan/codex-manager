@@ -31,10 +31,18 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - 流程框架 `flow.json` 是用户可手工编辑的文件：读取时以文件为准，写回时合并而不是覆盖未知字段。
 - 审查与汇总结论必须引用真实事件/记录；证据不足时如实标注，不硬造建议。
 
-## 多智能体接入（v0.21.0 起，v0.23.0 增强）
+## 多智能体接入（v0.21.0 起，v0.24.0 增强）
 
 `flow_serve.py` 用「适配器注册表」统一接入所有智能体，不再硬编码单一客户端。
 每次启动会打印 `已注册智能体 N 个` 与各自的连接状态。
+
+**v0.24.0 关键行为**（项目维度 + 智能体神经网络）：
+- **总控流程文字溢出修复**：`renderCtlMap` 用 `TRUNC(txt, maxPx, fs)` 按像素宽度截断（CJK≈1em、西文≈0.56em）并为每个节点加 `<clipPath>`；`#ctlTable` 改 `table-layout:fixed` + 单元格 `overflow-wrap:anywhere`；`.wfcard` 加 `overflow-wrap:anywhere; min-width:0` 与标题省略号。
+- **画布按项目分组**：`projectOf(cwd)` 取工作目录末段为项目名（无 cwd 回落「未标注项目」）；`storeConversationCanvas` 把 `cwd` / `project` 写入 `src`；`groupByProject(list)` 把对话画布按项目归组、非会话画布归入「流程框架」。
+- **同项目智能体大框**：`agentsInProject(list, project)` 按客户端聚合出 `{client, canvases, masters, subs}`；左侧列表每个客户端渲染一个彩色「智能体框」（🧠 主智能体 + 🤖 N 子智能体）。
+- **同项目跨智能体协作**：`projectCollaboration(list, project)` 按时间序生成接力链 `{links:[{from,to,ts}], clients, events}`，列表显示「🤝 协作链 ZCode→Codex→Gemini」。
+- **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
+- **🧠 智能体总结神经网络视图**（`viewNn`）：`nnBuildGraph(list, qaArr, kwPerSess)` 建图（hub / proj / sess / kw / skill 五类节点 + branch/coop/kw/sub 四类突触），`nnLayout(graph, mode, W, H)` 三布局（`chip` 芯片阵列 / `net` 神经网络环 / `tree` 知识树）；渲染层绘制芯片底板 + 引脚 + 神经元 + 突触，滚轮缩放（`nnZ` 越大文字越全，`nnApplyView` 控制标签透明度）、拖拽平移、点击神经元 `switchWorkflow(n.canvas)` 跳转、悬停 tooltip、脉冲光点沿突触流动（`nnSpawnPulses` / `nnTick`）。测试钩子 `__flow` 已含 `nnBuildGraph` / `nnLayout` 相关纯函数。
 
 **v0.23.0 关键行为**（修复「只显示 ZCode / 重开清空记录 / 同步节点过少」）：
 - **问答同步按全量会话**：编辑器 `loadHttpQa` 对每个客户端同步**全部会话**（手动/首次载入上限 `QA_SYNC_CAP_FULL=200`，6 秒自动轮询只补最新 `QA_SYNC_CAP_AUTO=12`），不再只取最新 1 个。
