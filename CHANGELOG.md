@@ -2,6 +2,73 @@
 
 本项目由 [@sanhansan](https://github.com/sanhansan) 维护。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循语义化版本。
 
+## [0.16.0] - 2026-10-07
+
+### 编辑器 v7：多客户端用量与问答 · Token 看板 · 一键重点 / 工作画布 · 同步自愈
+
+- **多客户端数据层（新增）**：`flow_serve.py` 新增 `GET /__flow_clients`（三家客户端会话列表：ZCode `~/.zcode/cli/rollout`、Codex CLI `~/.codex/sessions`、Qoder CLI 会话与 subagents，含大小/时间/父子关系，服务端保留原始 ID、由前端统一剥 `sess_` 前缀便于跨客户端匹配）、`GET /__flow_client_file?client=&id=&tail=`（按客户端读取会话原文，tail 钳制 256KB–16MB）、`GET /__flow_client_usage`（三家用量聚合：totals / byDay / byDayModel / byModel / bySession；ZCode 另含 byPlugin / unattributed）；三家口径统一为 输入=净输入（总输入 − 缓存读）+ 缓存读单列，保证「输入 + 缓存读 + 输出 = 合计」；Qoder CLI 本地日志不记录令牌数时如实标注（tokens:false + note，按模型改按调用数排序）；`/__flow_ping` 新增 `clients` 能力位（缺失曾导致问答只同步 ZCode，编辑器兼容 `clients || clientUsage` 双写法）
+- **「🪙 Token 使用量」升级为多客户端看板**：合并三家 KPI（总 Tokens / 输入 / 缓存读 / 输出 / 模型调用）、客户端筛选 chips（ZCode / Codex CLI / Qoder CLI，色点与问答徽章一致）、**按日 / 按月切换**（`tokSeries` 按 `YYYY-MM` 折叠聚合）、折线图悬停显示当日「合计 + 各客户端分解」（修 tooltip 局部变量遮蔽全局 `tx()` 导致多客户端行渲染中断的 bug）、**点击数据点展开周期明细卡**（期间每客户端模型用量表 + 活跃会话表，行内「→ 查看问答」一键转跳问答视图并定位该会话）、客户端模型用量合并表、多客户端合并按会话表（点行展开按日明细 + ZCode 插件分摊）、ZCode 按插件归属与「未归属」对账不变
+- **「💬 问答」升级为多客户端**：自动同步扩至三家——ZCode 最新会话、Codex CLI 最新 rollout、Qoder CLI 最新会话 + 其全部 subagents（6 秒轮询不变）；每条问答带客户端色徽章区分来源（ZCode 蓝 / Codex CLI 青 / Qoder 紫）；问答行新增「→ 查看 X 用量」反向转跳 Token 区块并按该客户端过滤；`parseCodexTurns` / `parseQoderTurns` / `parseAnyTurns` 格式自动识别进 CORE
+- **问答「⚡ 一键重点与提示词」与「🖼 生成工作画布」（新增）**：一键自动打分提取重点问答（核心主题 / 深度回答 / 多工具链 / 重度子智能体等维度，无需人工标注）并汇总可复用提示词（`keyPoints` / `highlightSummary` 纯函数）；「生成工作画布」按 🧠 总任务链 + 🤖 子智能体虚线挂载生成画布（`flowFromQa` 纯函数，可 Ctrl+Z 撤销）
+- **修复：画布没有同步数据（用户报告）——两个根因**：
+  ① HTTP 自动连接只在页面启动时连接一次——服务晚启动、重启或断线后画布**永久失联**：现连接失败即提示「⚠ 本地服务未连接：画布不会自动同步。启动 python flow_serve.py… 后每 4 秒自动重连」，且**文件轮询连续失败自动判定断连**（停旧轮询 + 状态栏提示 + 4 秒重连），服务恢复后自动回到「🌐 HTTP 自动连接 · 双向」并续传文件、恢复问答同步（此前轮询失败为静默，状态栏停留在过期的「已连接」）；
+  ② `parseQaTurns` 只取最后一行的消息窗口（+ full 窗口）——当会话日志 `messagesKind` 全为 `tail`/`delta` 分片（无 `full` 窗口）时，提问落在更早窗口内，解析恒为 0 条（点「→ 查看问答」命中 0）：现改为**按 `messageOffset` 合并全部窗口的并集**，分片会话也能还原完整问答（新增回归测试锁定）
+- 回归测试扩至 56 项，i18n 覆盖率 451 用键 / 0 缺失
+- **发布前独立复查修复**（两个子智能体并行：代码审查 + 文档一致性审计）：`flow_serve.py` 增加 Host/Origin 本机来源校验（防 DNS rebinding 读取会话与跨站写文件）；文件头部探测与 `read_tail` 改为按字节处理（防超长行撑爆内存、单行文件不再静默为空）；`/__flow_client_file` 的 `tail` 非法值按最小窗口处理而非误读全量；点击转跳问答时对超过 `tail` 窗口的大文件从客户端清单回填已知会话 ID（`loadQaText` 新增 `sidHint`，修复转跳后「命中 0」）；`parseQaTurns` 对无 `messageOffset` 的旁路/压缩窗口不再覆盖已按偏移拼好的历史（新增回归测试锁定）；清理死代码 `aggByMonth` 与悬空 `__flow.tokDays`、重绘前收起残留 Token 悬浮提示；Codex CLI 适配器 config.toml 行内注释容错、会话列表对文件消失排序兜底；双语 README 版本表补 v0.12.0 行并校正措辞
+- ZCode 插件清单与市场清单版本号同步至 0.16.0，`/codex-flow-edit` 命令文档与双语 README 同步更新（多客户端问答 / Token 看板 / 画布自愈）
+
+## [0.15.0] - 2026-10-07
+
+### 编辑器 v6：问答自动同步 · 关键词 · 提示词总结 · Agent Skills · Token 折线图
+
+- **问答多子智能体自动同步（新增）**：`flow_serve.py` 新增 `GET /__flow_rollout`（列出 `~/.zcode/cli/rollout/` 下会话文件，含完整会话 ID 供匹配）、`GET /__flow_rollout_file?name=`（原文，64MB 上限）、`GET /__flow_agents`（列出 `~/.zcode/cli/agents/` 下全部子智能体目录及元信息，上限 300）、`GET /__flow_agent?path=`（单个元数据 + output.txt）四个端点；编辑器「💬 问答」视图启动即自动载入**最新会话 + 其全部子智能体**，6 秒轻量轮询（`document.hidden` 时跳过、仅在新文件时拉正文、按 问+时间 去重 upsert 原地更新），状态条显示同步状态与条目数——不再需要手动选文件
+- **关键词总览条（新增）**：问答视图顶部新增关键词摘要条——🧠 任务关键字（总智能体提问抽取）与 🤖 子智能体关键字（质量/效率审查等）分区展示，词频降序、前 12 个；点击任意词条即填入搜索框过滤（再点取消），纯函数 `keywordDigest` 进 CORE
+- **提示词总结与导出（新增）**：问答视图新增「📝 生成提示词总结」——中英双语 Markdown（统计、任务关键词、子智能体关键词、逐条问答含关键词/工具/令牌），支持重新生成、一键复制、「⬇ 导出 .md」（`prompt-summary-YYYYMMDD.md`），纯函数 `promptSummary(items, lang, now)` 进 CORE
+- **「🧩 技能总结」更名为「🧩 Agent Skills」**：左侧任务栏、视图标题、技能工坊与双语词典全量更名；安装成功提示明确「智能体可用 Skill 工具直接调用」，已安装列表行带 ✅ 标记
+- **Agent Skills 结合提示词生成（新增）**：Skill 工坊新增「✨ 从问答/提示词生成草稿」——按当前加载的问答数据与关键词自动生成含 frontmatter 的 SKILL.md 草稿（slug 自动取高频关键词或 `prompt-<日期>`）；新增「⬇ 导出 SKILL.md」按钮直接下载当前编辑器内容；既有「保存到草稿目录 / 保存并安装到插件」一键安装闭环不变，纯函数 `skillDraftFromPrompts` 进 CORE
+- **画布「＋框架」（新增）**：工具栏新增「＋框架」按钮，一键把 输入 → Agent → 条件 → 合并 → 输出骨架（含反馈修正环）插入**当前画布**（右移错开已有节点、自动排版、可撤销），不再只依赖「新建流程框架」替换画布
+- **Token 每日折线图（新增）**：「🪙 Token 使用量」的按日迷你柱状图升级为 SVG **折线图**（面积填充 + 数据点 + 网格与纵轴刻度），鼠标悬浮显示当日完整用量提示（日期 · 合计 · 输入 · 缓存读 · 输出 · 模型调用次数），随窗口边缘自动避让；双语提示同步
+- 回归测试扩至 48 项（keywordDigest / promptSummary / skillDraftFromPrompts / flowTemplate 中英），i18n 覆盖率检查 412 用键 / 0 缺失
+- **发布前独立复查修复**（两个子智能体并行：代码审查 + 文档一致性审计）：问答去重键升级为「来源身份 + 时间 + 提问前缀」（子智能体用 agents 路径，并行同 prompt 不再互相吞并；比较字段覆盖工具列表与关键词内容）；问答展开态改用同一身份键（轮询插入新回合不再错位）；Agent Skills 已保存列表的 description 补转义；同步请求加 15s 超时与手动重入提示；rollout 为空不再误报「同步失败」（状态栏显示「已连接 · 暂无会话文件」）；`agents` 能力位单独参与门控；rollout/agent 文件截断改为按字节（原按字符，中文大文件实际可超 3 倍）；Token 提示框双轴钳制；下载 Blob 延迟回收（六处统一）；测试中两个恒真断言改为真断言
+- ZCode 插件清单与市场清单版本号同步至 0.15.0，命令文档 `/codex-flow-edit` 同步更新
+
+## [0.14.0] - 2026-10-07
+
+### 编辑器 v5：中英双语 · 🛠 Skill 工坊 · 节点就地编辑
+
+- **中英双语界面（新增）**：编辑器顶栏新增 **🌐 EN / 🌐 中文** 按钮，一键切换整套界面语言——左侧任务栏、工具栏、右侧属性面板、六个视图、动态提示与 toast 全量翻译，偏好记忆在 localStorage；英文模式下节点类型徽章、逻辑门名与自动生成的 SKILL.md 描述同步输出英文；新增 `tests/i18n-check.mjs` 覆盖率检查（提取代码里全部 `T()`/`tx()`/`data-i18n*` 用键与词典比对，当前 365 用键 / 0 缺失）
+- **🛠 Skill 工坊（新增，自动总结→编辑→保存闭环落地）**：`flow_serve.py` 新增技能端点——`GET /__flow_skills`（列出草稿目录 `~/.zcode/codex-manager/skills/` 与插件 `skills/` 下全部 SKILL.md 及 frontmatter 元信息）、`GET /__flow_skill?slug=&src=`（读取单个技能原文）、`POST /__flow_skill`（原子写入；`target:"draft"` 存草稿目录、`target:"install"` 安装进插件，slug 强制 `^[a-z0-9][a-z0-9-]{0,63}$`，路径穿越防护）；「🧩 技能总结」视图新增工坊区——「✨ 从习惯候选生成草稿」按习惯候选与用量数据自动写出含 frontmatter 的完整 SKILL.md，「💾 保存到草稿目录」「📦 保存并安装到插件」一键落盘（临时文件 + 原子替换），已保存列表点行即载回编辑器继续改；file:// 下生成/编辑仍可用，仅保存/安装提示需 HTTP 托管
+- **节点就地编辑（新增）**：画布上**双击节点（或选中按 F2）**弹出悬浮输入框直接改标签——Enter 提交、Esc 取消、清空回退为节点 ID；输入框随缩放/平移定位，改动进撤销栈并经既有通道写回文件
+- **前端页面优化**：KPI 卡片与工作流卡片悬浮微抬 + 阴影过渡、技能/工作流列表行悬浮高亮、侧栏按钮过渡统一、全部按钮 title 与占位符纳入双语体系，白色主题下层次更清晰
+- 纯函数 `skillDraft / suggestSlug / skillSummary / habitCandidates` 进 CORE，回归测试扩至 42 项
+- 命令文档 `/codex-flow-edit` 的编辑器用法说明同步更新（v0.14.0 布局：语言切换、Skill 工坊、节点就地编辑）
+- ZCode 插件清单与市场清单版本号同步至 0.14.0
+
+## [0.13.0] - 2026-10-07
+
+### 编辑器 v4：HTTP 零点击自动连接 · 总控流程使用量
+
+- **HTTP 自动连接（新增，零点击双向同步）**：插件自带 `assets/flow_serve.py`（纯标准库本地托管：静态文件 + `GET /__flow_ping` + `POST /__flow_write` 原子写回；仅绑 127.0.0.1，写回目标固定为 `--watch` 文件且必须位于托管目录内）。`/codex-flow-edit` 生成工作副本时同时写出 `flow-source.mmd` 并在注入数据中带 `watch` 字段，浏览器打开 `http://127.0.0.1:<端口>/flow-editor.html` 后编辑器**自动挂上该文件**（无需任何浏览器授权）：AI 改文件 1~2 秒内画布自动重画，画布改动 800ms 防抖后 POST 原子写回文件（临时文件 + `os.replace`），状态栏显示「🌐 …（HTTP 自动连接 · 双向）」
+- **通道互斥与降级**：HTTP 自动连接与 File System Access「🔗 连接文件」互斥——连了文件句柄则 HTTP 让位，断开后自动回到 HTTP；普通 `python -m http.server`（无 ping 端点）自动降级为「👁 HTTP 只读」（AI 改文件仍自动重画，画布改动只存本地并在状态栏提示）；file:// 打开时行为不变（手动连接）
+- **总控流程「📦 使用量」区块（新增）**：「🧭 总控流程」视图在关系图 + 关系表下方新增使用量区块——总记录/会话/技能/MCP/插件数 KPI、插件使用量排行条形图、插件明细表（调用数 · 技能/MCP 拆分 · 占比 · 最近使用 · 主要技能/工具）；与「🧩 技能总结」「📜 轨迹查询」共用同一份 usage.jsonl 数据（任一视图载入即可）
+- **使用量零点击自动载入（修复「使用量还是不显示」）**：`flow_serve.py` 新增 `GET /__flow_usage`（usage.jsonl 原文）与 `GET /__flow_tokens`（Token 聚合 JSON），`/__flow_ping` 带回 `usage`/`tokens` 能力位；编辑器启动即自动拉取——📦 使用量区块不再需要手动选文件或粘贴（file:// 下保留手动通道）。默认路径 `%USERPROFILE%\.zcode\codex-manager\usage.jsonl` 与 `%USERPROFILE%\.zcode\cli\rollout`（可 `--usage` / `--rollout` 覆盖）
+- **总控流程新增「🪙 Token 使用量」区块**：数据来自 ZCode rollout（`model-io-sess_*.jsonl`）服务端聚合——总 Tokens（合计 = 输入 + 输出 + 缓存读）/ 输入 / 缓存读 / 输出 / 模型调用 KPI，按日迷你柱状图（悬停显示当日令牌与调用次数）、按模型表格、**按插件（Token 归属）表**与**按会话全量表**（每行可点开「按日明细 + 按插件分摊」，首行默认展开）；口径优先取 `response.usage`、回退 `providerMetadata.anthropic.usage`，避免同条记录双重计数；bySession 上限 50 条、按会话表客户端用 usage.jsonl 反查目录
+- **Token → 插件归属（新增）**：`scan_tokens` 解析每条 rollout 记录的归属信号——`response.toolCalls`（`mcp__服务器__工具` 取服务器名；`Skill` 取 `input.skill` 的 `插件:技能` 前缀）与 delta 记录 `request.messages` 里新到达的 `role:"tool"` 结果（承接侧）——触发/承接某插件工具的模型调用，其全部令牌计入该插件；同一调用涉及多个插件时整数均分（余数给第一个），未涉及插件的调用计入「未归属（内置工具 / 对话）」，插件归属 + 未归属与总 Tokens **逐位精确对账**（全局与每会话均可核对）
+- 纯函数 `pluginUsageRows`（按插件聚合技能/MCP 调用）进 CORE，回归测试扩至 39 项
+- 命令文档 `/codex-flow-edit` 改为「启动 flow_serve.py 托管 + 打开 HTTP 地址」为默认路径（含 `--usage`/`--rollout` 默认路径与自动载入说明），file:// 与普通 http.server 作为兜底；README 中英文编辑器章节同步更新
+- ZCode 插件清单与市场清单版本号同步至 0.13.0
+
+## [0.12.0] - 2026-10-07
+
+### Codex CLI 适配：插件使用量 · 任务消耗 · 令牌口径修复
+
+- **插件使用量（新增）**：`usage` 报表新增「插件使用量」表格——读取 `~/.codex/config.toml` 的 `[plugins."名称@市场"]` 清单（`enabled = false` 跳过），再扫描插件缓存 `~/.codex/plugins/cache/*/*/*/.mcp.json`（含 `plugin.json` 内指针）建立 MCP 服务器 → 插件归属；每个插件列出提供的 MCP 服务器、调用次数、会话数与最近调用时间（已安装但没用过的也列出）
+- **任务消耗（新增）**：按 `task_started → task_complete` 划分任务并绑定用户指令，令牌取 `token_usage_record` 的 `turn_token_usage`（任务内累计，按 turn_id 差分，含回放任务与累计值重置保护）；报表新增「任务消耗 Top 10（按总令牌）」，Excel 新增「任务明细」Sheet（逐任务输入/缓存/输出/推理/总令牌）
+- **修复：令牌严重漏计**：旧版读取不存在的 `total_token_usage` 字段、只截获首个快照——真实输入 26,325,826 被报成 342,078（约 77 倍漏计）；现改为 `thread_token_usage`（会话线程累计，旧格式回退 `event_msg:token_count`），且任务差分合计与线程累计互相校验一致
+- **报表扩展**：Markdown 摘要增加 任务数 / 含模型调用任务数 / 任务平均令牌；工具明细与 CSV 增加「插件」列；Excel 新增「插件」Sheet，概览增加任务指标
+- MCP 工具 `codex_usage` 与 `/codex-usage` 提示词同步更新（解读插件用量与任务消耗结构）
+- ZCode 插件清单与市场清单版本号同步至 0.12.0
+
 ## [0.11.0] - 2026-10-07
 
 ### 💬 问答视图：逐项展开的总智能体与子智能体问答
