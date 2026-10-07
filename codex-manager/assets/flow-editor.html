@@ -57,6 +57,10 @@
   #side .wfturn { padding:2px 6px 2px 30px; font-size:11px; color:var(--muted); cursor:pointer; display:flex; gap:4px; align-items:baseline; border-radius:6px; }
   #side .wfturn:hover { color:var(--accent); background:rgba(120,130,160,.10); }
   #side .wfturn .tq { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #side .wfturn .dur { margin-left:auto; flex-shrink:0; font-size:10px; }
+  .nd-dur { font-size:9px; fill:var(--muted); pointer-events:none; }
+  .suboutbox { border:1px dashed var(--line); border-radius:8px; padding:6px 8px; margin:6px 0 2px; }
+  #subDlg pre { white-space:pre-wrap; word-break:break-word; max-height:52vh; overflow:auto; font:12.5px/1.55 Consolas,Menlo,monospace; background:var(--canvas); padding:8px 10px; border-radius:8px; margin:0 0 8px; }
   .nd-flash { animation:ndflash 1.5s ease-out; }
   @keyframes ndflash { 0%,55% { filter:drop-shadow(0 0 7px var(--accent)) brightness(1.35); } 100% { filter:none; } }
   #side .grow { flex:1; }
@@ -360,6 +364,8 @@
     <b data-i18n="🛰 分布工作区">🛰 分布工作区</b>
     <span class="hint" data-i18n="每个工作流是一个独立工作区；点「打开」进入画布编辑。">每个工作流是一个独立工作区；点「打开」进入画布编辑。</span>
     <span style="flex:1"></span>
+    <button id="btnExpTree" data-i18n="⊞ 导出全部工作流" data-i18n-title="把整棵工作流树（含对话画布与小对话）导出为 JSON 备份" title="把整棵工作流树（含对话画布与小对话）导出为 JSON 备份">⊞ 导出全部工作流</button>
+    <button id="btnImpTree" data-i18n="⊟ 导入工作流树" data-i18n-title="从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）" title="从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）">⊟ 导入工作流树</button>
     <button id="btnCtl2" data-i18n="🧭 总控流程" title="切到总控流程视图">🧭 总控流程</button>
   </div>
   <div class="vbody"><div id="wfGrid"></div></div>
@@ -502,6 +508,18 @@
   <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
     <button id="setDefaults" data-i18n="↺ 恢复默认值">↺ 恢复默认值</button>
     <button id="setSave" class="primary" data-i18n="💾 保存">💾 保存</button>
+    <form method="dialog" style="display:inline"><button data-i18n="关闭">关闭</button></form>
+  </div>
+</dialog>
+
+<dialog id="subDlg" style="max-width:760px;width:min(760px,92vw)">
+  <h3 id="subDlgTitle">🤖</h3>
+  <div id="subDlgMeta" class="hint" style="margin:2px 0 6px"></div>
+  <div id="subDlgMsg" class="hint" style="min-height:16px;margin:0 0 4px"></div>
+  <pre id="subDlgBody"></pre>
+  <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
+    <button id="subDlgLoad" data-i18n="📥 载入完整输出">📥 载入完整输出</button>
+    <button id="subDlgCopy" data-i18n="📋 复制">📋 复制</button>
     <form method="dialog" style="display:inline"><button data-i18n="关闭">关闭</button></form>
   </div>
 </dialog>
@@ -1821,6 +1839,138 @@ function ctlLayout(list){
   const h = 40 + maxRows * (H + ROWGAP);
   return { nodes, edges, w, h };
 }
+
+// ---------- v0.19.0 纯函数：耗时标注 / 整树导出导入 / Token 成本估算 ----------
+// 耗时格式化：<1分 / 分钟 / 时+分 / 天+时（双语）
+function fmtDurMs(ms, lang){
+  if (!(ms > 0)) return '';
+  const en = lang === 'en';
+  const tm = Math.round(ms / 60000);
+  if (tm < 1) return en ? '<1m' : '<1分';
+  if (tm < 60) return tm + (en ? 'm' : '分');
+  const h = Math.floor(tm / 60), mm = tm % 60;
+  if (h < 24) return h + (en ? 'h' : '时') + (mm ? mm + (en ? 'm' : '分') : '');
+  const d = Math.floor(h / 24), hh = h % 24;
+  return d + (en ? 'd' : '天') + (hh ? hh + (en ? 'h' : '时') : '');
+}
+// 小对话耗时：每次提问距「下一次提问」的间隔（最后一个 / 时间倒挂为 0=未知）；total = 首尾跨度
+function wfDurOfTurns(turns){
+  const ts = (turns || []).map(t => { const v = t ? +t.ts : 0; return (isFinite(v) && v > 0) ? v : 0; });
+  const gaps = ts.map((v, i) => (v > 0 && i + 1 < ts.length && ts[i + 1] >= v) ? (ts[i + 1] - v) : 0);
+  const total = (ts.length > 1 && ts[0] > 0 && ts[ts.length - 1] >= ts[0]) ? (ts[ts.length - 1] - ts[0]) : 0;
+  return { gaps, total };
+}
+// 子智能体画布节点的标签：与 flowFromQa 生成算法一致（按标签反查 qaItems 条目）
+function subNodeLabel(it){
+  const t = String(qaLabel(it) || '').replace(/["\[\]{}()\r\n]/g, ' ').replace(/\s+/g, ' ').trim();
+  return '🤖 ' + (t.length > 12 ? t.slice(0, 12) + '…' : (t || '…'));
+}
+// 工作流整树 JSON 解析（兼容单画布导出 {name,nodes,...} / {data:{nodes}}；字段白名单 + 尺寸上限）
+function wfTreeParse(text){
+  let obj = null;
+  try { obj = JSON.parse(String(text == null ? '' : text)); } catch(e){ return { ok: false, error: 'bad-json', entries: [], skipped: 0 }; }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, error: 'bad-json', entries: [], skipped: 0 };
+  let raw = null, bundle = false;
+  if (obj.type === 'cmflow-tree' && Array.isArray(obj.list)){ raw = obj.list; bundle = true; }
+  else if (Array.isArray(obj.list)){ raw = obj.list; bundle = true; }
+  else if (Array.isArray(obj.nodes)) raw = [{ name: obj.name || '', data: obj }];
+  else if (obj.data && Array.isArray(obj.data.nodes)) raw = [obj];
+  if (!raw) return { ok: false, error: 'no-canvas', entries: [], skipped: 0 };
+  const entries = []; let skipped = 0;
+  raw.slice(0, 300).forEach((w, i) => {
+    if (!w || typeof w !== 'object'){ skipped++; return; }
+    const d = (w.data && typeof w.data === 'object' && Array.isArray(w.data.nodes)) ? w.data : (Array.isArray(w.nodes) ? w : null);
+    if (!d){ skipped++; return; }
+    const name = String(w.name || d.name || '').trim().slice(0, 80) || ('imported-' + (i + 1));
+    const e = { name: name, data: {
+      dir: typeof d.dir === 'string' ? d.dir : 'TD',
+      name: name,
+      nodes: d.nodes.filter(x => x && typeof x === 'object').slice(0, 800),
+      edges: Array.isArray(d.edges) ? d.edges.filter(x => x && typeof x === 'object').slice(0, 800) : [],
+      subs: Array.isArray(d.subs) ? d.subs.filter(x => x && typeof x === 'object').slice(0, 200) : []
+    }};
+    const s = w.src || d.src;   // 单画布导出时 src 挂在画布对象上；整树导出时挂在条目上
+    if (s && typeof s === 'object'){
+      e.src = {
+        parent: String(s.parent || '').slice(0, 80),
+        client: String(s.client || '').slice(0, 40),
+        session: String(s.session || '').slice(0, 120),
+        task: String(s.task || '').slice(0, 200),
+        ts: +s.ts || 0,
+        turns: (Array.isArray(s.turns) ? s.turns : []).slice(0, 500).map(t => ({
+          q: String((t && t.q) || '').slice(0, 400),
+          ts: +(t && t.ts) || 0,
+          node: String((t && t.node) || '').slice(0, 40),
+          subs: Array.isArray(t && t.subs) ? t.subs.slice(0, 40).map(x => String(x).slice(0, 40)) : []
+        }))
+      };
+    }
+    entries.push(e);
+  });
+  if (!entries.length) return { ok: false, error: 'no-canvas', entries: [], skipped };
+  return { ok: true, bundle: bundle, entries: entries, skipped: skipped };
+}
+// 导入合并：同会话 → 更新原画布（保名）；同名异源 → 加「 · 2」后缀；其余追加
+function wfMergeEntries(list, entries){
+  const out = (Array.isArray(list) ? list : []).slice();
+  let added = 0, updated = 0, renamed = 0, skipped = 0;
+  const sessionKey = w => (w && w.src && w.src.session) ? (String(w.src.client || '') + '|' + String(w.src.session) + '|' + String(w.src.task || '')) : '';
+  const names = new Set(out.map(w => w && w.name).filter(Boolean));
+  (Array.isArray(entries) ? entries : []).forEach(e0 => {
+    if (!e0 || typeof e0 !== 'object' || !e0.data || !Array.isArray(e0.data.nodes)){ skipped++; return; }
+    let e = e0;
+    const k = sessionKey(e);
+    if (k){
+      const i = out.findIndex(w => sessionKey(w) === k);
+      if (i >= 0){
+        const keep = out[i].name;
+        out[i] = Object.assign({}, e, { name: keep, data: Object.assign({}, e.data, { name: keep }) });
+        updated++; return;
+      }
+    }
+    if (names.has(e.name)){
+      const samePlainName = !k && out.some(w => w && w.name === e.name && !sessionKey(w));
+      if (samePlainName){
+        const i = out.findIndex(w => w && w.name === e.name);
+        out[i] = Object.assign({}, e, { data: Object.assign({}, e.data, { name: out[i].name }) });
+        updated++; return;
+      }
+      let n = 2, nm = e.name + ' · ' + n;
+      while (names.has(nm) && n < 99){ n++; nm = e.name + ' · ' + n; }
+      e = Object.assign({}, e, { name: nm, data: Object.assign({}, e.data, { name: nm }) });
+      renamed++;
+    }
+    out.push(e); names.add(e.name); added++;
+  });
+  return { list: out, added: added, updated: updated, renamed: renamed, skipped: skipped };
+}
+// 模型 → 单价（美元/百万 token）：精确匹配优先，其次模型名包含单价键（最长键优先，如 gpt-5-mini 优先于 gpt-5）
+function priceFor(model, prices){
+  const m = String(model || '').toLowerCase();
+  if (!m || !prices || typeof prices !== 'object') return null;
+  const keys = Object.keys(prices);
+  for (const k of keys){ if (k.toLowerCase() === m) return prices[k]; }
+  let best = null, len = 0;
+  keys.forEach(k => {
+    const kl = k.toLowerCase();
+    if (kl && m.indexOf(kl) >= 0 && kl.length > len){ best = prices[k]; len = kl.length; }
+  });
+  return best;
+}
+// 单模型费用（美元）：输入/输出/缓存读分别按单价折算；未配置单价返回 null
+function costOfModel(row, prices){
+  const p = priceFor(row && row.model, prices);
+  if (!p) return null;
+  const n = v => (typeof v === 'number' && isFinite(v) && v > 0) ? v : 0;
+  return (n(row.input) * n(p.in) + n(row.output) * n(p.out) + n(row.cacheRead) * n(p.cr)) / 1e6;
+}
+function fmtCost(v){
+  if (typeof v !== 'number' || !isFinite(v) || v <= 0) return '';
+  if (v < 0.01) return '$' + v.toFixed(4);
+  if (v < 1) return '$' + v.toFixed(3);
+  if (v < 100) return '$' + v.toFixed(2);
+  return '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
 //__CORE_END__
 
 // ---------- 数据注入位（/codex-flow-edit 会把下面这行标记替换为 JSON） ----------
@@ -2189,6 +2339,44 @@ if (typeof document !== "undefined") var UI = function(){
     '🪙 Token 使用量（多客户端：ZCode / Codex CLI / Qoder CLI）': '🪙 Token usage (multi-client: ZCode / Codex CLI / Qoder CLI)',
     '（20 秒缓存）': ' (20s cache)',
     '，于 ': ', at ',
+    // v0.19.0：整树导出导入 / 子智能体输出 / 耗时 / 成本
+    '⊞ 导出全部工作流': '⊞ Export all workflows',
+    '⊟ 导入工作流树': '⊟ Import workflow tree',
+    '把整棵工作流树（含对话画布与小对话）导出为 JSON 备份': 'Export the whole workflow tree (conversation canvases + chats) as a JSON backup',
+    '从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）': 'Restore/merge the workflow tree from JSON (single-canvas JSON also accepted)',
+    '距下一次提问': 'until next prompt',
+    '📄 查看输出': '📄 View output',
+    '子智能体输出': 'Sub-agent output',
+    '未找到该子智能体的输出数据': 'No output data found for this sub-agent',
+    '未在已载入的问答数据里找到该子智能体的输出（可在「💬 问答」同步最新数据后重试）': 'This sub-agent\'s output is not in the loaded Q&A data (sync in "💬 Q&A" and retry)',
+    '（预览为前 4000 字，可点「📥 载入完整输出」看全文）': '(Preview: first 4000 chars; click "📥 Load full output" for the rest)',
+    '（暂无输出文本：子智能体可能还在运行，或该客户端未落盘输出）': '(No output text yet: the sub-agent may still be running, or this client does not persist output)',
+    '📥 载入完整输出': '📥 Load full output',
+    '📋 复制': '📋 Copy',
+    '正在载入完整输出…': 'Loading full output…',
+    '服务端没有返回输出内容（子智能体可能还在运行）': 'Server returned no output (the sub-agent may still be running)',
+    '已载入完整输出（{0} 字符）': 'Full output loaded ({0} chars)',
+    '✅ 已复制到剪贴板': '✅ Copied to clipboard',
+    '没有可复制的内容': 'Nothing to copy',
+    '剪贴板不可用，可手动选中文本复制': 'Clipboard unavailable; select the text and copy manually',
+    '已导出全部 {0} 个工作流画布（含对话画布与小对话）': 'Exported all {0} workflow canvases (including conversation canvases and chats)',
+    '不是有效的 JSON 文件': 'not a valid JSON file',
+    '没有找到可导入的画布（需要含 nodes 数组）': 'no importable canvas found (needs a nodes array)',
+    '已导入 {0} 个画布：新增 {1} · 更新 {2}{3}{4}': 'Imported {0} canvases: {1} added · {2} updated{3}{4}',
+    ' · 改名 ': ' · renamed ',
+    ' · 跳过 ': ' · skipped ',
+    '已从本地服务备份恢复 {0} 个画布（含小对话记录）': 'Restored {0} canvases from the local-server backup (chats included)',
+    '估算费用': 'Est. cost',
+    '费用': 'Cost',
+    '按 ⚙ 设置里的模型单价估算（美元）；未配置单价的模型不计入': 'Estimated with model prices from ⚙ Settings (USD); models without a price are excluded',
+    '费用为近似值：仅统计已配置单价的模型。': ' Cost is approximate: only models with a configured price are counted.',
+    '提示：在「⚙ 设置」里填写模型单价后，这里会显示估算费用。': ' Tip: configure model prices in "⚙ Settings" to see estimated cost here.',
+    '模型单价（美元 / 百万 token，用于估算费用）': 'Model prices (USD / 1M tokens, used for cost estimation)',
+    '留空的模型不计费；缓存读 = 命中缓存的输入（单价更低）；合计 ≈ 输入×in + 输出×out + 缓存读×cr。': 'Models with empty prices are not billed; cache read = cached input (lower price); total ≈ input×in + output×out + cacheRead×cr.',
+    '💰 按常见公开价填入（参考，请自行核对）': '💰 Fill common public prices (reference only — please verify)',
+    '参考价仅供参考，实际以各模型官网价目为准。': 'Reference prices only; check each model vendor\'s official pricing.',
+    '已填入 {0} 个模型的参考价（请核对后点「💾 保存」）': 'Filled reference prices for {0} models (verify, then click "💾 Save")',
+    '没有可匹配参考价的模型（可手工填写）': 'No models matched the reference list (fill in manually)',
   };
   const I18N_HTML = {
     'help-mermaid': 'mermaid subset: <code>flowchart TD / LR</code>; nodes <code>A[rect]</code> <code>A{diamond}</code> <code>A(rounded)</code>; edges <code>--&gt;</code> / <code>-.-&gt;</code> with labels <code>--&gt;|text|</code>; <code>subgraph</code> grouping',
@@ -2237,8 +2425,54 @@ if (typeof document !== "undefined") var UI = function(){
     try { const d = JSON.parse(localStorage.getItem(WF_KEY) || 'null'); if (d && Array.isArray(d.list) && d.list.length) return d; } catch(e){}
     return null;
   }
-  function saveAll(){ try { localStorage.setItem(WF_KEY, JSON.stringify(WF)); } catch(e){} }
   let saveTimer = null;
+  function saveAll(){ try { localStorage.setItem(WF_KEY, JSON.stringify(WF)); } catch(e){} scheduleWfBackup(); }
+  // ---------- 工作流树服务端自动备份（flow_serve.py /__flow_wf_state；rev 重播种后自动恢复） ----------
+  let wfBackupTimer = null, wfBackupBusy = false, wfBackupAt = '';
+  function scheduleWfBackup(){
+    if (!httpCaps || !httpCaps.wfstate) return;
+    clearTimeout(wfBackupTimer);
+    wfBackupTimer = setTimeout(pushWfBackup, 2500);
+  }
+  function wfTreeObj(){ return { type: 'cmflow-tree', v: 1, exportedAt: Date.now(), rev: (WF && WF.rev) || '', active: WF ? WF.active : '', list: (WF && WF.list) || [] }; }
+  async function pushWfBackup(){
+    if (!httpCaps || !httpCaps.wfstate || !WF) return;
+    if (wfBackupBusy){ scheduleWfBackup(); return; }
+    wfBackupBusy = true;
+    try {
+      const r = await fetch('__flow_wf_state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tree: wfTreeObj() }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+      wfBackupAt = new Date().toLocaleTimeString();
+    } catch(e){ wfBackupAt = ''; }
+    finally { wfBackupBusy = false; }
+  }
+  // rev 重播种后：从服务端备份把「名字不冲突」的画布并回（主流程 seed 优先；用户已删除的不复活——删除会同步刷新备份）
+  async function restoreWfBackup(seedNames){
+    if (!/^https?:$/.test(location.protocol) || !WF) return 0;
+    let j = null;
+    try { j = await (await fetch('__flow_wf_state?_=' + Date.now(), { cache: 'no-store' })).json(); } catch(e){ return 0; }
+    if (!j || !j.ok || !j.exists || !j.tree) return 0;
+    const parsed = wfTreeParse(JSON.stringify(j.tree));
+    if (!parsed.ok || !parsed.entries.length) return 0;
+    const keep = parsed.entries.filter(e => (seedNames || []).indexOf(e.name) < 0);
+    if (!keep.length) return 0;
+    const m = wfMergeEntries(WF.list, keep);
+    WF.list = m.list;
+    return m.added + m.updated;
+  }
+  // 当前画布（对话画布）的小对话耗时：节点 id → 距下一次提问 ms（含挂在该提问下的子智能体节点）
+  function activeDurs(){
+    const e = WF.list.find(w => w.name === WF.active);
+    const turns = (e && e.src && e.src.turns) || [];
+    const gaps = wfDurOfTurns(turns).gaps;
+    const m = new Map();
+    turns.forEach((t, i) => {
+      const gms = gaps[i] || 0;
+      if (gms > 0){ m.set(t.node, gms); (t.subs || []).forEach(sid => m.set(sid, gms)); }
+    });
+    return m;
+  }
   function markDirty(){
     const entry = WF.list.find(w => w.name === WF.active);
     if (entry) entry.data = { dir:g.dir, nodes:g.nodes, edges:g.edges, subs:g.subs, name:WF.active };
@@ -2273,9 +2507,16 @@ if (typeof document !== "undefined") var UI = function(){
           '<span class="wfdot" style="background:' + ci.color + '" title="' + escXml(ci.label) + '"></span>' +
           '<span class="nm">' + escXml((k.src && k.src.task) || k.name) + '</span></div>' +
           '<div class="wfmeta" data-wf="' + escXml(k.name) + '">' + escXml(meta) + '</div></div>');
-        if (ko) turns.forEach(t => rows.push(
-          '<div class="wfturn" data-cw="' + escXml(k.name) + '" data-cn="' + escXml(t.node) + '" title="' + escXml(String(t.q)) + '">💬 <span class="tq">' + escXml(String(t.q).slice(0, 46)) + '</span>' +
-          ((t.subs && t.subs.length) ? '<span class="hint">🤖' + t.subs.length + '</span>' : '') + '</div>'));
+        if (ko){
+          const gaps = wfDurOfTurns(turns).gaps;
+          turns.forEach((t, ti) => {
+            const durTxt = fmtDurMs(gaps[ti], LANG);
+            rows.push(
+              '<div class="wfturn" data-cw="' + escXml(k.name) + '" data-cn="' + escXml(t.node) + '" title="' + escXml(String(t.q)) + '">💬 <span class="tq">' + escXml(String(t.q).slice(0, 46)) + '</span>' +
+              ((t.subs && t.subs.length) ? '<span class="hint">🤖' + t.subs.length + '</span>' : '') +
+              (durTxt ? '<span class="dur" title="' + escXml(T('距下一次提问') + ' · ' + durTxt) + '">⏱ ' + durTxt + '</span>' : '') + '</div>');
+          });
+        }
       });
     });
     box.innerHTML = rows.join('');
@@ -2412,6 +2653,7 @@ if (typeof document !== "undefined") var UI = function(){
              '<path class="eg'+selCls+fbCls+'" d="'+ep.d+'"'+dotted+' marker-end="'+marker+'" pointer-events="none"/>'+lbl;
     }).join('');
 
+    const durs = activeDurs();  // 对话画布：小对话节点徽章（距下一次提问）
     const nodesHtml = g.nodes.map(n => {
       const selOn = sel && sel.type==='node' && sel.id===n.id;
       const shapeCls = n.shape==='diamond' ? 'nd-diam' : n.shape==='round' ? 'nd-round' : 'nd-rect';
@@ -2435,10 +2677,14 @@ if (typeof document !== "undefined") var UI = function(){
         badge += '<rect x="'+bx+'" y="'+(n.y-20)+'" width="'+bw+'" height="15" rx="7" fill="'+(KIND_COLOR[n.kind]||'#64748b')+'" opacity=".93"/>' +
           '<text class="kbadge-t" x="'+(bx+bw/2)+'" y="'+(n.y-9)+'" text-anchor="middle">'+escXml(t)+'</text>';
       }
+      const durMs = durs.get(n.id) || 0;
+      const durTxt = fmtDurMs(durMs, LANG);
+      const durHtml = durTxt ? '<text class="nd-dur" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h+12)+'" text-anchor="middle">⏱ '+escXml(durTxt)+'</text>' : '';
       const port = anchors(n).out;
       const txt = (n.subflow ? '▸ ' : '') + fitText(n.label, n.w - 16);
-      return '<g data-node="'+escXml(n.id)+'">' + body +
-        '<text class="nd-t" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h/2+4.5)+'" text-anchor="middle" pointer-events="none">'+escXml(txt)+'</text>' + badge +
+      return '<g data-node="'+escXml(n.id)+'">' +
+        (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body +
+        '<text class="nd-t" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h/2+4.5)+'" text-anchor="middle" pointer-events="none">'+escXml(txt)+'</text>' + badge + durHtml +
         '<circle class="port" cx="'+port.x+'" cy="'+port.y+'" r="5.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/></g>';
     }).join('');
 
@@ -2517,6 +2763,11 @@ if (typeof document !== "undefined") var UI = function(){
     }
     if (sel.type === 'node'){
       const n = nodeById(sel.id); if (!n) return setSel(null);
+      const subIt = subItemForNode(n);
+      const subBox = subIt
+        ? '<div class="suboutbox"><div class="hint">🤖 ' + escXml(subIt.profile || subIt.description || T('子智能体')) + (subIt.ts ? ' · ' + escXml(fmtWfWhen(subIt.ts)) : '') + (subIt.status ? ' · ' + escXml(subIt.status) : '') + '</div>' +
+          '<p style="margin:4px 0 0"><button id="pSubOut" class="small">' + T('📄 查看输出') + '</button></p></div>'
+        : (String(n.label || '').indexOf('🤖') === 0 ? '<div class="suboutbox hint">' + T('未在已载入的问答数据里找到该子智能体的输出（可在「💬 问答」同步最新数据后重试）') + '</div>' : '');
       const shapeSel = [['rect', T('矩形')],['diamond', T('菱形')],['round', T('圆角')]].map(([v,tt]) => '<option value="'+v+'"'+(n.shape===v?' selected':'')+'>'+escXml(tt)+'</option>').join('');
       const kindSel = '<option value="">'+escXml(T('（普通节点）'))+'</option>' + KINDS.map(k=>'<option value="'+k+'"'+(n.kind===k?' selected':'')+'>'+escXml(kindLabel(k))+'</option>').join('');
       const gateSel = '<option value="">'+escXml(T('（无）'))+'</option>' + GATES.map(gt=>'<option value="'+gt+'"'+(n.gate===gt?' selected':'')+'>'+escXml(gateLabel(gt))+'</option>').join('');
@@ -2531,6 +2782,7 @@ if (typeof document !== "undefined") var UI = function(){
         '<label>'+escXml(T('节点说明（STEP 文档，随 Markdown/JSON 导出）'))+'</label><textarea id="pDoc" style="height:80px">'+escXml(n.doc||'')+'</textarea>' +
         '<label>'+escXml(T('子流程（虚线节点，双击可跳转）'))+'</label><select id="pSubflow">'+wfSel2+'</select>' +
         '<label>'+escXml(T('所属分组'))+'</label><select id="pSub">'+subSel+'</select>' +
+        (subBox ? '<label>'+escXml(T('子智能体'))+'</label>' + subBox : '') +
         '<p><button id="pDel">'+escXml(T('删除节点'))+'</button></p>';
       $('pLabel').addEventListener('focus', pushHistory);
       $('pLabel').addEventListener('input', ev => { n.label = ev.target.value || n.id; sizeNode(n); render(); syncCode(); markDirty(); });
@@ -2551,6 +2803,7 @@ if (typeof document !== "undefined") var UI = function(){
         else n.sub = ev.target.value || null;
         render(); syncCode(); markDirty(); renderPanel();
       });
+      if (subIt && $('pSubOut')) $('pSubOut').addEventListener('click', () => openSubDlg(subIt));
       $('pDel').addEventListener('click', () => deleteNode(n.id));
       if (renderPanel.focusLabel){ renderPanel.focusLabel = false; const pl = $('pLabel'); pl.focus(); pl.select(); }
     } else {
@@ -2566,6 +2819,70 @@ if (typeof document !== "undefined") var UI = function(){
       $('pDel').addEventListener('click', () => { pushHistory(); g.edges.splice(sel.id,1); setSel(null); syncCode(); markDirty(); });
     }
   }
+
+  // 画布 🤖 节点 → qaItems 子智能体条目（flowFromQa 生成的节点无 subflow 字段，按标签反查）
+  function subItemForNode(n){
+    if (!n || String(n.label || '').indexOf('🤖') !== 0) return null;
+    const subs = qaItems.filter(it => it.who === 'sub');
+    let hit = subs.find(it => subNodeLabel(it) === n.label);
+    if (!hit){
+      const bare = String(n.label).replace(/^🤖\s*/, '').replace(/…+$/, '').trim();
+      if (bare.length >= 2) hit = subs.find(it => subNodeLabel(it).indexOf(bare) >= 0);
+    }
+    return hit || null;
+  }
+  let subDlgIt = null;
+  function openSubDlg(it){
+    if (!it) return toast(T('未找到该子智能体的输出数据'));
+    subDlgIt = it;
+    const ci = qaClientInfo(it.client);
+    $('subDlgTitle').textContent = '🤖 ' + (it.description || it.profile || T('子智能体输出'));
+    $('subDlgMeta').textContent = [ci.label, it.model ? T('模型 ') + it.model : '', it.status || '',
+      it.tokens ? it.tokens + ' tokens' : '', it.durationMs ? Math.round(it.durationMs / 1000) + 's' : '',
+      it.ts ? fmtWfWhen(it.ts) : ''].filter(Boolean).join(' · ');
+    $('subDlgMsg').textContent = String(it.a || '').length > 4000 ? T('（预览为前 4000 字，可点「📥 载入完整输出」看全文）') : '';
+    $('subDlgBody').textContent = it.a || T('（暂无输出文本：子智能体可能还在运行，或该客户端未落盘输出）');
+    const ap = String(it.agentPath || '');
+    const qoderFile = it.client === 'qoder' && ap.indexOf('/subagents/') > 0;   // Qoder 子智能体是 subagents/*.jsonl 文件，走客户端文件端点
+    const canLoad = !!ap && !!httpCaps && (qoderFile ? !!httpCaps.qoder : (ap.indexOf('/') >= 0 && !!httpCaps.agents));
+    $('subDlgLoad').style.display = canLoad ? '' : 'none';
+    $('subDlgLoad').disabled = false;
+    $('subDlg').showModal();
+  }
+  $('subDlgLoad').addEventListener('click', async () => {
+    const it = subDlgIt;
+    if (!it || !it.agentPath) return;
+    $('subDlgLoad').disabled = true;
+    $('subDlgMsg').textContent = T('正在载入完整输出…');
+    try {
+      const ap = String(it.agentPath);
+      let full = '';
+      if (it.client === 'qoder' && ap.indexOf('/subagents/') > 0){
+        const r = await qaFetch('/__flow_client_file?client=qoder&id=' + encodeURIComponent(ap));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const parsed = parseQoderTurns(await r.text());
+        full = parsed.turns.map(t => t.a).filter(Boolean).join('\n\n');
+      } else {
+        const r = await qaFetch('/__flow_agent?path=' + encodeURIComponent(ap));
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        full = String(j.output || '');
+      }
+      if (!full){ $('subDlgMsg').textContent = T('服务端没有返回输出内容（子智能体可能还在运行）'); return; }
+      it.a = full;
+      qaDirty = true;
+      $('subDlgBody').textContent = full;
+      $('subDlgMsg').textContent = tx('已载入完整输出（{0} 字符）', full.length);
+    } catch(e){ $('subDlgMsg').textContent = T('载入失败：') + ((e && e.message) || e); }
+    $('subDlgLoad').disabled = false;
+  });
+  $('subDlgCopy').addEventListener('click', () => {
+    const txt = $('subDlgBody').textContent || '';
+    if (!txt){ toast(T('没有可复制的内容')); return; }
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+      .then(() => { $('subDlgMsg').textContent = T('✅ 已复制到剪贴板'); })
+      .catch(() => toast(T('剪贴板不可用，可手动选中文本复制')));
+  });
 
   function deleteNode(id){
     pushHistory();
@@ -2875,9 +3192,29 @@ if (typeof document !== "undefined") var UI = function(){
   try { applyTheme(localStorage.getItem('cmflow:theme:v2') || 'light'); } catch(e){ applyTheme('light'); }
   $('btnCodeToggle').addEventListener('click', () => { const c = $('code'); c.classList.toggle('hidden'); $('btnCodeToggle').textContent = c.classList.contains('hidden') ? T('展开') : T('收起'); });
 
-  // ---------- ⚙ 设置：数据来源目录（flow_serve.py 托管下可改，保存即生效） ----------
+  // ---------- ⚙ 设置：数据来源目录 + 模型单价（flow_serve.py 托管下可改，保存即生效） ----------
   const SET_KEYS = ['usage', 'rollout', 'agents', 'codex', 'qoder'];
   let lastSetView = null;
+  let priceCfg = {};       // 已保存的模型单价（美元/百万 token）：{模型: {in, out, cr}}
+  let priceModels = [];    // 本次设置弹窗里的模型行（键=下标 → id pp_in_0 等）
+  const PRICE_REF = {      // 参考价（常见公开价目，仅供一键填入；请以各家官网为准）
+    'gpt-5-mini': { in: 0.25, out: 2, cr: 0.025 },
+    'gpt-5': { in: 1.25, out: 10, cr: 0.125 },
+    'gpt-4.1': { in: 2, out: 8, cr: 0.5 },
+    'claude-sonnet-4': { in: 3, out: 15, cr: 0.3 },
+    'claude-opus-4': { in: 15, out: 75, cr: 1.5 },
+    'claude-haiku-4': { in: 1, out: 5, cr: 0.1 },
+  };
+  async function loadHttpSettings(){
+    if (!httpCaps || !httpCaps.settings) return;
+    try {
+      const r = await fetch('__flow_settings?_=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      priceCfg = (j && j.prices) || {};
+      if (curView === 'ctl') renderCtlUsage();
+    } catch(e){}
+  }
   function setLabel(k){
     if (k === 'usage') return T('usage.jsonl 文件（📦 使用量）');
     if (k === 'rollout') return T('ZCode rollout 目录（🪙 Token / 💬 问答）');
@@ -2909,6 +3246,7 @@ if (typeof document !== "undefined") var UI = function(){
   function renderSetDlg(v, keepInputs){
     const vals = {};
     if (keepInputs) SET_KEYS.forEach(k => { const el = $('setp_' + k); if (el) vals[k] = el.value; });
+    const keepPrice = keepInputs ? collectPriceInputs() : null;
     lastSetView = v;
     const saved = v.saved || {}, cli = v.cli || {}, dflt = v.default || {}, eff = v.effective || {}, ex = v.exists || {};
     $('setBody').innerHTML = SET_KEYS.map(k => {
@@ -2921,23 +3259,91 @@ if (typeof document !== "undefined") var UI = function(){
       return '<div class="setRow"><label for="setp_' + k + '">' + escXml(setLabel(k)) + '</label>' +
         '<input type="text" id="setp_' + k + '"' + (locked ? ' disabled' : '') + ' placeholder="' + escXml(T('默认：') + (dflt[k] || '')) + '" value="' + escXml(val) + '">' +
         '<div class="stat">' + st.join('　') + '</div></div>';
+    }).join('') + priceSectionHtml(v, keepPrice);
+    if ($('priceRef')) $('priceRef').addEventListener('click', fillPriceRef);
+  }
+  // ---- 模型单价区（⬆ Token 成本估算的数据源；键=下标避免模型名进 id） ----
+  function priceModelsFor(v){
+    const list = [], seen = {};
+    const add = m => { const nm = String(m || '').trim().slice(0, 128); if (nm && !seen[nm]){ seen[nm] = 1; list.push(nm); } };
+    Object.keys((v && v.prices) || {}).forEach(add);
+    const fromAgg = c => { if (!c) return; (c.byModel || []).forEach(m => add(m.model)); };
+    if (clientUsage) Object.values(clientUsage).forEach(fromAgg); else if (tokenAgg) fromAgg(tokenAgg);
+    if (!list.length) Object.keys(PRICE_REF).forEach(add);
+    return list.slice(0, 120);
+  }
+  function collectPriceInputs(){
+    const vals = {};
+    priceModels.forEach((m, i) => ['in', 'out', 'cr'].forEach(k => { const el = $('pp_' + k + '_' + i); if (el) vals['pp_' + k + '_' + i] = el.value; }));
+    return vals;
+  }
+  function priceSectionHtml(v, keepVals){
+    const prices = (v && v.prices) || {};
+    priceModels = priceModelsFor(v);
+    if (!priceModels.length) return '';
+    const rows = priceModels.map((m, i) => {
+      const cur = prices[m] || {};
+      const inp = (k, ph) => {
+        const id = 'pp_' + k + '_' + i;
+        const val = (keepVals && keepVals[id] !== undefined) ? keepVals[id] : (cur[k] !== undefined ? cur[k] : '');
+        return '<input type="number" id="' + id + '" min="0" step="0.01" style="width:88px" placeholder="' + escXml(ph) + '" value="' + escXml(String(val)) + '">';
+      };
+      return '<div class="setRow"><label title="' + escXml(m) + '">' + escXml(m.length > 34 ? m.slice(0, 34) + '…' : m) + '</label>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + inp('in', T('输入')) + inp('out', T('输出')) + inp('cr', T('缓存读')) + '</div></div>';
     }).join('');
+    return '<div class="hsec" style="margin-top:16px">' + T('模型单价（美元 / 百万 token，用于估算费用）') + '</div>' +
+      '<p class="hint" style="margin:2px 0 6px">' + T('留空的模型不计费；缓存读 = 命中缓存的输入（单价更低）；合计 ≈ 输入×in + 输出×out + 缓存读×cr。') + '</p>' +
+      rows +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 2px">' +
+      '<button id="priceRef" type="button">' + T('💰 按常见公开价填入（参考，请自行核对）') + '</button>' +
+      '<span class="hint">' + T('参考价仅供参考，实际以各模型官网价目为准。') + '</span></div>';
+  }
+  function fillPriceRef(){
+    let n = 0;
+    priceModels.forEach((m, i) => {
+      const key = Object.keys(PRICE_REF).find(k => m.toLowerCase().indexOf(k) >= 0 || k.indexOf(m.toLowerCase()) === 0);
+      const ref = key && PRICE_REF[key];
+      if (!ref) return;
+      [['in', ref.in], ['out', ref.out], ['cr', ref.cr]].forEach(([k, val]) => { const el = $('pp_' + k + '_' + i); if (el && val != null) el.value = String(val); });
+      n++;
+    });
+    $('setMsg').textContent = n
+      ? tx('已填入 {0} 个模型的参考价（请核对后点「💾 保存」）', n)
+      : T('没有可匹配参考价的模型（可手工填写）');
+  }
+  function collectPrices(){
+    const prices = {};
+    priceModels.forEach((m, i) => {
+      const row = {};
+      ['in', 'out', 'cr'].forEach(k => {
+        const el = $('pp_' + k + '_' + i);
+        if (!el) return;
+        const val = el.value.trim();
+        const num = Number(val);
+        if (val !== '' && isFinite(num) && num >= 0) row[k] = num;
+      });
+      if (Object.keys(row).length) prices[m] = row;
+    });
+    return prices;
   }
   $('btnSet').addEventListener('click', openSetDlg);
   $('setSave').addEventListener('click', async () => {
     const paths = {};
     SET_KEYS.forEach(k => { const el = $('setp_' + k); if (el) paths[k] = el.value.trim(); });
+    const prices = collectPrices();
     $('setMsg').textContent = T('正在保存…');
     try {
-      const r = await fetch('__flow_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths }) });
+      const r = await fetch('__flow_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths, prices }) });
       const j = await r.json();
       if (!j.ok){ $('setMsg').textContent = T('保存失败：') + (j.error || ('HTTP ' + r.status)); return; }
+      priceCfg = (j.view && j.view.prices) || {};
       renderSetDlg(j.view);
       const locked = j.locked || [];
       $('setMsg').textContent = locked.length
         ? tx('已保存；由启动参数指定的 {0} 已忽略', locked.map(k => setLabel(k)).join('，'))
         : T('✅ 已保存并立即生效');
       toast(T('✅ 设置已保存并立即生效'));
+      if (curView === 'ctl') renderCtlUsage();   // 单价变化立即反映到成本估算
       loadHttpUsage();
       if (httpCaps && httpCaps.clientUsage) loadHttpClientUsage(true).then(() => { if (curView === 'ctl') renderCtlUsage(); });
       else if (httpCaps && httpCaps.tokens) loadHttpTokens(true).then(() => { if (curView === 'ctl') renderCtlUsage(); });
@@ -3073,10 +3479,38 @@ if (typeof document !== "undefined") var UI = function(){
   }
   function exportWf(name){
     const e = wfEntry(name); if (!e) return;
+    const obj = graphToJSON(Object.assign({ name:e.name }, e.data || {}));
+    if (e.src) obj.src = e.src;   // 对话画布：连同会话 / 小对话元信息一起导出（单画布 JSON 可再导入整树）
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(graphToJSON(Object.assign({ name:e.name }, e.data || {})), null, 2)], {type:'application/json'}));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'}));
     a.download = e.name + '.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  // ---------- 工作流整树：导出 / 导入合并（⊞ / ⊟，v0.19.0） ----------
+  function exportWfTree(){
+    markDirtyNow();
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    const fname = 'codex-flow-tree-' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + '.json';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(wfTreeObj(), null, 2)], { type:'application/json' }));
+    a.download = fname; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(tx('已导出全部 {0} 个工作流画布（含对话画布与小对话）', WF.list.length));
+  }
+  function importWfTreeText(text){
+    const parsed = wfTreeParse(text);
+    if (!parsed.ok){
+      toast(T('导入失败：') + (parsed.error === 'bad-json' ? T('不是有效的 JSON 文件') : T('没有找到可导入的画布（需要含 nodes 数组）')));
+      return null;
+    }
+    const m = wfMergeEntries(WF.list, parsed.entries);
+    WF.list = m.list;
+    saveAll(); fillWfSel();
+    if (curView === 'dist') renderDist();
+    if (curView === 'ctl') renderCtl();
+    toast(tx('已导入 {0} 个画布：新增 {1} · 更新 {2}{3}{4}', parsed.entries.length, m.added, m.updated,
+      m.renamed ? T(' · 改名 ') + m.renamed : '', m.skipped ? T(' · 跳过 ') + m.skipped : ''));
+    return m;
   }
   function bindWfOps(root){
     root.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => switchWorkflow(b.dataset.open)));
@@ -3214,7 +3648,7 @@ if (typeof document !== "undefined") var UI = function(){
       }).join('　') + '<br>' : '';
       tip.innerHTML = '<b>' + escXml(d.key) + '</b>　' + T('合计') + ' ' + fmtN(tot) + ' tokens<br>' + perHtml +
         T('输入') + ' ' + fmtN(d.input) + ' · ' + T('缓存读') + ' ' + fmtN(d.cacheRead) + ' · ' + T('输出') + ' ' + fmtN(d.output) + '<br>' +
-        T('模型调用') + ' ' + fmtN(d.calls) + ' ' + T('次');
+        T('模型调用') + ' ' + fmtN(d.calls) + ' ' + T('次') + (d.cost != null ? '<br>' + T('估算费用') + ' ≈ ' + fmtCost(d.cost) : '');
       tip.style.display = 'block';
       let px = ev.clientX + 14, py = ev.clientY + 12;  // 注意：不能用 tx 作局部名，会遮蔽全局 tx() 造成 TDZ
       const tw = tip.offsetWidth, th = tip.offsetHeight;
@@ -3299,6 +3733,22 @@ if (typeof document !== "undefined") var UI = function(){
     const qoderOnly = entries.length && entries.every(([, c]) => c.tokens === false);
     const notes = entries.filter(([, c]) => c.note).map(([, c]) => c.note);
     const series = tokSeries(entries, tokMode);
+    // 成本估算：按 ⚙ 设置里的模型单价（美元/百万 token）折算；未配置单价的模型不计入（显示 ≈）
+    const allModelRows = [];
+    entries.forEach(([, c]) => (c.byModel || []).forEach(m => allModelRows.push(m)));
+    let costTotal = 0, costHit = 0;
+    allModelRows.forEach(m => { const v = costOfModel(m, priceCfg); if (v != null){ costTotal += v; costHit++; } });
+    const costPartial = costHit > 0 && costHit < allModelRows.length;
+    if (Object.keys(priceCfg).length){
+      const byKey = {};
+      entries.forEach(([, c]) => (c.byDayModel || []).forEach(d => {
+        const cv = costOfModel(d, priceCfg);
+        if (cv == null) return;
+        const key = tokMode === 'month' ? String(d.day).slice(0, 7) : String(d.day);
+        byKey[key] = (byKey[key] || 0) + cv;
+      }));
+      series.forEach(s => { if (byKey[s.key] != null) s.cost = byKey[s.key]; });
+    }
     // 周期明细卡（点击数据点展开）
     let periodSec = '';
     if (tokPeriod){
@@ -3315,11 +3765,14 @@ if (typeof document !== "undefined") var UI = function(){
         });
         const models = [...mm.values()].sort((a, b) => b.total - a.total || b.calls - a.calls);
         const sess = (c.bySession || []).filter(s => tokSceneDays(s, tokPeriod, tokMode)).slice(0, 12);
-        const mRows = models.map(m => '<tr><td>' + escXml(m.model) + '</td><td>' + m.calls + '</td><td>' + fmtN(m.input) + '</td><td>' + fmtN(m.cacheRead) + '</td><td>' + fmtN(m.output) + '</td><td>' + fmtN(m.total || sumT(m)) + '</td></tr>').join('');
+        const mRows = models.map(m => {
+          const cv = c.tokens === false ? null : costOfModel(m, priceCfg);
+          return '<tr><td>' + escXml(m.model) + '</td><td>' + m.calls + '</td><td>' + fmtN(m.input) + '</td><td>' + fmtN(m.cacheRead) + '</td><td>' + fmtN(m.output) + '</td><td>' + fmtN(m.total || sumT(m)) + '</td><td>' + (cv == null ? '—' : fmtCost(cv)) + '</td></tr>';
+        }).join('');
         const sRows = sess.map(s => '<tr><td title="' + escXml(s.session) + '">' + escXml(sessionTaskName(s.session) || (qaBare(s.session).slice(0, 14) + '…')) + '</td><td class="hint">' + escXml((s.cwd || '').replace(/^.*[\\\/]/, '') || '—') + '</td><td>' + s.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(sumT(s))) + '</td><td class="hint">' + escXml(s.last || '—') + '</td><td><button class="small" data-gotoqa="' + escXml(cid + '|' + s.session) + '">' + T('→ 查看问答') + '</button> <button class="small" data-importflow="' + escXml(cid + '|' + s.session) + '" title="' + T('把该会话的问答生成为独立对话画布（当前画布不受影响，同一会话重复导入会合并更新）') + '">' + T('⤵ 导入画布') + '</button></td></tr>').join('');
         if (!models.length && !sess.length) return;
         card += '<div style="margin:6px 0 2px"><b style="color:' + ci.color + '">● ' + escXml(ci.label) + '</b>　<span class="hint">' + T('调用') + ' ' + models.reduce((n, m) => n + m.calls, 0) + (c.tokens === false ? ' · ' + T('该客户端不记录令牌数') : ' · ' + fmtN(models.reduce((n, m) => n + (m.total || sumT(m)), 0)) + ' tokens') + '</span></div>' +
-          (mRows ? '<table class="stable" style="width:auto"><thead><tr><th>' + T('模型') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th></tr></thead><tbody>' + mRows + '</tbody></table>' : '') +
+          (mRows ? '<table class="stable" style="width:auto"><thead><tr><th>' + T('模型') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('费用') + '</th></tr></thead><tbody>' + mRows + '</tbody></table>' : '') +
           (sRows ? '<table class="stable" style="width:auto;margin-top:2px"><thead><tr><th>' + T('会话') + '</th><th>' + T('目录') + '</th><th>' + T('调用') + '</th><th>' + T('合计') + '</th><th>' + T('最后活动') + '</th><th></th></tr></thead><tbody>' + sRows + '</tbody></table>' : '');
       });
       periodSec = '<div id="tokPeriodBox" class="hcard" style="margin:8px 0">' +
@@ -3334,10 +3787,11 @@ if (typeof document !== "undefined") var UI = function(){
         const ci = qaClientInfo(cid);
         const ms = c.byModel || [];
         ms.forEach((m, i) => {
-          mrows.push('<tr><td>' + (i === 0 ? '<span style="color:' + ci.color + '">●</span> ' + escXml(ci.label) : '') + '</td><td>' + escXml(m.model) + '</td><td>' + m.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.output)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.total || sumT(m))) + '</td></tr>');
+          const cv = c.tokens === false ? null : costOfModel(m, priceCfg);
+          mrows.push('<tr><td>' + (i === 0 ? '<span style="color:' + ci.color + '">●</span> ' + escXml(ci.label) : '') + '</td><td>' + escXml(m.model) + '</td><td>' + m.calls + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.input)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.cacheRead)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.output)) + '</td><td>' + (c.tokens === false ? '—' : fmtN(m.total || sumT(m))) + '</td><td>' + (cv == null ? '—' : fmtCost(cv)) + '</td></tr>');
         });
       });
-      modelSec = mrows.length ? '<div class="hsec">' + T('客户端模型用量') + '</div><table class="stable"><thead><tr><th>' + T('客户端') + '</th><th>' + T('模型') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th></tr></thead><tbody>' + mrows.join('') + '</tbody></table>' : '';
+      modelSec = mrows.length ? '<div class="hsec">' + T('客户端模型用量') + '</div><table class="stable"><thead><tr><th>' + T('客户端') + '</th><th>' + T('模型') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('费用') + '</th></tr></thead><tbody>' + mrows.join('') + '</tbody></table>' : '';
     }
     // 按会话（多客户端合并，点行展开明细，可转跳问答）
     const sessAll = [];
@@ -3378,8 +3832,10 @@ if (typeof document !== "undefined") var UI = function(){
         '<p class="hint" style="margin:0 0 4px">' + T('归属口径：模型调用触发该插件工具（mcp__服务器__工具 / Skill 技能）或承接其工具结果时，整个调用的令牌计入该插件；同一调用涉及多个插件时均分；未涉及插件的调用（内置工具 / 纯对话）计入「未归属」。插件与未归属合计 = 总 Tokens。') + '</p>';
     }
     html +=
-      '<div class="kpi"><div><b>' + fmtN(grand) + '</b><span>' + T('总 Tokens') + '</span></div><div><b>' + fmtN(t.input) + '</b><span>' + T('输入') + '</span></div><div><b>' + fmtN(t.cacheRead) + '</b><span>' + T('缓存读') + '</span></div><div><b>' + fmtN(t.output) + '</b><span>' + T('输出') + '</span></div><div><b>' + fmtN(t.calls) + '</b><span>' + T('模型调用') + '</span></div></div>' +
-      '<p class="hint" style="margin:2px 0 8px">' + (qoderOnly ? '' : T('合计 = 输入 + 输出 + 缓存读（缓存读为命中缓存的输入、单价低）。')) + T('扫描 ') + entries.reduce((n, [, c]) => n + (c.files || 0), 0) + T(' 个会话文件') + (clientUsageAt ? T('，于 ') + escXml(clientUsageAt) + T('（20 秒缓存）') : '') + T('。') + (notes.length ? ' ' + escXml(notes.join('；')) + T('。') : '') + '</p>';
+      '<div class="kpi"><div><b>' + fmtN(grand) + '</b><span>' + T('总 Tokens') + '</span></div><div><b>' + fmtN(t.input) + '</b><span>' + T('输入') + '</span></div><div><b>' + fmtN(t.cacheRead) + '</b><span>' + T('缓存读') + '</span></div><div><b>' + fmtN(t.output) + '</b><span>' + T('输出') + '</span></div><div><b>' + fmtN(t.calls) + '</b><span>' + T('模型调用') + '</span></div>' +
+      '<div title="' + escXml(T('按 ⚙ 设置里的模型单价估算（美元）；未配置单价的模型不计入')) + '"><b>' + (costHit ? ((costPartial ? '≈ ' : '') + fmtCost(costTotal)) : '—') + '</b><span>' + T('估算费用') + '</span></div></div>' +
+      '<p class="hint" style="margin:2px 0 8px">' + (qoderOnly ? '' : T('合计 = 输入 + 输出 + 缓存读（缓存读为命中缓存的输入、单价低）。')) + T('扫描 ') + entries.reduce((n, [, c]) => n + (c.files || 0), 0) + T(' 个会话文件') + (clientUsageAt ? T('，于 ') + escXml(clientUsageAt) + T('（20 秒缓存）') : '') + T('。') + (notes.length ? ' ' + escXml(notes.join('；')) + T('。') : '') +
+      (costHit ? (costPartial ? ' ' + T('费用为近似值：仅统计已配置单价的模型。') : '') : ' ' + T('提示：在「⚙ 设置」里填写模型单价后，这里会显示估算费用。')) + '</p>';
     html += (series.length ? renderTokChart(series, tokMode) : '<p class="hint">' + T('该客户端暂无按日数据。') + '</p>');
     html += periodSec + modelSec + pluginSec +
       (sessRows ? '<div class="hsec">' + tx('按会话（{0} 个 · 点行展开明细，可转跳问答 / 导入画布）', sessAll.length) + '</div><table class="stable"><thead><tr><th>' + T('任务 / 会话') + '</th><th>' + T('目录') + '</th><th>' + T('调用') + '</th><th>' + T('输入') + '</th><th>' + T('缓存读') + '</th><th>' + T('输出') + '</th><th>' + T('合计') + '</th><th>' + T('最后活动') + '</th><th></th></tr></thead><tbody>' + sessRows + '</tbody></table>' : '');
@@ -3427,6 +3883,8 @@ if (typeof document !== "undefined") var UI = function(){
     toast(T('已创建流程框架：输入 → Agent → 条件 →（是/否）→ 合并 → 输出，含反馈修正环'));
   });
   $('btnImportWf').addEventListener('click', () => { importMode = 'wf'; $('fileIn').value = ''; $('fileIn').click(); });
+  $('btnExpTree').addEventListener('click', exportWfTree);
+  $('btnImpTree').addEventListener('click', () => { importMode = 'wftree'; $('fileIn').value = ''; $('fileIn').click(); });
 
   // ---------- 文件导入 ----------
   let importMode = 'json';
@@ -3445,6 +3903,8 @@ if (typeof document !== "undefined") var UI = function(){
           saveAll(); fillWfSel(); switchWorkflow(nn);
           toast(T('已导入工作流：') + nn);
         } catch(e){ toast(T('导入失败：') + e.message); }
+      } else if (importMode === 'wftree'){
+        importWfTreeText(text);
       } else if (importMode === 'usage'){
         if (loadUsageText(text, 'file')){
           afterUsageLoad();
@@ -3713,7 +4173,7 @@ if (typeof document !== "undefined") var UI = function(){
       syncStatus('⚠ ' + T('本地服务未连接：画布不会自动同步。启动 ') + 'python flow_serve.py --dir <流程目录>' + T(' 后每 4 秒自动重连'));
       scheduleHttpRetry();                        // 服务重启后自动恢复同步（画布不同步问题根因）
     }
-    if (httpCaps){ loadHttpUsage(); loadHttpTokens(); loadHttpClientUsage(); }   // usage.jsonl / rollout / 多客户端用量自动载入
+    if (httpCaps){ loadHttpUsage(); loadHttpTokens(); loadHttpClientUsage(); loadHttpSettings(); }   // usage.jsonl / rollout / 多客户端用量 / 模型单价自动载入
     skillHint();                                          // 技能工坊能力提示随之刷新
     startQaSync();                                        // 问答视图：最新会话 + 全部子智能体自动同步（每 6s）
   }
@@ -4626,6 +5086,16 @@ if (typeof document !== "undefined") var UI = function(){
     const nm = (PAYLOAD && PAYLOAD.workflow) || '主流程';
     WF = { list: [{ name: nm, data: { name: nm, dir: seed.dir, nodes: seed.nodes, edges: seed.edges, subs: seed.subs } }], active: nm, rev: payRev || null };
     saveAll();
+    // 重播种会清掉本地会话画布：从 flow_serve.py 的备份（wf-backup.json）把不冲突的画布并回来
+    if (/^https?:$/.test(location.protocol)){
+      restoreWfBackup([nm]).then(n => {
+        if (!n) return;
+        fillWfSel(); saveAll();
+        if (curView === 'dist') renderDist();
+        if (curView === 'ctl') renderCtl();
+        toast(tx('已从本地服务备份恢复 {0} 个画布（含小对话记录）', n));
+      });
+    }
   }
   applyLang();
   fillWfSel();
@@ -4639,7 +5109,9 @@ if (typeof document !== "undefined") var UI = function(){
   syncCode();
   tryRestoreSync().then(initHttpWatch, initHttpWatch); // 先恢复文件句柄；无句柄时退回 HTTP 自动连接（flow_serve.py）
   // 测试钩子（自动化验证用，不影响正常使用）
-  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, ensureQaSession, importSessionToCanvas, openSetDlg, renderSetDlg, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }) };
+  window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, ensureQaSession, importSessionToCanvas, openSetDlg, renderSetDlg, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }),
+    wf: () => WF, exportWfTree, importWfTreeText, pushWfBackup, restoreWfBackup, wfTreeObj, fillWfSel, activeDurs, openSubDlg, subItemForNode,
+    fmtDurMs, wfDurOfTurns, wfTreeParse, wfMergeEntries, subNodeLabel, costOfModel, priceFor, fmtCost, priceCfg: () => priceCfg, loadHttpSettings };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

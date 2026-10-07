@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -28,6 +28,8 @@ const core = await import(pathToFileURL(corePath).href);
   parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa,
   suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts,
   fmtWfWhen, taskCanvasName, wfTree, isQaContinuation,
+  fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries,
+  priceFor, costOfModel, fmtCost,
 } = core;
 
 let pass = 0, fail = 0;
@@ -680,6 +682,138 @@ t("flowTemplate：英文参数输出英文标签，缺省中文不变", () => {
   ok(en.nodes.some(n => n.label === "Input"), "en=true 应输出英文标签");
   ok(en.nodes.some(n => n.label === "Merge"), "英文骨架应含 Merge");
   eq(en.name, "Test");
+});
+
+// ---------- v0.19.0：耗时标注 / 整树导出导入 / Token 成本估算 ----------
+t("fmtDurMs：分/时/天档位、双语、无效值返回空", () => {
+  eq(fmtDurMs(0), "");
+  eq(fmtDurMs(-5), "");
+  eq(fmtDurMs(NaN), "");
+  eq(fmtDurMs(10 * 1000), "<1分");
+  eq(fmtDurMs(30 * 1000), "1分", "30 秒按四舍五入进位到 1 分");
+  eq(fmtDurMs(5 * 60000), "5分");
+  eq(fmtDurMs(59.4 * 60000), "59分");
+  eq(fmtDurMs(65 * 60000), "1时5分");
+  eq(fmtDurMs(120 * 60000), "2时");
+  eq(fmtDurMs(25 * 3600000), "1天1时");
+  eq(fmtDurMs(48 * 3600000), "2天");
+  eq(fmtDurMs(10 * 1000, "en"), "<1m");
+  eq(fmtDurMs(65 * 60000, "en"), "1h5m");
+  eq(fmtDurMs(25 * 3600000, "en"), "1d1h");
+});
+
+t("wfDurOfTurns：相邻间隔与首尾跨度；倒挂/缺 ts 记为 0", () => {
+  const r = wfDurOfTurns([{ q: "a", ts: 1000 }, { q: "b", ts: 61000 }, { q: "c", ts: 121000 }]);
+  eq(r.gaps, [60000, 60000, 0], "最后一次没有下一次提问，记为 0");
+  eq(r.total, 120000, "total = 首尾跨度");
+  const bad = wfDurOfTurns([{ q: "a", ts: 5000 }, { q: "b", ts: 1000 }, { q: "c" }]);
+  eq(bad.gaps, [0, 0, 0], "时间倒挂/缺 ts 一律 0（未知）");
+  eq(bad.total, 0);
+  eq(wfDurOfTurns([]).gaps, []);
+  eq(wfDurOfTurns(null).total, 0);
+});
+
+t("subNodeLabel：与 flowFromQa 生成的 🤖 节点标签逐字一致（含截断）", () => {
+  const items = [
+    { who: "master", ts: 1000, q: "开始任务", a: "", kw: [], tools: [] },
+    { who: "sub", ts: 1500, description: "质量审查员审查调试流程", q: "你是质量审查员…", a: "", kw: [], tools: [] },
+    { who: "sub", ts: 1600, description: "", q: "你是效率审查员，找出可省掉环节", a: "", kw: [], tools: [] },
+  ];
+  const r = flowFromQa(items, { maxNodes: 36 });
+  const labels = r.code.split("\n").filter(l => l.includes("🤖")).map(l => l.match(/\["(.+)"\]/)[1]);
+  const subs = items.filter(x => x.who === "sub");
+  eq(subs.map(x => subNodeLabel(x)), labels, "subNodeLabel 必须与画布生成算法一致");
+  eq(labels[0], "🤖 质量审查员审查调试流程", "12 字以内不截断");
+  eq(labels[1], "🤖 你是效率审查员，找出可省…", "超 12 字截断加省略号");
+});
+
+t("wfTreeParse：整树对象往返（含 src/turns 白名单与尺寸上限路径）", () => {
+  const tree = { type: "cmflow-tree", v: 1, list: [
+    { name: "主流程", data: { dir: "LR", nodes: [{ id: "n1", label: "甲" }], edges: [], subs: [] },
+      src: { parent: "", client: "zcode", session: "sess_A", task: "部署", ts: 123, extra: "应被丢弃",
+        turns: [{ q: "提问", ts: 1000, node: "m1", subs: ["s1"], junk: "应被丢弃" }] } },
+    { name: "", data: { dir: "TD", nodes: [{ id: "n2" }], edges: [], subs: [] } },
+  ] };
+  const r = wfTreeParse(JSON.stringify(tree));
+  ok(r.ok && r.bundle === true, "整树对象应识别为 bundle");
+  eq(r.entries.length, 2);
+  eq(r.entries[0].name, "主流程");
+  eq(r.entries[0].data.dir, "LR");
+  eq(r.entries[0].data.nodes.length, 1);
+  eq(r.entries[0].src.session, "sess_A");
+  eq(r.entries[0].src.turns.length, 1);
+  eq(r.entries[0].src.turns[0].q, "提问");
+  ok(r.entries[0].src.extra === undefined, "src 未列字段应被丢弃");
+  ok(r.entries[0].src.turns[0].junk === undefined, "turns 未列字段应被丢弃");
+  eq(r.entries[1].name, "imported-2", "无名画布应生成占位名");
+});
+
+t("wfTreeParse：兼容单画布导出与 {data:{nodes}}；坏 JSON/无画布报错", () => {
+  const r1 = wfTreeParse(JSON.stringify({ name: "单画布", dir: "TD", nodes: [{ id: "n1" }], edges: [], subs: [] }));
+  ok(r1.ok && r1.bundle === false, "单画布导出应可导入且不算 bundle");
+  eq(r1.entries[0].name, "单画布");
+  eq(r1.entries[0].data.dir, "TD");
+  const r2 = wfTreeParse(JSON.stringify({ name: "包装", data: { nodes: [{ id: "x" }] } }));
+  ok(r2.ok, "{data:{nodes}} 包装应可导入");
+  eq(r2.entries[0].name, "包装");
+  eq(r2.entries[0].data.nodes[0].id, "x");
+  eq(wfTreeParse("not json").error, "bad-json");
+  eq(wfTreeParse('{"a":1}').error, "no-canvas");
+  eq(wfTreeParse("").ok, false);
+  eq(wfTreeParse("[]").ok, false, "数组顶层不是合法捆绑");
+});
+
+t("wfMergeEntries：同会话更新保名、同名异源改名、其余追加、坏条目跳过", () => {
+  const list = [
+    { name: "主流程（10-07 14:30，部署）", data: { dir: "TD", nodes: [], edges: [], subs: [] }, src: { client: "zcode", session: "s1", task: "部署" } },
+    { name: "旧画布", data: { dir: "TD", nodes: [], edges: [], subs: [] }, src: { client: "zcode", session: "s2", task: "旧任务" } },
+  ];
+  const m = wfMergeEntries(list, [
+    { name: "随便改的名字", data: { dir: "LR", nodes: [{ id: "n9" }], edges: [], subs: [] }, src: { client: "zcode", session: "s1", task: "部署" } },
+    { name: "旧画布", data: { dir: "TD", nodes: [{ id: "n2" }], edges: [], subs: [] }, src: { client: "zcode", session: "s3", task: "新任务" } },
+    { name: "新画布", data: { dir: "TD", nodes: [{ id: "n3" }], edges: [], subs: [] } },
+    { name: "坏条目", data: {} },
+  ]);
+  eq(m.updated, 1); eq(m.renamed, 1); eq(m.added, 2, "改名条目也计入新增（added 含 renamed，UI 明细相加=解析总数）"); eq(m.skipped, 1);
+  eq(m.list.length, 4);
+  eq(m.list[0].name, "主流程（10-07 14:30，部署）", "同会话更新须保留原画布名");
+  eq(m.list[0].data.dir, "LR", "同会话更新应替换画布数据");
+  eq(m.list[0].data.name, "主流程（10-07 14:30，部署）", "数据内 name 也应保持原画布名");
+  eq(m.list[2].name, "旧画布 · 2", "同名异源应加序号后缀");
+  eq(m.list[3].name, "新画布");
+  const m2 = wfMergeEntries([{ name: "平名", data: { nodes: [] } }], [{ name: "平名", data: { nodes: [{ id: "z" }] } }]);
+  eq(m2.updated, 1, "双方都无会话信息时同名应更新而非改名");
+  eq(m2.list.length, 1);
+  eq(m2.list[0].data.nodes[0].id, "z");
+});
+
+t("priceFor：精确匹配优先、包含匹配取最长键、不区分大小写、无价返回 null", () => {
+  const P = { "gpt-5": { in: 1, out: 2, cr: 0.5 }, "gpt-5-mini": { in: 0.25, out: 2, cr: 0.025 } };
+  eq(priceFor("gpt-5-mini", P), P["gpt-5-mini"], "精确与包含同时命中时应取 mini 价");
+  eq(priceFor("GPT-5-MINI", P), P["gpt-5-mini"], "匹配应不区分大小写");
+  eq(priceFor("openai/gpt-5-mini-2026", P), P["gpt-5-mini"], "包含匹配应取最长键");
+  eq(priceFor("gpt-4", P), null);
+  eq(priceFor("", P), null);
+  eq(priceFor("gpt-5", null), null);
+});
+
+t("costOfModel：输入/输出/缓存读三路折算；无单价/坏输入返回 null", () => {
+  const P = { "gpt-5": { in: 1.25, out: 10, cr: 0.125 } };
+  eq(costOfModel({ model: "gpt-5", input: 1000000, output: 100000, cacheRead: 2000000 }, P), 2.5);
+  eq(costOfModel({ model: "gpt-5", input: 0, output: 0, cacheRead: 0 }, P), 0);
+  eq(costOfModel({ model: "claude-x", input: 100 }, P), null, "未配置单价返回 null（UI 显示 —）");
+  eq(costOfModel(null, P), null);
+  eq(costOfModel({ model: "gpt-5", input: -5, output: "abc" }, P), 0, "坏值按 0 计");
+});
+
+t("fmtCost：四档格式与无效值", () => {
+  eq(fmtCost(0.00123), "$0.0012");
+  eq(fmtCost(0.5), "$0.500");
+  eq(fmtCost(12.5), "$12.50");
+  eq(fmtCost(1234.56), "$1,235");
+  eq(fmtCost(0), "");
+  eq(fmtCost(-1), "");
+  eq(fmtCost(NaN), "");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

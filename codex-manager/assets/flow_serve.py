@@ -21,20 +21,26 @@
  12. GET  /__flow_clients → 列三个代码客户端（ZCode / Codex CLI / Qoder CLI）的会话文件（含 Qoder 子智能体）；
  13. GET  /__flow_client_file?client=&id=&tail= → 读指定客户端会话原文（tail=末尾字节数，大文件增量浏览）；
  14. GET  /__flow_client_usage → 多客户端用量聚合（ZCode+Codex 令牌明细、Qoder 模型调用数，20s 缓存）；
- 15. GET  /__flow_settings → 数据来源目录设置视图（saved/cli/default/effective/exists）；
- 16. POST /__flow_settings {"paths":{...}} → 保存数据来源目录（usage/rollout/agents/codex/qoder），
-     写入 ~/.zcode/codex-manager/flow-settings.json 并立即生效（空串=清除覆盖；
-     启动参数指定的路径优先，不受设置覆盖）。
+ 15. GET  /__flow_settings → 数据来源目录设置视图（saved/cli/default/effective/exists/prices）；
+ 16. POST /__flow_settings {"paths":{...},"prices":{...}} → 保存数据来源目录（usage/rollout/agents/
+     codex/qoder）与模型单价（估算费用用，每百万 token 美元），写入
+     ~/.zcode/codex-manager/flow-settings.json 并立即生效（空串=清除覆盖；
+     启动参数指定的路径优先，不受设置覆盖）；
+ 17. GET  /__flow_wf_state → 工作流树自动备份（整树 JSON，含对话画布与小对话结构）；
+ 18. POST /__flow_wf_state {"tree":{...}} → 原子写入 ~/.zcode/codex-manager/wf-backup.json
+     （编辑器每次改动防抖回传；rev 重播种/清空浏览器存档后可从它恢复对话画布）。
 
 安全约束：只绑定 127.0.0.1；写回目标固定为 --watch 指定的单个文件、技能目录下的
-SKILL.md 或设置文件 flow-settings.json，slug 必须匹配 ^[a-z0-9][a-z0-9-]{0,63}$，
-会话/子智能体/客户端文件路径按名字正则校验且解析后的真实路径必须位于对应根目录之内
-（防目录穿越）；设置键固定为 5 个数据来源目录且值必须为绝对路径字符串；会话文件与
-客户端文件读取均有字节上限。
+SKILL.md、设置文件 flow-settings.json 或工作流备份 wf-backup.json，slug 必须匹配
+^[a-z0-9][a-z0-9-]{0,63}$，会话/子智能体/客户端文件路径按名字正则校验且解析后的真实
+路径必须位于对应根目录之内（防目录穿越）；设置键固定为 5 个数据来源目录且值必须为
+绝对路径字符串；单价须为有限非负数；工作流备份须为含 list 数组的对象且 ≤8MB；
+会话文件与客户端文件读取均有字节上限。
 """
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import sys
@@ -56,6 +62,10 @@ CLIENT_TAIL_MIN_BYTES = 256 * 1024        # /__flow_client_file 的 tail 下限
 CLIENT_TAIL_MAX_BYTES = 16 * 1024 * 1024  # tail 上限
 CLIENT_USAGE_TTL = 20.0                   # 多客户端用量聚合缓存（秒）
 _USAGE_CACHE = {"t": 0.0, "key": None, "v": None}
+WF_STATE_MAX_BYTES = 8 * 1024 * 1024      # /__flow_wf_state 工作流树备份上限
+WF_STATE_MAX_CANVASES = 300               # 备份中画布数量上限
+PRICE_MAX_MODELS = 300                    # 单价表模型数上限
+PRICE_MAX_VALUE = 1e6                     # 单价上限（防误输入）
 
 
 def _local_dt(iso):
@@ -746,15 +756,57 @@ def settings_load():
             if isinstance(obj.get(k), str) and obj[k].strip()}
 
 
-def settings_save(saved):
+def settings_save(saved, prices=None):
     path = settings_file()
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    text = json.dumps(saved, ensure_ascii=False, indent=2) + "\n"
+    obj = dict(saved)
+    if prices is not None:
+        if prices:
+            obj["prices"] = prices
+        else:
+            obj.pop("prices", None)
+    text = json.dumps(obj, ensure_ascii=False, indent=2) + "\n"
     d = os.path.dirname(path) or "."
     fd, tmp = tempfile.mkstemp(prefix=".flow-settings-", dir=d)
     with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     os.replace(tmp, path)
+
+
+def prices_valid(pr):
+    """校验模型单价表：{模型: {"in","out","cr"}}，值须为有限非负数（美元/百万 token）。"""
+    out = {}
+    if not isinstance(pr, dict):
+        return out
+    for k, v in pr.items():
+        if len(out) >= PRICE_MAX_MODELS:
+            break
+        if not isinstance(k, str) or not k.strip() or len(k) > 128 or not isinstance(v, dict):
+            continue
+        row, okrow = {}, False
+        for kk in ("in", "out", "cr"):
+            x = v.get(kk)
+            if isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and 0 <= x <= PRICE_MAX_VALUE:
+                row[kk] = float(x)
+                okrow = True
+        if okrow:
+            out[k.strip()] = row
+    return out
+
+
+def prices_load():
+    try:
+        with open(settings_file(), encoding="utf-8") as f:
+            obj = json.load(f)
+    except Exception:
+        return {}
+    if not isinstance(obj, dict):
+        return {}
+    return prices_valid(obj.get("prices"))
+
+
+def wf_state_file():
+    return os.path.join(os.path.expanduser("~"), ".zcode", "codex-manager", "wf-backup.json")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -770,6 +822,7 @@ class Handler(SimpleHTTPRequestHandler):
     settings_saved = {}      # flow-settings.json 中已保存的覆盖值（内存副本）
     settings_cli = {}        # 启动参数显式指定的路径（优先级最高，设置不可覆盖）
     settings_default = {}    # 各键的出厂默认路径
+    settings_prices = {}     # 模型单价表（估算费用，美元/百万 token）
 
     def watch_path(self):
         try:
@@ -924,6 +977,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "qoder": bool(self.qoder_dir and os.path.isdir(self.qoder_dir)),
                 "clients": True,  # /__flow_clients 端点存在（多客户端会话列表）
                 "settings": True,  # /__flow_settings 端点存在（数据来源目录设置）
+                "wfstate": True,   # /__flow_wf_state 端点存在（工作流树自动备份/恢复）
                 "clientUsage": bool((self.rollout_dir and os.path.isdir(self.rollout_dir))
                                     or (self.codex_dir and os.path.isdir(self.codex_dir))
                                     or (self.qoder_dir and os.path.isdir(self.qoder_dir))),
@@ -931,6 +985,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path == "/__flow_settings":
             self.send_json(200, self.settings_view())
+            return
+        if path == "/__flow_wf_state":
+            self.send_wf_state()
             return
         if path == "/__flow_usage":
             # 给编辑器自动载入 usage.jsonl（Agent Skills/轨迹查询/总控使用量共用）
@@ -1108,6 +1165,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/__flow_settings":
             self.post_settings()
             return
+        if path == "/__flow_wf_state":
+            self.post_wf_state()
+            return
         if path != "/__flow_write":
             self.send_json(404, {"ok": False, "error": "unknown endpoint"})
             return
@@ -1156,7 +1216,7 @@ class Handler(SimpleHTTPRequestHandler):
                              "bytes": len(text.encode("utf-8"))})
 
     def settings_view(self):
-        """数据来源目录设置视图：saved（文件覆盖）/cli（启动参数锁定）/default/effective/exists。"""
+        """设置视图：saved（文件覆盖）/cli（启动参数锁定）/default/effective/exists + prices（模型单价）。"""
         effective = {k: getattr(self, KEY_ATTR[k]) for k in SETTINGS_KEYS}
         exists = {}
         for k in SETTINGS_KEYS:
@@ -1164,16 +1224,22 @@ class Handler(SimpleHTTPRequestHandler):
             exists[k] = os.path.isfile(p) if k == "usage" else os.path.isdir(p)
         return {"ok": True, "file": settings_file(),
                 "saved": dict(self.settings_saved), "cli": dict(self.settings_cli),
-                "default": dict(self.settings_default), "effective": effective, "exists": exists}
+                "default": dict(self.settings_default), "effective": effective, "exists": exists,
+                "prices": dict(self.settings_prices)}
 
     def post_settings(self):
-        """保存数据来源目录：键固定 5 个、值须为绝对路径字符串（空=清除覆盖）；
-        CLI 锁定的键保持不变；未锁定的立即生效并原子落盘。"""
+        """保存数据来源目录与模型单价：路径键固定 5 个、值须为绝对路径字符串（空=清除覆盖）；
+        单价为 {模型: {"in","out","cr"}} 有限非负数（空对象=清空）；CLI 锁定的键保持不变；
+        未锁定的立即生效并原子落盘。"""
         try:
             body = self.read_body()
             paths = body.get("paths")
+            if paths is None:
+                paths = {}
             if not isinstance(paths, dict):
-                raise ValueError("缺少 paths 字段")
+                raise ValueError("paths 字段类型错误")
+            if "prices" in body and not isinstance(body.get("prices"), dict):
+                raise ValueError("prices 字段类型错误")
         except Exception as e:
             self.send_json(400, {"ok": False, "error": "请求体解析失败：%s" % e})
             return
@@ -1204,15 +1270,59 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 saved.pop(k, None)
             applied[k] = v or (self.settings_cli.get(k) or self.settings_default.get(k) or "")
+        prices_new = prices_valid(body["prices"]) if "prices" in body else None
         try:
-            settings_save(saved)
+            settings_save(saved, prices_new if prices_new is not None else self.settings_prices)
         except Exception as e:
             self.send_json(500, {"ok": False, "error": "设置写入失败：%s" % e})
             return
         for k, v in applied.items():
             setattr(type(self), KEY_ATTR[k], v)  # 改类属性：后续所有请求立即用新路径
         type(self).settings_saved = saved
+        if prices_new is not None:
+            type(self).settings_prices = prices_new
         self.send_json(200, {"ok": True, "locked": locked, "view": self.settings_view()})
+
+    def send_wf_state(self):
+        """读工作流树备份：不存在/损坏时 exists=false（编辑器静默跳过，不影响正常使用）。"""
+        fp = wf_state_file()
+        try:
+            mt = os.path.getmtime(fp)
+        except OSError:
+            self.send_json(200, {"ok": True, "exists": False, "tree": None})
+            return
+        try:
+            with open(fp, encoding="utf-8") as f:
+                tree = json.load(f)
+        except Exception:
+            self.send_json(200, {"ok": True, "exists": False, "tree": None, "error": "备份文件损坏"})
+            return
+        self.send_json(200, {"ok": True, "exists": True, "tree": tree, "mtime": int(mt),
+                             "bytes": os.path.getsize(fp)})
+
+    def post_wf_state(self):
+        """写工作流树备份（编辑器防抖回传整树）：须为含 list 数组的对象且 8MB 以内，原子写。"""
+        try:
+            body = self.read_body()
+            tree = body.get("tree")
+            if not isinstance(tree, dict) or not isinstance(tree.get("list"), list):
+                raise ValueError("缺少 tree.list 字段")
+            if len(tree["list"]) > WF_STATE_MAX_CANVASES:
+                raise ValueError("画布数量过多（>%d）" % WF_STATE_MAX_CANVASES)
+            text = json.dumps(tree, ensure_ascii=False)
+            if len(text.encode("utf-8")) > WF_STATE_MAX_BYTES:
+                raise ValueError("备份过大（大于 8MB）")
+        except Exception as e:
+            self.send_json(400, {"ok": False, "error": "请求体解析失败：%s" % e})
+            return
+        fp = wf_state_file()
+        try:
+            os.makedirs(os.path.dirname(fp), exist_ok=True)
+            self.write_atomic(fp, text)
+        except Exception as e:
+            self.send_json(500, {"ok": False, "error": "备份写入失败：%s" % e})
+            return
+        self.send_json(200, {"ok": True, "bytes": len(text.encode("utf-8"))})
 
     def log_message(self, fmt, *args):
         line = fmt % args
@@ -1256,6 +1366,7 @@ def main():
     Handler.settings_cli = cli_paths
     Handler.settings_default = defaults
     Handler.settings_saved = saved
+    Handler.settings_prices = prices_load()
     for k in SETTINGS_KEYS:
         setattr(Handler, KEY_ATTR[k], cli_paths.get(k) or saved.get(k) or defaults[k])
     Handler.skills_dir = a.skills or d_skills
