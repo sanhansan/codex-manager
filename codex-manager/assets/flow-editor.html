@@ -14,6 +14,10 @@
     --sub-a:#f7f6fa; --sub-a-line:#dcd8e6; --sub-b:#f8f6f1; --sub-b-line:#e4ddd0;
     --code-bg:#ffffff; --code-bar:#f4f5f6; --code-ink:#1b1e23; --code-err:#c02626; --code-hl:#1d4ed8;
     --fb:#d23b52;
+    /* v0.27.0 画布卡片（参考图3）：圆角卡片 = 标题区 + 多行正文 + 底部文件名；端口为空心圆 */
+    --card-bg:#ffffff; --card-head:#f7f8fa; --card-line:#c9ccd3; --card-file:#8a9099;
+    --card-title:#1b1e23; --card-body:#4a5160; --card-port:#ffffff; --card-port-line:#8a929c;
+    --node-wire:#9aa3af; --node-wire-hl:#1d4ed8;
   }
   :root[data-theme="dark"] {
     --line:#2b2f36; --ink:#d6d9de; --accent:#6ea3f2; --muted:#8b929c;
@@ -23,6 +27,10 @@
     --sub-a:#17161d; --sub-a-line:#35323f; --sub-b:#1d1b16; --sub-b-line:#433d30;
     --code-bg:#101214; --code-bar:#15181b; --code-ink:#d6d9de; --code-err:#e89090; --code-hl:#6ea3f2;
     --fb:#e57a8b;
+    /* v0.27.0 画布卡片（深色）：与图3 的深灰卡片一致 */
+    --card-bg:#1e2126; --card-head:#25282e; --card-line:#3a3f48; --card-file:#8b929c;
+    --card-title:#e8ebef; --card-body:#aeb5c0; --card-port:#16181c; --card-port-line:#6b737e;
+    --node-wire:#7d858f; --node-wire-hl:#6ea3f2;
   }
   * { box-sizing:border-box; }
   html,body { height:100%; margin:0; font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); font-variant-numeric:tabular-nums; }
@@ -65,13 +73,15 @@
   #side .wfturn .dur { margin-left:auto; flex-shrink:0; font-size:10px; font-family:Consolas,Menlo,monospace; }
   /* ---- v0.24.0 项目分组 / 项目内智能体大框 ---- */
   #side .wfproj { margin:6px 6px 8px; border:1px solid var(--line); border-radius:4px; background:rgba(120,130,150,.05); overflow:hidden; }
-  #side .wfproj > .wfph { display:flex; align-items:center; gap:5px; padding:5px 8px; cursor:pointer; font-size:12px; font-weight:600; border-bottom:1px solid var(--line); background:rgba(120,130,150,.07); }
+  #side .wfproj > .wfph { padding:5px 8px; cursor:pointer; border-bottom:1px solid var(--line); background:rgba(120,130,150,.07); }
   #side .wfproj > .wfph:hover { background:rgba(120,130,150,.14); }
-  #side .wfproj > .wfph .pj { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #side .wfproj > .wfph .cnt { color:var(--muted); font-size:10px; font-weight:400; flex-shrink:0; }
+  /* v0.25.0 项目头两行布局：第一行 项目名（可截断），第二行 计数（不再溢出边框） */
+  #side .wfproj > .wfph .wr1 { display:flex; align-items:center; gap:5px; min-width:0; font-size:12px; font-weight:600; }
+  #side .wfproj > .wfph .pj { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #side .wfproj > .wfph .cnt { display:block; margin-top:2px; padding-left:19px; color:var(--muted); font-size:10px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #side .wfproj.collapsed > .wfpbody { display:none; }
   #side .wfproj.collapsed > .wfph .pcar { transform:rotate(-90deg); }
-  #side .wfproj .wfph .pcar { transition:transform .15s; font-size:9px; color:var(--muted); }
+  #side .wfproj .wfph .pcar { transition:transform .15s; font-size:9px; color:var(--muted); flex-shrink:0; }
   #side .wfpbody { padding:4px 5px 6px; }
   #side .wfpanc { font-size:10.5px; color:var(--muted); padding:2px 8px 5px; }
   #side .wfpanc b { color:var(--accent); font-weight:600; }
@@ -80,11 +90,13 @@
   #side .wfcoop .lbl { font-size:10px; color:var(--muted); }
   /* 项目内「智能体分组大框」：把同一项目的多个智能体画布圈在一起 */
   #side .wfagrp { border:1px solid color-mix(in srgb, var(--agc, var(--accent)) 45%, var(--line)); border-left:3px solid var(--agc, var(--accent)); border-radius:3px; margin:4px 3px; background:color-mix(in srgb, var(--agc, var(--accent)) 6%, transparent); }
-  #side .wfagrp > .wfah { display:flex; align-items:center; gap:5px; padding:3px 7px; font-size:11.5px; cursor:pointer; }
+  #side .wfagrp > .wfah { padding:3px 7px; cursor:pointer; }
   #side .wfagrp > .wfah:hover { background:rgba(120,130,150,.10); }
-  #side .wfagrp > .wfah .an { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #side .wfagrp > .wfah .tag { font-size:9.5px; padding:0 4px; border-radius:7px; border:1px solid color-mix(in srgb, var(--agc, var(--accent)) 50%, var(--line)); color:var(--agc, var(--accent)); flex-shrink:0; }
-  #side .wfagrp > .wfah .mst { font-size:9.5px; color:var(--muted); flex-shrink:0; }
+  /* v0.25.0 智能体框头两行布局：第一行 色点+名称+对话数，第二行 角色徽章（不再横向溢出） */
+  #side .wfagrp > .wfah .wr1 { display:flex; align-items:center; gap:5px; min-width:0; font-size:11.5px; }
+  #side .wfagrp > .wfah .an { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #side .wfagrp > .wfah .mst { color:var(--muted); font-size:9.5px; flex-shrink:0; }
+  #side .wfagrp > .wfah .tag { display:inline-block; margin-top:2px; margin-left:11px; max-width:100%; font-size:9.5px; padding:0 4px; border-radius:7px; border:1px solid color-mix(in srgb, var(--agc, var(--accent)) 50%, var(--line)); color:var(--agc, var(--accent)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ---- v0.24.0 画布面包屑 + 切换动画 ---- */
   #cvCrumb { position:absolute; top:6px; left:8px; right:8px; z-index:6; display:flex; flex-wrap:wrap; gap:4px; align-items:center; pointer-events:none; font-size:11px; }
   #cvCrumb .cb { pointer-events:auto; display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter:blur(3px); color:var(--muted); cursor:pointer; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -102,46 +114,23 @@
   #cvCrumb .cbmenu .mi .mt { color:var(--muted); font-size:10px; flex-shrink:0; }
   .cv-flip { animation:cvFlip .26s ease-out; }
   @keyframes cvFlip { from { opacity:0; transform:translateY(6px) scale(.994); } to { opacity:1; transform:none; } }
-  /* ================= v0.24.0 智能体总结神经网络（芯片脑图） ================= */
+  /* ---- v0.25.0 画布协作链（多智能体从哪到哪里） ---- */
+  #cvCollab { position:absolute; top:34px; left:8px; right:8px; z-index:5; display:flex; flex-wrap:wrap; gap:4px; align-items:center; pointer-events:none; font-size:11px; }
+  #cvCollab:empty { display:none; }
+  #cvCollab .clb { pointer-events:auto; display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter:blur(3px); color:var(--muted); cursor:pointer; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #cvCollab .clb:hover { color:var(--accent); border-color:var(--accent); }
+  #cvCollab .clb.cur { color:var(--fg); border-color:color-mix(in srgb, var(--clb-c, var(--accent)) 60%, var(--line)); cursor:default; font-weight:600; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--clb-c, var(--accent)) 45%, transparent); }
+  #cvCollab .clb .wfdot { width:7px; height:7px; }
+  #cvCollab .clsep { color:var(--muted); opacity:.75; pointer-events:none; }
+  #cvCollab .clhint { font-size:10.5px; color:var(--muted); padding:1px 6px; border-radius:8px; border:1px dashed var(--line); pointer-events:none; background:color-mix(in srgb, var(--panel) 70%, transparent); }
+  /* ================= v0.25.0 智能体总结神经网络（Canvas 高帧率渲染器，参考 code-map GPU treemap） ================= */
   #viewNn .vbody { overflow:hidden; flex:1; min-height:0; display:flex; }
-  #nnSvg { width:100%; height:100%; display:block; background:
+  #nnCv { width:100%; height:100%; display:block; background:
       radial-gradient(circle at 22% 18%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 46%),
       radial-gradient(circle at 78% 82%, color-mix(in srgb, #7c3aed 8%, transparent), transparent 46%),
       var(--canvas);
     cursor:grab; }
-  #nnSvg.drag { cursor:grabbing; }
-  #nnSvg .nnbg { fill:transparent; }
-  /* 芯片底板 */
-  #nnSvg .chip { fill:var(--panel); stroke:var(--line); stroke-width:1; }
-  #nnSvg .chiphdr { font:600 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; }
-  #nnSvg .chipmeta { font:10.5px/1 system-ui,-apple-system,sans-serif; }
-  #nnSvg .chipcty { fill:var(--muted); font:10px/1 system-ui,-apple-system,sans-serif; }
-  /* 引脚 */
-  #nnSvg .pin { stroke:color-mix(in srgb, var(--accent) 55%, var(--line)); stroke-width:1.4; stroke-linecap:round; opacity:.55; }
-  /* 神经元 */
-  #nnSvg .nrn { transition:opacity .3s; }
-  #nnSvg .nrn circle { transition:r .18s, fill .2s; }
-  #nnSvg .nrn .core { fill:var(--nnc, var(--accent)); opacity:.9; }
-  #nnSvg .nrn .halo { fill:none; stroke:var(--nnc, var(--accent)); stroke-width:1; opacity:.35; }
-  #nnSvg .nrn .txt { font:10.5px/1 system-ui,-apple-system,sans-serif; fill:var(--ink); pointer-events:none; }
-  #nnSvg .nrn .sub { font:9.5px/1 system-ui,-apple-system,sans-serif; fill:var(--muted); pointer-events:none; }
-  #nnSvg .nrn.g1 circle { opacity:.55; }
-  #nnSvg .nrn.g2 circle { opacity:.35; }
-  #nnSvg .nrn:hover .core, #nnSvg .nrn.hot .core { opacity:1; }
-  #nnSvg .nrn.hot .halo { opacity:.8; stroke-width:2; }
-  #nnSvg .nrn.clickable { cursor:pointer; }
-  /* 突触 */
-  #nnSvg .syn { stroke:var(--line); stroke-width:1; fill:none; }
-  #nnSvg .syn.l1 { stroke:color-mix(in srgb, var(--accent) 50%, var(--line)); stroke-width:1.6; }
-  #nnSvg .syn.l2 { opacity:.6; }
-  #nnSvg .pulse { fill:var(--accent); filter:drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 70%, transparent)); }
-  #nnSvg .pulse.k2 { fill:#7c3aed; }
-  #nnSvg .pulse.k3 { fill:#0d9488; }
-  /* 汇总中心 */
-  #nnSvg .hubring { fill:none; stroke:var(--accent); stroke-width:2; opacity:.5; }
-  #nnSvg .hub { fill:var(--accent); }
-  #nnSvg .hubtxt { fill:var(--canvas); font:600 12px/1 system-ui,sans-serif; text-anchor:middle; }
-  #nnSvg .lbl-hi { font:600 11.5px/1 system-ui,-apple-system,sans-serif; fill:var(--ink); }
+  #nnCv.drag { cursor:grabbing; }
   .nntip { position:absolute; left:0; top:0; pointer-events:none; display:none; max-width:340px; padding:7px 10px; border-radius:4px; border:1px solid var(--line); background:var(--panel); box-shadow:0 6px 20px rgba(0,0,0,.16); font-size:12px; z-index:8; }
   .nntip b { display:block; margin-bottom:3px; }
   .nntip .row { color:var(--muted); font-size:11px; }
@@ -150,8 +139,11 @@
   .nnzoom { position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:4px; }
   .nnzoom button { width:28px; height:28px; border-radius:4px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; font-size:14px; line-height:1; }
   .nnzoom button:hover { border-color:var(--accent); color:var(--accent); }
-  @keyframes nnIn { from { opacity:0; } to { opacity:1; } }
-  #nnSvg .fadein { animation:nnIn .5s ease-out; }
+  /* v0.27.0 文字树图：左上角「缩放档」指示（色块档 / 条带档 / 文字档） */
+  .nnlod { position:absolute; left:10px; top:10px; z-index:8; pointer-events:none; padding:5px 10px; border-radius:4px;
+    border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 90%, transparent); color:var(--ink);
+    font:11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing:.02em; }
+  .nntip i { display:block; color:var(--muted); font-size:11px; font-style:normal; }
   .nd-dur { font-size:9px; fill:var(--muted); pointer-events:none; }
   .suboutbox { border:1px dashed var(--line); border-radius:2px; padding:6px 8px; margin:6px 0 2px; }
   #subDlg pre { white-space:pre-wrap; word-break:break-word; max-height:52vh; overflow:auto; font:12.5px/1.55 Consolas,Menlo,monospace; background:var(--canvas); padding:8px 10px; border:1px solid var(--line); border-radius:2px; margin:0 0 8px; }
@@ -166,11 +158,35 @@
   .vhead b { font-size:14px; margin-right:4px; }
   .vbody { overflow:auto; padding:14px; }
   #wfGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(235px,1fr)); gap:12px; }
+  /* v0.27.0 分布工作区：项目分组框（同一项目多智能体共处一框）+ 当前画布自动跟随高亮 */
+  #wfGrid { display:block; }
+  .pfgroup { border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:6px; padding:10px 12px 12px; margin-bottom:14px;
+    background:color-mix(in srgb, var(--panel) 96%, var(--accent)); }
+  .pfgroup-fw { border-left-color:var(--muted); }
+  .pfhead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:7px; border-bottom:1px dashed var(--line); }
+  .pfhead .pfname { font-weight:700; font-size:13.5px; }
+  .pfhead .pfstat { color:var(--muted); font-size:11.5px; }
+  .pfhead .pfchain { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-left:auto; }
+  .pgchip { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; padding:1px 7px; border-radius:9px; border:1px solid var(--line); }
+  .pgchip i { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .pgarr { color:var(--muted); font-size:10.5px; }
+  .pfbody { display:grid; grid-template-columns:repeat(auto-fill,minmax(235px,1fr)); gap:12px; }
+  .wfcard.wfcur { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .wfcard.flash { animation:wfflash 1.1s ease-out; }
+  @keyframes wfflash { 0%,45% { box-shadow:0 0 0 5px color-mix(in srgb, var(--accent) 34%, transparent); } 100% { box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); } }
   .wfcard { border:1px solid var(--line); border-radius:2px; padding:12px; background:var(--panel); overflow-wrap:anywhere; min-width:0; }
   .wfcard h5 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .wfcard h5 > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
   .wfcard h5 .cur { font-size:11px; color:var(--accent); font-weight:normal; }
   .wfcard .meta { color:var(--muted); font-size:12px; margin-bottom:8px; line-height:1.7; }
+  /* v0.25.0 分布工作区：智能体徽章行（哪个智能体 + 子智能体/轮数 + 接力方向 + 跳转对话） */
+  .wfcard .agrow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; margin-bottom:8px; padding:5px 8px; border:1px solid var(--line); border-radius:2px; background:color-mix(in srgb, var(--canvas) 60%, transparent); }
+  .wfcard .agrow b { font-size:12px; }
+  .wfcard .agrow .agtag { color:var(--muted); font-size:11px; padding:0 5px; border-radius:8px; border:1px solid var(--line); white-space:nowrap; }
+  .wfcard .agrow .aghand { font-size:11px; }
+  .wfcard .agrow .handin { color:var(--accent); }
+  .wfcard .agrow .handout { color:#7c3aed; }
+  .wfcard .agrow button { margin-left:auto; }
   .wfcard .ops { display:flex; gap:6px; flex-wrap:wrap; }
   #ctlMapWrap { border:1px solid var(--line); border-radius:2px; background:var(--canvas); overflow:auto; margin-bottom:16px; }
   #ctlMap { display:block; }
@@ -208,19 +224,24 @@
   #cv .sub-b { fill:var(--sub-b); stroke:var(--sub-b-line); }
   #cv .sub-t { fill:var(--muted); font-size:13px; }
   #cv .nd { stroke-width:1.4; }
-  #cv .nd-rect { fill:var(--nd-bg); stroke:var(--nd-line); }
+  #cv .nd-rect { fill:var(--card-bg); stroke:var(--card-line); }
   #cv .nd-diam { fill:var(--nd-dbg); stroke:var(--nd-line); }
-  #cv .nd-round { fill:var(--nd-rbg); stroke:var(--nd-line); }
+  #cv .nd-round { fill:var(--card-bg); stroke:var(--card-line); }
   #cv .nd-sub { stroke-dasharray:5,3; }
-  #cv .nd-sel { stroke:var(--accent); stroke-width:2.4; }
-  #cv .nd-t { fill:var(--ink); font-size:13px; }
+  #cv .nd-sel { stroke:var(--node-wire-hl); stroke-width:2.2; }
+  #cv .nd-t { fill:var(--card-title); font-weight:600; }
+  #cv .nd-b { fill:var(--card-body); font-size:11px; }
+  #cv .nd-file { fill:var(--card-file); font-size:9.5px; font-family:Consolas,Menlo,monospace; }
+  #cv .nd-head { fill:var(--card-head); }
+  #cv .nd-headline { stroke:var(--card-line); stroke-width:.8; }
   #cv .badge-r { fill:var(--accent); opacity:.92; }
   #cv .badge-t { fill:#fff; font-size:10.5px; }
-  #cv .port { fill:var(--accent); opacity:.85; }
-  #cv .eg { fill:none; stroke:var(--edge); stroke-width:1.6; }
-  #cv .eg-sel { stroke:var(--accent); stroke-width:2.4; }
-  #cv .lbl-bg { fill:var(--panel); stroke:var(--line); }
-  #cv .lbl-t { fill:var(--muted); font-size:12px; }
+  #cv .port { fill:var(--card-port); stroke:var(--card-port-line); stroke-width:1.5; }
+  #cv .port:hover { stroke:var(--accent); }
+  #cv .eg { fill:none; stroke:var(--node-wire); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+  #cv .eg-sel { stroke:var(--accent); stroke-width:3; }
+  #cv .lbl-bg { fill:var(--panel); stroke:var(--card-line); }
+  #cv .lbl-t { fill:var(--card-body); font-size:11.5px; font-weight:600; }
   #cv .arrow { fill:var(--edge); }
   #cv .arrow-fb { fill:var(--fb); }
   #cv .eg-fb { stroke:var(--fb); }
@@ -483,6 +504,7 @@
   <div style="display:flex;flex:1;min-height:0">
   <div id="cvwrap">
     <div id="cvCrumb"></div>
+    <div id="cvCollab"></div>
     <svg id="cv"><defs id="defs"></defs><g id="world"></g></svg>
     <div id="zoomer">
       <button id="zIn" title="放大" data-i18n-title="放大">＋</button>
@@ -553,8 +575,12 @@
 <div id="viewDist" class="view">
   <div class="vhead">
     <b data-i18n="🛰 分布工作区">🛰 分布工作区</b>
-    <span class="hint" data-i18n="每个工作流是一个独立工作区；点「打开」进入画布编辑。">每个工作流是一个独立工作区；点「打开」进入画布编辑。</span>
+    <span class="hint" data-i18n="按项目分框：同一项目下不同智能体的会话共处一框；卡片标题取真实对话题目；「当前」卡片自动跟随高亮，无需手动点选。">按项目分框：同一项目下不同智能体的会话共处一框；卡片标题取真实对话题目；「当前」卡片自动跟随高亮，无需手动点选。</span>
     <span style="flex:1"></span>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted);cursor:pointer">
+      <input id="distFollow" type="checkbox" checked style="width:auto">
+      <span data-i18n="跟随当前">跟随当前</span>
+    </label>
     <button id="btnExpTree" data-i18n="⊞ 导出全部工作流" data-i18n-title="把整棵工作流树（含对话画布与小对话）导出为 JSON 备份" title="把整棵工作流树（含对话画布与小对话）导出为 JSON 备份">⊞ 导出全部工作流</button>
     <button id="btnImpTree" data-i18n="⊟ 导入工作流树" data-i18n-title="从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）" title="从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）">⊟ 导入工作流树</button>
     <button id="btnCtl2" data-i18n="🧭 总控流程" title="切到总控流程视图">🧭 总控流程</button>
@@ -625,17 +651,22 @@
 <div id="viewNn" class="view">
   <div class="vhead">
     <b data-i18n="🧠 智能体总结神经网络">🧠 智能体总结神经网络</b>
-    <span class="hint" data-i18n="把已连接智能体的项目/会话/知识压成一张可缩放的神经网络芯片：滚轮缩放（放大后浮现文字），点击神经元跳转对应画布，拖拽平移。">把已连接智能体的项目/会话/知识压成一张可缩放的神经网络芯片：滚轮缩放（放大后浮现文字），点击神经元跳转对应画布，拖拽平移。</span>
+    <span class="hint" data-i18n="项目 / 智能体 / 会话 / 对话轮四层嵌套的文字树图（参考 code-map）：远看是一片密排代码纹理，滚轮放大到「文字档」即可读出真实对话文字，点击会话跳转画布。">项目 / 智能体 / 会话 / 对话轮四层嵌套的文字树图（参考 code-map）：远看是一片密排代码纹理，滚轮放大到「文字档」即可读出真实对话文字，点击会话跳转画布。</span>
     <span style="flex:1"></span>
-    <select id="nnLayout" title="布局"><option value="chip" data-i18n="🔲 芯片阵列">🔲 芯片阵列</option><option value="net" data-i18n="🕸 神经网络">🕸 神经网络</option><option value="tree" data-i18n="🌳 知识树">🌳 知识树</option></select>
-    <button id="nnReplay" data-i18n="▶ 重播脉冲">▶ 重播脉冲</button>
+    <input id="nnSearch" type="text" placeholder="搜索项目/会话/文字…（Enter 飞下一个）" data-i18n-ph="搜索项目/会话/文字…（Enter 飞下一个）" style="width:190px">
+    <select id="nnLayout" title="面积权重">
+      <option value="lines" data-i18n="📏 按文字行数">📏 按文字行数</option>
+      <option value="turns" data-i18n="💬 按对话轮数">💬 按对话轮数</option>
+      <option value="even" data-i18n="▦ 等面积">▦ 等面积</option>
+    </select>
     <button id="nnFit" data-i18n="适应视图">适应视图</button>
     <button id="nnRefresh" data-i18n="🔄 重建">🔄 重建</button>
   </div>
   <div class="vbody" style="position:relative;padding:0">
-    <svg id="nnSvg"></svg>
+    <canvas id="nnCv"></canvas>
     <div id="nnTip" class="nntip"></div>
     <div id="nnHud" class="nnhud"></div>
+    <div id="nnLod" class="nnlod"></div>
     <div id="nnZoom" class="nnzoom"><button id="nnIn" title="放大">＋</button><button id="nnOut" title="缩小">－</button><button id="nnFit2" title="适应视图">⊙</button></div>
   </div>
 </div>
@@ -743,9 +774,25 @@ const KINDS = ['input','output','agent','map','cond','merge'];
 const KIND_CN = { input:'输入', output:'输出', agent:'Agent', map:'Map Agent', cond:'条件', merge:'合并' };
 const KIND_COLOR = { input:'#2563eb', output:'#059669', agent:'#7c3aed', map:'#b45309', cond:'#dc2626', merge:'#0891b2' };
 const KIND_SHAPE = { input:'round', output:'round', cond:'diamond' };
+// 代码客户端清单（CORE 内共享：分组/协作/神经网络与 UI 都读同一份，避免两处漂移）
+const QA_CLIENTS = { zcode: { label:'ZCode', color:'#2563eb' }, codex: { label:'Codex CLI', color:'#0d9488' }, qoder: { label:'Qoder CLI', color:'#7c3aed' }, gemini: { label:'Gemini (Antigravity)', color:'#ea580c' }, wb: { label:'WorkBuddy', color:'#db2777' }, qwen: { label:'Qwen Code', color:'#ca8a04' }, kimi: { label:'Kimi', color:'#0e7490' } };
+function qaClientInfo(c){ return QA_CLIENTS[c] || QA_CLIENTS.zcode; }
 
 function cjkWidth(s){ let w=0; for (const ch of String(s)) w += /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 14 : 7.5; return w; }
-function nodeW(label){ return Math.min(240, Math.max(90, cjkWidth(label) + 34)); }
+// v0.27.0 卡片式节点（参考图3）：固定卡宽 + 标题区/正文区/文件名区三段高度
+const CARD_W = 236;          // 卡片宽（图3 的卡片接近方形偏宽）
+const CARD_HEAD = 26;        // 标题区高（含类型徽章）
+const CARD_LINE = 15;        // 正文本行行高
+const CARD_PAD = 9;          // 内边距
+const CARD_FILE = 16;        // 底部文件名条高
+const CARD_MIN_BODY = 3;     // 正文最少行数
+function cardBodyLines(n){
+  const txt = String((n && n.doc) || (n && n.body) || '');
+  if (txt) return txt.length;
+  const label = String((n && n.label) || '');
+  return Math.max(CARD_MIN_BODY, Math.min(6, Math.ceil(cjkWidth(label) / (CARD_W - CARD_PAD * 2)) + 2));
+}
+function nodeW(label){ return CARD_W; }
 const NODE_H = 40;
 
 // 清洗节点标签：剥掉生成器残留的包裹引号（""…"" / "…" / '…'），字面 \n \t 显示为空格
@@ -785,7 +832,15 @@ function joinLabel(n){
 }
 // 标签显示前统一清洗：旧版存档 / JSON 导入里常残留字面 \n \t，原样显示会变成乱码框
 function sanitizeLabel(s){ return String(s == null ? '' : s).replace(/\\n|\\t|[\r\n\t]+/g, ' '); }
-function sizeNode(n){ if (typeof n.label === 'string') n.label = sanitizeLabel(n.label); n.w = nodeW(n.label); n.h = NODE_H; return n; }
+function sizeNode(n){
+  if (typeof n.label === 'string') n.label = sanitizeLabel(n.label);
+  n.w = nodeW(n.label);
+  // v0.27.0 卡片高度 = 标题区 + 正文（按内容行数）+ 文件名条（图3 三段式）
+  const lines = cardBodyLines(n);
+  n.bodyLines = lines;
+  n.h = CARD_HEAD + CARD_PAD + lines * CARD_LINE + CARD_PAD + CARD_FILE;
+  return n;
+}
 function normalize(g){ (g.nodes||[]).forEach(sizeNode); return g; }
 
 function upsertNode(g, id, label, shape, subId){
@@ -1132,11 +1187,17 @@ function autoLayout(g, dir){
       for (let b = 0; b < keys.length; b += BAND){
         const seg = keys.slice(b, b + BAND);
         const down = (b / BAND) % 2 === 0;
-        const x = 30 + col * (240 + 90);
-        seg.forEach((lv, i) => {
-          const n = rows[lv][0];
-          n.x = x;
-          n.y = 30 + (down ? i : (seg.length - 1 - i)) * (NODE_H + 90);
+        const x = 30 + col * (CARD_W + 90);
+        // 卡片高矮不一 → 按序累加实际高度（蛇形上下）
+        const hs = seg.map(lv => rows[lv][0].h);
+        const seq = down ? seg.map((lv,i)=>i) : seg.map((lv,i)=>seg.length-1-i);
+        let cy = 30;
+        seq.forEach(i => {
+          const n = rows[seg[i]];
+          const node = n[0];
+          node.x = x;
+          node.y = cy;
+          cy += node.h + 90;
         });
         col++;
       }
@@ -1145,13 +1206,14 @@ function autoLayout(g, dir){
       for (let b = 0; b < keys.length; b += BAND){
         const seg = keys.slice(b, b + BAND);
         const fwd = rowIdx % 2 === 0;
-        const y = 30 + rowIdx * (NODE_H + 120);
+        const rowH = Math.max.apply(null, seg.map(lv => rows[lv][0].h));
+        const y = 30 + rowIdx * (rowH + 120);
         const ws = seg.map(lv => rows[lv][0].w);
         const total = ws.reduce((a,c)=>a+c, 0) + (seg.length - 1) * gapCross;
         let cx = fwd ? 30 : 30 + total;
         seg.forEach((lv, i) => {
           const n = rows[lv][0];
-          n.y = y;
+          n.y = y + Math.round((rowH - n.h) / 2);
           n.x = fwd ? cx : cx - n.w;
           cx += (fwd ? 1 : -1) * (ws[i] + gapCross);
         });
@@ -1184,8 +1246,10 @@ function autoLayout(g, dir){
     let y = 30;
     for (const lv of keys){
       let x = 30 + Math.max(0, (maxW - rowW[lv]) / 2);
-      for (const n of rows[lv]){ n.x = Math.round(x); n.y = y; x += n.w + gapCross; }
-      y += NODE_H + gapMain;
+      // v0.27.0 卡片高度不定 → 同行按最高卡片对齐，行距取本行最高卡片
+      const rowH = Math.max.apply(null, rows[lv].map(n => n.h));
+      for (const n of rows[lv]){ n.x = Math.round(x); n.y = y + Math.round((rowH - n.h) / 2); x += n.w + gapCross; }
+      y += rowH + gapMain;
     }
   }
   return g;
@@ -1789,10 +1853,17 @@ function qaFilter(items, opt){
   const who = opt.who || 'all';
   const client = opt.client || 'all';
   const kw = String(opt.kw || '').trim().toLowerCase();
+  // v0.25.0 会话过滤：裸会话号匹配（子智能体按 parentSession 归入其父会话）
+  const sess = String(opt.sess || '').trim();
   return (items || []).filter(it => {
     if (who === 'master' && it.who !== 'master') return false;
     if (who === 'sub' && it.who !== 'sub') return false;
     if (client !== 'all' && (it.client || 'zcode') !== client) return false;
+    if (sess){
+      const s1 = String(it.sessionId || '').replace(/^sess_/, '');
+      const s2 = String(it.parentSession || '').replace(/^sess_/, '');
+      if (s1 !== sess && s2 !== sess) return false;
+    }
     if (kw){
       const hay = (it.q + ' ' + it.a + ' ' + (it.kw || []).join(' ') + ' ' + (it.description || '') + ' ' + (it.profile || '') + ' ' + (it.sessionId || '') + ' ' + (it.parentSession || '')).toLowerCase();
       if (hay.indexOf(kw) < 0) return false;
@@ -2053,11 +2124,14 @@ function groupByProject(list){
   (list || []).forEach(w => {
     const isConv = !!(w.src && w.src.session);
     const key = isConv ? projectKeyOf(w) : '流程框架';
-    if (!map.has(key)) map.set(key, { project: key, convs: [], others: [] });
+    if (!map.has(key)) map.set(key, { project: key, convs: [], others: [], frame: !isConv });
     const g = map.get(key);
     if (isConv) g.convs.push(w); else g.others.push(w);
   });
-  return [...map.values()].sort((a, b) => (b.convs.length - a.convs.length) || (a.project < b.project ? -1 : 1));
+  // 会话项目排在前面（按会话数），末位「流程框架」；新增项目按会话时间倒序
+  return [...map.values()]
+    .map(g => { g.recent = g.convs.reduce((m, w) => Math.max(m, (w.src && w.src.ts) || 0), 0); return g; })
+    .sort((a, b) => (a.frame - b.frame) || (b.convs.length - a.convs.length) || (b.recent - a.recent) || (a.project < b.project ? -1 : 1));
 }
 // 同一项目内的智能体（客户端）清单：主智能体（master）与子智能体（sub）
 function agentsInProject(list, project){
@@ -2066,12 +2140,20 @@ function agentsInProject(list, project){
     if (!(w.src && w.src.session)) return;
     if (projectKeyOf(w) !== project) return;
     const cid = w.src.client || 'zcode';
-    if (!byClient.has(cid)) byClient.set(cid, { client: cid, canvases: [], subs: 0, masters: 0 });
+    if (!byClient.has(cid)) byClient.set(cid, { client: cid, canvases: [], subs: 0, masters: 0, first: Infinity, last: 0 });
     const g = byClient.get(cid);
     g.canvases.push(w);
+    // v0.27.0 分布工作区用：客户端展示名与颜色
+    const ci = qaClientInfo(cid);
+    if (!g.label) g.label = ci.label;
+    if (!g.color) g.color = ci.color;
+    // v0.27.0 分布工作区排序用：该智能体在本项目的最早/最晚会话时间
+    const ts = w.src.ts || 0;
+    if (ts < g.first) g.first = ts;
+    if (ts > g.last) g.last = ts;
     (w.src.turns || []).forEach(t => { g.masters++; g.subs += (t.subs || []).length; });
   });
-  return [...byClient.values()].sort((a, b) => b.canvases.length - a.canvases.length);
+  return [...byClient.values()].sort((a, b) => (a.first - b.first) || (b.canvases.length - a.canvases.length));
 }
 // 同一项目内不同智能体之间的协作（谁先谁后 / 谁与谁同行）：按时间排序相邻不同客户端的窗口
 function projectCollaboration(list, project){
@@ -2320,159 +2402,143 @@ function fmtCost(v){
   if (v < 100) return '$' + v.toFixed(2);
   return '$' + String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
-// ---------- v0.24.0 智能体总结神经网络：图构建 / 布局（纯函数，DOM 无关，便于单测） ----------
-// 节点：{ id, kind:'hub'|'proj'|'sess'|'kw'|'skill', label, sub, client, canvas, ts, score, proj }
-// 边：  { from, to, kind:'branch'|'coop'|'kw'|'sub', k:1|2|3 }
-function nnBuildGraph(list, qaArr, kwPerSess){
-  const nodes = [], edges = [];
-  const add = n => { nodes.push(n); return n; };
-  const seen = new Set();
-  const push = (a, b, kind, k) => {
-    if (a === b) return;
-    const key = a + '>' + b + '>' + kind;
-    if (seen.has(key)) return;
-    seen.add(key);
-    edges.push({ from: a, to: b, kind: kind, k: k || 1 });
+// ---------- v0.27.0 文字树图：squarified treemap + LOD + 分词（纯函数，DOM 无关，便于单测） ----------
+// 层级：项目 → 智能体 → 会话 → 对话轮（四层嵌套 treemap），参考 Peeter95/code-map。
+// squarified treemap（Bruls et al. 2000）：贪心行打包，使每个矩形的长宽比尽量接近 1。
+function nnSquarify(items, rect){
+  const out = [];
+  const it = (items || []).filter(x => x && x.w > 0).slice().sort((a, b) => b.w - a.w);
+  const total = it.reduce((a, c) => a + c.w, 0);
+  if (!total || rect.w <= 0 || rect.h <= 0) return out;
+  let x = rect.x, y = rect.y, w = rect.w, h = rect.h, i = 0;
+  const scale = () => (w * h) / it.slice(i).reduce((a, c) => a + c.w, 0);
+  const worst = (row, side, s) => {
+    if (!row.length) return Infinity;
+    const sum = row.reduce((a, c) => a + c.w, 0) * s;
+    const max = Math.max.apply(null, row.map(c => c.w * s));
+    const min = Math.min.apply(null, row.map(c => c.w * s));
+    const side2 = side * side, sum2 = sum * sum;
+    return Math.max((side2 * max) / sum2, sum2 / (side2 * min));
   };
-  const L = (list || []).filter(w => w && w.data);
-  const convs = L.filter(w => w.src && w.src.session);
-  const frameworks = L.filter(w => !(w.src && w.src.session));
-  const groups = groupByProject(L).filter(g => g.convs.length);
-  const hubId = 'hub';
-  add({ id: hubId, kind: 'hub', label: '智能体总结', sub: (groups.length || 1) + ' 项目 · ' + convs.length + ' 画布', score: convs.length });
-  groups.forEach(grp => {
-    const pid = 'p:' + grp.project;
-    const agents = agentsInProject(L, grp.project);
-    const collab = projectCollaboration(L, grp.project);
-    const nSub = agents.reduce((a, g) => a + g.subs, 0);
-    add({ id: pid, kind: 'proj', label: grp.project,
-      sub: agents.length + ' 智能体 · ' + grp.convs.length + ' 对话' + (nSub ? ' · 🤖' + nSub : ''),
-      score: grp.convs.length });
-    push(hubId, pid, 'branch', 1);
-    grp.convs.forEach(w => {
-      const cid = (w.src && w.src.client) || 'zcode';
-      const ci = (typeof QA_CLIENTS !== 'undefined' && QA_CLIENTS[cid]) || { label: cid, color: '#2563eb' };
-      const turns = (w.src && w.src.turns) || [];
-      const nS = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
-      const sid = 's:' + w.name;
-      add({ id: sid, kind: 'sess', label: String((w.src && w.src.task) || w.name).slice(0, 22),
-        sub: String(ci.label).replace(/ CLI$/, '') + ' · 💬' + turns.length + (nS ? ' · 🤖' + nS : ''),
-        client: cid, color: ci.color, canvas: w.name, ts: (w.src && w.src.ts) || 0,
-        score: turns.length, proj: grp.project });
-      push(pid, sid, 'branch', 2);
-      turns.forEach(t => {
-        (t.subs || []).forEach((subNode, k) => {
-          const kid = 'k:' + w.name + ':' + subNode + ':' + k;
-          add({ id: kid, kind: 'kw', label: '🤖 ' + String(t.q || '').slice(0, 16), sub: '子智能体',
-            color: '#7c3aed', canvas: w.name, ts: t.ts || 0, score: 1, proj: grp.project, kwnode: subNode });
-          push(sid, kid, 'sub', 3);
-        });
-      });
-    });
-    collab.links.forEach(l => {
-      const pickOf = c => grp.convs.filter(w => ((w.src && w.src.client) || 'zcode') === c)
-        .sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0))[0];
-      const a = pickOf(l.from), b = pickOf(l.to);
-      if (a && b) push('s:' + a.name, 's:' + b.name, 'coop', 1);
-    });
-  });
-  // 关键词层：同项目跨会话共现 → 知识突触
-  if (kwPerSess && typeof kwPerSess === 'object'){
-    const byKw = new Map();
-    Object.keys(kwPerSess).forEach(canvas => {
-      const e = L.find(w => w.name === canvas);
-      if (!e || !(e.src && e.src.session)) return;
-      const proj = projectKeyOf(e);
-      (kwPerSess[canvas] || []).slice(0, 4).forEach(kw => {
-        const kid = 'w:' + proj + ':' + kw;
-        if (!nodes.some(n => n.id === kid)) add({ id: kid, kind: 'kw', label: String(kw).slice(0, 14), sub: '知识', color: '#0d9488', proj: proj, score: 1 });
-        push('s:' + canvas, kid, 'kw', 2);
-        const key = proj + '|' + kw;
-        if (byKw.has(key)) push(byKw.get(key), 's:' + canvas, 'kw', 2);
-        else byKw.set(key, 's:' + canvas);
-      });
-    });
+  while (i < it.length){
+    const horiz = w >= h;                 // 沿短边铺一行
+    const side = horiz ? h : w;
+    const row = [];
+    let s = scale();
+    let best = Infinity;
+    while (i + row.length < it.length){
+      const cand = row.concat([it[i + row.length]]);
+      const wr = worst(cand, side, s);
+      if (wr > best) break;
+      best = wr;
+      row.length = 0; row.push.apply(row, cand);
+    }
+    if (!row.length){ row.push(it[i]); }
+    const rowSum = row.reduce((a, c) => a + c.w, 0) * s;
+    const thick = rowSum / side;
+    if (horiz){
+      let cy = y;
+      for (const c of row){
+        const ch = (c.w * s) / thick;
+        out.push({ id: c.id, x: x, y: cy, w: thick, h: ch, node: c.node });
+        cy += ch;
+      }
+      x += thick; w -= thick;
+    } else {
+      let cx = x;
+      for (const c of row){
+        const cw = (c.w * s) / thick;
+        out.push({ id: c.id, x: cx, y: y, w: cw, h: thick, node: c.node });
+        cx += cw;
+      }
+      y += thick; h -= thick;
+    }
+    i += row.length;
+    if (w <= 0.01 || h <= 0.01) break;
   }
-  // 流程框架直接挂 hub
-  frameworks.forEach(w => {
-    add({ id: 'f:' + w.name, kind: 'skill', label: String(w.name).slice(0, 22),
-      sub: ((w.data && w.data.nodes) || []).length + ' 节点', canvas: w.name, color: '#ca8a04',
-      score: ((w.data && w.data.nodes) || []).length });
-    push(hubId, 'f:' + w.name, 'branch', 1);
-  });
-  // 会话时间流：同项目相邻会话弱突触（学习的时间序）
-  groups.forEach(grp => {
-    const arr = grp.convs.slice().sort((a, b) => ((a.src && a.src.ts) || 0) - ((b.src && b.src.ts) || 0));
-    for (let i = 1; i < arr.length && i <= 8; i++) push('s:' + arr[i - 1].name, 's:' + arr[i].name, 'kw', 3);
-  });
-  return { nodes: nodes, edges: edges, groups: groups };
+  return out;
 }
-// 三布局（chip 芯片阵列 / net 神经网络环 / tree 知识树）→ id → {x,y}
-function nnLayout(graph, mode, W, H){
-  W = W || 1200; H = H || 760;
-  const pos = new Map();
-  const nodes = (graph && graph.nodes) || [];
-  const hub = nodes.find(n => n.kind === 'hub');
-  const projs = nodes.filter(n => n.kind === 'proj');
-  const cx = W / 2, cy = H / 2;
-  if (hub) pos.set(hub.id, { x: cx, y: cy });
-  if (mode === 'net'){
-    projs.forEach((p, i) => {
-      const ang = -Math.PI / 2 + (i / Math.max(1, projs.length)) * Math.PI * 2;
-      const R = Math.min(W, H) * 0.30;
-      pos.set(p.id, { x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R });
-      const kids = nodes.filter(n => n.kind === 'sess' && n.proj === p.label);
-      kids.forEach((k, j) => {
-        const a2 = ang + ((j - (kids.length - 1) / 2) / Math.max(1, kids.length)) * 1.5;
-        const r2 = 70 + (j % 2) * 26;
-        pos.set(k.id, { x: pos.get(p.id).x + Math.cos(a2) * r2, y: pos.get(p.id).y + Math.sin(a2) * r2 });
-      });
-    });
-  } else if (mode === 'tree'){
-    const colW = Math.min(320, (W - 120) / 3);
-    let y = 60;
-    projs.forEach(p => {
-      pos.set(p.id, { x: 80, y: y + 40 });
-      const kids = nodes.filter(n => n.kind === 'sess' && n.proj === p.label);
-      kids.forEach((k, j) => pos.set(k.id, { x: 80 + colW, y: y + j * 54 }));
-      y += Math.max(120, kids.length * 54 + 40);
-    });
-    if (hub) pos.set(hub.id, { x: 80, y: Math.max(40, y / 2) });
-  } else {
-    const cols = Math.max(1, Math.ceil(Math.sqrt(projs.length)));
-    const cw = (W - 200) / cols, ch = (H - 200) / Math.max(1, Math.ceil(projs.length / cols));
-    projs.forEach((p, i) => {
-      const gx = 100 + (i % cols) * cw + cw / 2;
-      const gy = 100 + Math.floor(i / cols) * ch + ch / 2;
-      pos.set(p.id, { x: gx, y: gy });
-      const kids = nodes.filter(n => n.kind === 'sess' && n.proj === p.label);
-      const kc = Math.max(1, Math.ceil(Math.sqrt(kids.length)));
-      kids.forEach((k, j) => {
-        const dx = ((j % kc) - (kc - 1) / 2) * Math.min(cw * 0.42, 190);
-        const dy = (Math.floor(j / kc) - (Math.ceil(kids.length / kc) - 1) / 2) * Math.min(ch * 0.34, 96);
-        pos.set(k.id, { x: gx + dx, y: gy + dy });
-      });
-      // 项目内知识神经元：贴着芯片内缘一圈（不外溢，避免跨芯片碰撞）
-      const kws = nodes.filter(n => n.kind === 'kw' && n.proj === p.label);
-      const R = 150 + Math.min(120, kids.length * 16);
-      kws.forEach((k, j) => {
-        const ang = -Math.PI / 2 + (j / Math.max(1, kws.length)) * Math.PI * 2;
-        pos.set(k.id, { x: gx + Math.cos(ang) * R * 1.25, y: gy + Math.sin(ang) * R * 0.68 });
-      });
-    });
+// 「每行像素」line_px = 行高 × 缩放（code-map line_px = line_h * cam_scale）：
+// < NT_STRIPS_FROM_PX(0.6) 纯色块 / ≥ NT_TEXT_FROM_PX(9.0) 真实文字档。
+function ntLinePx(rect, nLines, z){
+  const h = Math.max(1, rect ? rect.h : 10);
+  const n = Math.max(1, nLines || 1);
+  return (h / n) * (z || 1);
+}
+// 单行可见字符数（等宽近似：CJK≈1em、西文≈0.62em）
+function ntVisibleChars(wpx, fs){ return Math.max(0, Math.floor(wpx / ((fs || 10) * 0.62))); }
+// 代码分词：注释 / 字符串 / 数字 / 关键字 / 标识符 / 标点（供真实文字档着色）
+const NT_KW = new Set(('const let var function return if else for while class new import from export default async await try catch throw ' +
+  'typeof instanceof in of this super extends static public private protected void int float double char bool boolean string ' +
+  'def lambda self None True False and or not is with as pass yield raise global nonlocal del elif except finally ' +
+  'SELECT FROM WHERE INSERT UPDATE DELETE JOIN create table struct enum interface implements fn impl pub mut use mod match').split(/\s+/));
+function ntTokenize(t){
+  const s = String(t || '');
+  const out = [];
+  // 注释 / 字符串 必须先于标点匹配，否则 "// 注释" 会被标点组吞掉
+  const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\/\/[^\n]*|#[^\n]*)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)|([\s\S])/g;
+  let m, plain = '';
+  const flush = () => { if (plain){ out.push({ t: plain, k: 'p' }); plain = ''; } };
+  while ((m = re.exec(s))){
+    if (m[1]){ flush(); out.push({ t: m[1], k: 'str' }); }
+    else if (m[2]){ flush(); out.push({ t: m[2], k: 'cmt' }); }
+    else if (m[3]){ flush(); out.push({ t: m[3], k: 'num' }); }
+    else if (m[4]){ flush(); out.push({ t: m[4], k: NT_KW.has(m[4]) ? 'kw' : 'id' }); }
+    else plain += m[5];
   }
-  // 关键词 / 框架等未定位节点：以锚点为心按「黄金角螺旋」紧凑外扩（半径收敛在锚点附近）
-  nodes.forEach(n => {
-    if (pos.has(n.id)) return;
-    const anchor = n.proj ? nodes.find(m => m.kind === 'proj' && m.label === n.proj) : hub;
-    const ap = (anchor && pos.get(anchor.id)) || { x: cx, y: cy };
-    const sibs = nodes.filter(m => !pos.has(m.id) && (n.proj ? m.proj === n.proj : !m.proj));
-    const j = Math.max(0, sibs.indexOf(n));
-    const ang = j * 2.399963;
-    const R = 104 + 34 * Math.sqrt(j + 1);
-    pos.set(n.id, { x: ap.x + Math.cos(ang) * R, y: ap.y + Math.sin(ang) * R * 0.8 });
+  flush();
+  return out;
+}
+// 稳定性哈希（条带档按内容生成伪随机字符长度，保证同内容同纹理）
+function ntHash(s){
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+  return h;
+}
+// 卡片正文换行：按显示宽度折行，最多 maxLines 行（溢出末行补 …），供画布卡片多行正文使用
+function ntWrapText(t, maxW, maxLines, fs){
+  const s = String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+  const lim = Math.max(1, maxLines || 3);
+  if (!s) return [];
+  const out = [];
+  let cur = '', w = 0, truncated = false;
+  for (const ch of s){
+    const cw = /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 14 : 7.5;   // 与 cjkWidth 同口径
+    if (w + cw > maxW && cur){
+      out.push(cur); cur = ''; w = 0;
+      if (out.length >= lim){ truncated = true; break; }     // 已满行且还有内容 → 截断
+    }
+    cur += ch; w += cw;
+  }
+  if (truncated){ out[out.length - 1] = out[out.length - 1].replace(/.$/, '') + '…'; }
+  else if (cur) out.push(cur);
+  return out;
+}
+// 聚焦集合：悬停某矩形时返回应保持高亮的 id 集合（其余压暗到 NT_DIM）
+// 纯逻辑版：输入 rects 数组 + 目标 rect，输出 Set<id>
+function ntFocusSetIn(rects, rc){
+  const set = new Set();
+  if (!rc) return set;
+  const add = r => set.add(r.id);
+  (rects || []).forEach(r => {
+    if (rc.kind === 'turn'){
+      if (r.id === rc.id) add(r);
+      const sid = String(rc.id).split('#')[0];
+      if (r.id === sid) add(r);
+    } else if (rc.kind === 'sess'){
+      if (r.id === rc.id || String(r.id).indexOf(rc.id + '#') === 0) add(r);
+      if (r.kind === 'agent' && r.id === 'a:' + rc.proj + ':' + rc.client) add(r);
+      if (r.kind === 'proj' && r.label === rc.proj) add(r);
+    } else if (rc.kind === 'agent'){
+      if (r.id === rc.id) add(r);
+      if (r.proj === rc.proj && r.client === rc.client) add(r);
+      if (r.kind === 'proj' && r.label === rc.proj) add(r);
+    } else if (rc.kind === 'proj'){
+      if (r.id === rc.id) add(r);
+      if (r.proj === rc.label) add(r);
+    }
   });
-  return pos;
+  return set;
 }
 //__CORE_END__
 
@@ -2793,6 +2859,29 @@ if (typeof document !== "undefined") var UI = function(){
     '会话 ID 缺失，无法导入画布': 'Session ID missing; cannot import to canvas',
     '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
     '问答画布': 'Q&A canvas',
+    // ---- v0.27.0 文字树图神经网络 / 分布式卡片 / 画布卡片 ----
+    '项目 / 智能体 / 会话 / 对话轮四层嵌套的文字树图（参考 code-map）：远看是一片密排代码纹理，滚轮放大到「文字档」即可读出真实对话文字，点击会话跳转画布。': 'A four-level nested text treemap (project / agent / session / turn), inspired by code-map: from afar it is a dense field of code texture; zoom until the "text" tier to read real conversation lines; click a session to jump to its canvas.',
+    '搜索项目/会话/文字…（Enter 飞下一个）': 'Search project / session / text\u2026 (Enter flies to next)',
+    '📏 按文字行数': '📏 By text lines',
+    '💬 按对话轮数': '💬 By turns',
+    '▦ 等面积': '▦ Equal area',
+    '色块档': 'solid tier',
+    '条带档': 'strips tier',
+    '文字档': 'text tier',
+    '滚轮放大可读真实文字': 'Zoom in to read real text',
+    '对话轮': 'Turn',
+    '🧩 会话 {0}': '🧩 Sessions {0}',
+    '💬 文本行 {0}': '💬 Text lines {0}',
+    '按项目分框：同一项目下不同智能体的会话共处一框；卡片标题取真实对话题目；「当前」卡片自动跟随高亮，无需手动点选。': 'Framed by project: sessions from different agents on the same project share one frame; card titles use the real conversation topic; the "current" card follows automatically \u2014 no manual clicking.',
+    '跟随当前': 'Follow current',
+    '当前对话画布（自动跟随）': 'Current conversation canvas (auto-follows)',
+    '已开启：自动跟随当前对话画布': 'Enabled: auto-following the current conversation canvas',
+    '已关闭自动跟随': 'Auto-follow disabled',
+    '协作接力顺序': 'Handoff order',
+    '{0} 智能体 · {1} 会话': '{0} agents · {1} sessions',
+    '暂无画布。先到「💬 问答」同步本地记录，再生成对话画布。': 'No canvases yet. Sync local records in "💬 Q&A" first, then generate a conversation canvas.',
+    ' 等 {0} 会话': ' +{0} sessions',
+    '多会话': 'Multiple sessions',
     '对话': 'Conversation',
     '对话 · ': 'Conversation · ',
     '任务 / 会话': 'Task / Session',
@@ -2914,6 +3003,23 @@ if (typeof document !== "undefined") var UI = function(){
     '没有可匹配参考价的模型（可手工填写）': 'No models matched the reference list (fill in manually)',
     // ---- v0.24.0 项目分组 / 神经网络 ----
     '工作流（按项目分组）': 'Workflows (grouped by project)',
+    // ---- v0.25.0 协作链条 / 分布工作区智能体标注 / 问答会话过滤 / 神经网络重写 ----
+    '从': 'from',
+    '接手': 'took over',
+    '交给': 'handed to',
+    '（本画布）': ' (this canvas)',
+    '当前画布所属智能体': "Current canvas's agent",
+    '跳到该智能体在同项目的最新画布': 'Jump to this agent\'s latest canvas in the same project',
+    '该项目里没有该智能体的画布': 'No canvas of this agent in the project',
+    '该会话接手了前一会话的工作': 'This session took over the previous agent\'s work',
+    '该会话把工作交给了下一个智能体': 'This session handed the work to the next agent',
+    '到「💬 问答」查看这段对话': 'Open this conversation in 💬 Q&A',
+    '该画布没有关联会话': 'This canvas has no linked session',
+    '已按会话 {0} 过滤问答': 'Q&A filtered to session {0}',
+    '会话过滤：': 'Session filter: ',
+    '点击飞入 →': 'Click to fly in →',
+    '🗺 代码地图': '🗺 Code map',
+    '把已连接智能体的项目/智能体/会话压成一张可无限缩放的神经网络：滚轮缩放、拖拽平移、点击神经元跳转；参考 code-map 的 GPU 树图做成 Canvas 高帧率渲染。': 'Compress connected agents\' projects/agents/sessions into an infinitely zoomable neural network: scroll to zoom, drag to pan, click a neuron to jump. Canvas high-FPS renderer inspired by the code-map GPU treemap.',
     '快速切换': 'Quick switch',
     '按项目 / 智能体快速切换画布': 'Quickly switch canvases by project / agent',
     '流程框架': 'Flow frameworks',
@@ -2934,11 +3040,15 @@ if (typeof document !== "undefined") var UI = function(){
     '🔲 芯片阵列': '🔲 Chip array',
     '🕸 神经网络': '🕸 Neural network',
     '🌳 知识树': '🌳 Knowledge tree',
+    '🗺 代码地图': '🗺 Code map',
     '▶ 重播脉冲': '▶ Replay pulses',
     '🔄 重建': '🔄 Rebuild',
     '🧠 神经元 {0}': '🧠 Neurons {0}',
     '突触 {0}': 'Synapses {0}',
     '📁 项目 {0}': '📁 Projects {0}',
+    '搜索神经元…（Enter 飞下一个）': 'Search neurons… (Enter for next)',
+    '🔎 {0} 命中': '🔎 {0} matches',
+    '匹配 {0}/{1}：{2}': 'Match {0}/{1}: {2}',
     '滚轮缩放 · 拖拽平移 · 点击跳转': 'Scroll zoom · drag pan · click to jump',
     '点击跳转画布 →': 'Click to jump to canvas →',
     '项目：': 'Project: ',
@@ -3106,8 +3216,8 @@ if (typeof document !== "undefined") var UI = function(){
       const turnsN = agents.reduce((a, g) => a + g.masters, 0);
       rows.push('<div class="wfproj' + (collapsed ? ' collapsed' : '') + '" data-proj="' + escXml(grp.project) + '">' +
         '<div class="wfph" data-projtog="' + escXml(grp.project) + '" title="' + escXml(grp.project) + '">' +
-        '<span class="pcar">▾</span><span class="nm pj">📁 ' + escXml(grp.project) + '</span>' +
-        '<span class="cnt">' + tx('{0} 智能体 · {1} 对话', agents.length, grp.convs.length) + (subsN ? ' · 🤖' + subsN : '') + '</span></div>' +
+        '<div class="wr1"><span class="pcar">▾</span><span class="nm pj">📁 ' + escXml(grp.project) + '</span></div>' +
+        '<span class="cnt" title="' + tx('{0} 智能体 · {1} 对话', agents.length, grp.convs.length) + (subsN ? ' · 🤖' + subsN : '') + '">' + tx('{0} 智能体 · {1} 对话', agents.length, grp.convs.length) + (subsN ? ' · 🤖' + subsN : '') + '</span></div>' +
         '<div class="wfpbody">');
       // 同项目内多智能体协作：谁与谁接力（时间序）
       if (collab.links.length > 1 || (collab.links.length === 1 && collab.clients.length > 1)){
@@ -3121,10 +3231,10 @@ if (typeof document !== "undefined") var UI = function(){
         const role = a.subs > 0 ? ('🧠 ' + T('主智能体') + ' + 🤖 ' + tx('{0} 子智能体', a.subs)) : ('🧠 ' + T('主智能体'));
         rows.push('<div class="wfagrp" style="--agc:' + ci.color + '">' +
           '<div class="wfah" data-agrp="' + escXml(a.client) + '">' +
-          '<span class="wfdot" style="background:' + ci.color + '"></span>' +
+          '<div class="wr1"><span class="wfdot" style="background:' + ci.color + '"></span>' +
           '<span class="an">' + escXml(ci.label) + '</span>' +
-          '<span class="tag">' + escXml(role) + '</span>' +
-          '<span class="mst">' + tx('{0} 对话', a.canvases.length) + '</span></div>');
+          '<span class="mst">' + tx('{0} 对话', a.canvases.length) + '</span></div>' +
+          '<span class="tag" title="' + escXml(role) + '">' + escXml(role) + '</span></div>');
         a.canvases.slice().sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0))
           .forEach(k => rows.push(wfChildRows(k, true)));
         rows.push('</div>');
@@ -3212,6 +3322,8 @@ if (typeof document !== "undefined") var UI = function(){
     if (!same){
       const w = $('cvwrap');
       if (w){ w.classList.remove('cv-flip'); void w.offsetWidth; w.classList.add('cv-flip'); }
+      // v0.27.0 分布工作区自动跟随：切了当前画布就同步高亮/滚动（不是等用户去点）
+      if (typeof distFollowCurrent === 'function') distFollowCurrent(false);
     }
     showView('canvas');
   }
@@ -3243,6 +3355,40 @@ if (typeof document !== "undefined") var UI = function(){
     el.querySelectorAll('.cb[data-cbm]').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
       openCrumbMenu(b, b.dataset.cbm);
+    }));
+    renderCollabStrip(e);
+  }
+  // v0.25.0 画布协作链条：多智能体接力「从哪到哪里」——时间序智能体芯片 + 接力箭头 + 当前画布高亮，点击跳到该智能体同项目画布
+  function renderCollabStrip(e){
+    const el = $('cvCollab');
+    if (!el) return;
+    if (!e || !(e.src && e.src.session)){ el.innerHTML = ''; return; }
+    const proj = projectKeyOf(e);
+    const cid = e.src.client || 'zcode';
+    const collab = projectCollaboration(WF.list, proj);
+    if (collab.clients.length < 2){ el.innerHTML = ''; return; }
+    const parts = ['<span class="clhint">🤝 ' + T('协作链') + '</span>'];
+    collab.clients.forEach((c, i) => {
+      const ci = qaClientInfo(c);
+      if (i) parts.push('<span class="clsep">→</span>');
+      const cur = c === cid;
+      parts.push('<span class="clb' + (cur ? ' cur' : '') + '" style="--clb-c:' + ci.color + '" data-clb="' + escXml(c) + '" title="' + (cur ? T('当前画布所属智能体') : T('跳到该智能体在同项目的最新画布')) + '"><span class="wfdot" style="background:' + ci.color + '"></span>' + escXml(ci.label.replace(/ CLI$/, '')) + (cur ? T('（本画布）') : '') + '</span>');
+    });
+    // 接力说明：该会话从谁接手、交给了谁
+    const inn = [...new Set(collab.links.filter(l => l.to === cid).map(l => l.from))];
+    const out = [...new Set(collab.links.filter(l => l.from === cid).map(l => l.to))];
+    const hintBits = [];
+    if (inn.length) hintBits.push(T('从') + ' ' + inn.map(c => qaClientInfo(c).label.replace(/ CLI$/, '')).join('/') + ' ' + T('接手'));
+    if (out.length) hintBits.push(T('交给') + ' ' + out.map(c => qaClientInfo(c).label.replace(/ CLI$/, '')).join('/'));
+    if (hintBits.length) parts.push('<span class="clhint">' + escXml(hintBits.join(' · ')) + '</span>');
+    el.innerHTML = parts.join('');
+    el.querySelectorAll('.clb[data-clb]').forEach(b => b.addEventListener('click', () => {
+      const c = b.dataset.clb;
+      if (c === cid) return;
+      const cand = WF.list.filter(w => w.src && w.src.session && projectKeyOf(w) === proj && (w.src.client || 'zcode') === c)
+        .sort((x, y) => ((y.src && y.src.ts) || 0) - ((x.src && x.src.ts) || 0));
+      if (!cand.length){ toast(T('该项目里没有该智能体的画布')); return; }
+      switchWorkflow(cand[0].name);
     }));
   }
   // 面包屑下拉：项目 → 该项目所有画布；智能体 → 该项目内该智能体的画布
@@ -3308,39 +3454,91 @@ if (typeof document !== "undefined") var UI = function(){
     return { x:(cx - r.left - view.x)/view.z, y:(cy - r.top - view.y)/view.z };
   }
   function nodeById(id){ return g.nodes.find(n=>n.id===id); }
+  // v0.27.0 端口位置（图3）：LR 布局 = 卡片左/右边缘中点；TD 布局 = 上/下边缘中点
   function anchors(n){
     return g.dir === 'LR'
       ? { out:{x:n.x+n.w, y:n.y+n.h/2}, inn:{x:n.x, y:n.y+n.h/2} }
       : { out:{x:n.x+n.w/2, y:n.y+n.h}, inn:{x:n.x+n.w/2, y:n.y} };
   }
+  // v0.27.0 正交折线（图3）：端口之间走「横—竖—横」直角折线，圆角拐弯，不用曲线
   function edgePath(e, mt){
     const a = nodeById(e.from), b = nodeById(e.to);
     if (!a || !b) return '';
     const p1 = anchors(a).out, p2 = anchors(b).inn;
-    let c1, c2;
-    const reverse = g.dir === 'TD' ? (p2.y < p1.y) : (p2.x < p1.x);
-    if (reverse){
-      const bend = Math.max(60, (g.dir === 'TD' ? Math.abs(p2.x-p1.x) : Math.abs(p2.y-p1.y)) * .55);
-      const lift = 76;
-      c1 = g.dir === 'TD' ? {x:p1.x+bend, y:p1.y-lift} : {x:p1.x, y:p1.y-bend};
-      c2 = g.dir === 'TD' ? {x:p2.x-bend, y:p2.y-lift} : {x:p2.x, y:p2.y-bend};
+    const R = 8;                        // 拐角圆角半径
+    const pts = [];
+    const off = mt && mt.laneCnt > 1 ? (mt.laneIdx - (mt.laneCnt - 1) / 2) * 16 : 0;
+    const fb = !!(mt && mt.feedback);
+    if (g.dir === 'LR'){
+      const reverse = p2.x < p1.x;
+      const midX = reverse ? Math.min(p1.x, p2.x) - 40 - (fb ? 34 : 0)
+                           : (p1.x + p2.x) / 2 + off;
+      pts.push({ x:p1.x, y:p1.y });
+      pts.push({ x:midX, y:p1.y });
+      pts.push({ x:midX, y:p2.y });
+      pts.push({ x:p2.x, y:p2.y });
+      if (reverse){
+        // 反馈边：从上/下绕行（走卡片外侧）
+        const lift = Math.max(70, Math.abs(p2.y - p1.y) * 0.2 + 60) * (fb ? 1.25 : 1);
+        const top = Math.min(p1.y, p2.y) - lift;
+        pts.length = 0;
+        pts.push({ x:p1.x, y:p1.y });
+        pts.push({ x:p1.x + 26, y:p1.y });
+        pts.push({ x:p1.x + 26, y:top });
+        pts.push({ x:p2.x - 26, y:top });
+        pts.push({ x:p2.x - 26, y:p2.y });
+        pts.push({ x:p2.x, y:p2.y });
+      }
     } else {
-      const bend = g.dir === 'LR' ? Math.max(40, Math.abs(p2.x-p1.x)/2) : Math.max(40, Math.abs(p2.y-p1.y)/2);
-      c1 = g.dir==='LR' ? {x:p1.x+bend, y:p1.y} : {x:p1.x, y:p1.y+bend};
-      c2 = g.dir==='LR' ? {x:p2.x-bend, y:p2.y} : {x:p2.x, y:p2.y-bend};
+      const reverse = p2.y < p1.y;
+      const midY = reverse ? Math.min(p1.y, p2.y) - 40 - (fb ? 34 : 0)
+                           : (p1.y + p2.y) / 2 + off;
+      pts.push({ x:p1.x, y:p1.y });
+      pts.push({ x:p1.x, y:midY });
+      pts.push({ x:p2.x, y:midY });
+      pts.push({ x:p2.x, y:p2.y });
+      if (reverse){
+        const side = Math.max(70, Math.abs(p2.x - p1.x) * 0.2 + 60) * (fb ? 1.25 : 1);
+        const left = Math.min(p1.x, p2.x) - side;
+        pts.length = 0;
+        pts.push({ x:p1.x, y:p1.y });
+        pts.push({ x:p1.x, y:p1.y - 26 });
+        pts.push({ x:left, y:p1.y - 26 });
+        pts.push({ x:left, y:p2.y + 26 });
+        pts.push({ x:p2.x, y:p2.y + 26 });
+        pts.push({ x:p2.x, y:p2.y });
+      }
     }
-    // 平行边分道 + 反馈边外扩：沿 p1→p2 的法线方向平移控制点
-    if (mt && (mt.laneCnt > 1 || mt.feedback)){
-      const off = (mt.laneCnt > 1 ? (mt.laneIdx - (mt.laneCnt - 1) / 2) * 18 : 0) + (mt.feedback ? 30 : 0);
-      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
-      const nx = -dy / len, ny = dx / len;
-      c1 = { x:c1.x + nx*off, y:c1.y + ny*off };
-      c2 = { x:c2.x + nx*off, y:c2.y + ny*off };
+    // 去重共线点
+    const p = [pts[0]];
+    for (let i = 1; i < pts.length; i++){
+      const q = pts[i], r = p[p.length - 1];
+      if (Math.abs(q.x - r.x) < 0.5 && Math.abs(q.y - r.y) < 0.5) continue;
+      p.push(q);
     }
-    const mid = t => ({ x:((1-t)**3)*p1.x + 3*((1-t)**2)*t*c1.x + 3*(1-t)*t*t*c2.x + t*t*t*p2.x,
-                        y:((1-t)**3)*p1.y + 3*((1-t)**2)*t*c1.y + 3*(1-t)*t*t*c2.y + t*t*t*p2.y });
-    const m = mid(.5);
-    return { d:'M'+p1.x+','+p1.y+' C'+c1.x+','+c1.y+' '+c2.x+','+c2.y+' '+p2.x+','+p2.y, mid:m };
+    // 圆角折线
+    let d = 'M' + p[0].x + ',' + p[0].y;
+    for (let i = 1; i < p.length - 1; i++){
+      const a1 = p[i - 1], c = p[i], b1 = p[i + 1];
+      const l1 = Math.hypot(c.x - a1.x, c.y - a1.y), l2 = Math.hypot(b1.x - c.x, b1.y - c.y);
+      const r = Math.min(R, l1 / 2, l2 / 2);
+      if (r < 0.6){ d += ' L' + c.x + ',' + c.y; continue; }
+      const u1 = { x:(c.x - a1.x) / l1, y:(c.y - a1.y) / l1 };
+      const u2 = { x:(b1.x - c.x) / l2, y:(b1.y - c.y) / l2 };
+      d += ' L' + (c.x - u1.x * r) + ',' + (c.y - u1.y * r);
+      d += ' Q' + c.x + ',' + c.y + ' ' + (c.x + u2.x * r) + ',' + (c.y + u2.y * r);
+    }
+    d += ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    // 中点（标签锚点）：优先取中间那条竖/横边的中点
+    let m;
+    if (p.length >= 4){
+      const k = Math.floor((p.length - 1) / 2);
+      m = { x:(p[k].x + p[k + 1].x) / 2, y:(p[k].y + p[k + 1].y) / 2 };
+    } else {
+      const k = Math.floor((p.length - 1) / 2);
+      m = { x:(p[k].x + p[k + 1].x) / 2, y:(p[k].y + p[k + 1].y) / 2 };
+    }
+    return { d:d, mid:m };
   }
 
   function render(){
@@ -3363,7 +3561,9 @@ if (typeof document !== "undefined") var UI = function(){
       const fbCls = fb && !selCls ? ' eg-fb' : '';
       const dotted = e.style==='dotted' ? ' stroke-dasharray="5,4"' : '';
       const marker = fb ? 'url(#arrFb)' : 'url(#arr)';
-      const lbl = e.label ? '<g><rect class="lbl-bg" x="'+(ep.mid.x-e.label.length*3.6-5)+'" y="'+(ep.mid.y-10)+'" width="'+(e.label.length*7.2+10)+'" height="20" rx="2"/><text class="lbl-t" x="'+ep.mid.x+'" y="'+(ep.mid.y+4)+'" text-anchor="middle">'+escXml(e.label)+'</text></g>' : '';
+      const lblTxt = String(e.label || '');
+      const lblW = Math.max(18, cjkWidth(lblTxt) + 14);
+      const lbl = lblTxt ? '<g><rect class="lbl-bg" x="'+(ep.mid.x-lblW/2)+'" y="'+(ep.mid.y-9)+'" width="'+lblW+'" height="18" rx="5"/><text class="lbl-t" x="'+ep.mid.x+'" y="'+(ep.mid.y+4)+'" text-anchor="middle">'+escXml(lblTxt)+'</text></g>' : '';
       return '<path d="'+ep.d+'" fill="none" stroke="transparent" stroke-width="16" data-edge="'+i+'"/>' +
              '<path class="eg'+selCls+fbCls+'" data-eg="'+i+'" d="'+ep.d+'"'+dotted+' marker-end="'+marker+'" pointer-events="none"/>'+lbl;
     }).join('');
@@ -3373,34 +3573,62 @@ if (typeof document !== "undefined") var UI = function(){
       const selOn = sel && sel.type==='node' && sel.id===n.id;
       const shapeCls = n.shape==='diamond' ? 'nd-diam' : n.shape==='round' ? 'nd-round' : 'nd-rect';
       const subCls = n.subflow ? ' nd-sub' : '';
-      let body;
+      const cls = 'nd '+shapeCls+subCls+(selOn?' nd-sel':'');
+      const R = 8;                            // 卡片圆角（图3 的圆角方卡）
+      let body = '';
       if (n.shape === 'diamond'){
         const cx=n.x+n.w/2, cy=n.y+n.h/2;
-        body = '<polygon class="nd '+shapeCls+subCls+(selOn?' nd-sel':'')+'" points="'+cx+','+(n.y-4)+' '+(n.x+n.w+6)+','+cy+' '+cx+','+(n.y+n.h+4)+' '+(n.x-6)+','+cy+'"/>';
+        body = '<polygon class="'+cls+'" points="'+cx+','+(n.y-4)+' '+(n.x+n.w+6)+','+cy+' '+cx+','+(n.y+n.h+4)+' '+(n.x-6)+','+cy+'"/>';
       } else {
-        const rx = n.shape==='round' ? 20 : 2;
-        body = '<rect class="nd '+shapeCls+subCls+(selOn?' nd-sel':'')+'" x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+n.h+'" rx="'+rx+'"/>';
+        // 卡片主体 + 标题区分隔线（图3：标题区 / 多行正文 / 底部文件名）
+        const headH = Math.min(CARD_HEAD, n.h);
+        body = '<rect class="'+cls+'" x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+n.h+'" rx="'+R+'"/>' +
+          '<path class="nd-head" d="M'+n.x+','+(n.y+headH)+' h'+n.w+' v'+(-headH)+' a'+R+','+R+' 0 0 0 '+(-R)+','+(-R)+' h'+(2*R-n.w)+' a'+R+','+R+' 0 0 0 '+(-R)+','+R+' z"/>' +
+          '<line class="nd-headline" x1="'+n.x+'" y1="'+(n.y+headH)+'" x2="'+(n.x+n.w)+'" y2="'+(n.y+headH)+'"/>';
       }
-      let badge = '';
-      if (n.gate){
-        const t = '⚙' + n.gate, bw = t.length * 7 + 10;
-        badge = '<rect class="badge-r" x="'+(n.x+n.w/2-bw/2)+'" y="'+(n.y-20)+'" width="'+bw+'" height="15" rx="2"/><text class="badge-t" x="'+(n.x+n.w/2)+'" y="'+(n.y-9)+'" text-anchor="middle">'+escXml(t)+'</text>';
-      }
+      // 标题区：色点 + 类型/门徽章 + 标题（图3 的顶部小标题）
+      const titleY = n.y + Math.min(CARD_HEAD, n.h) / 2 + 4;
+      const kindT = n.kind ? (KIND_CN[n.kind] || n.kind) : '';
+      let head = '';
+      let tx = n.x + CARD_PAD;
       if (n.kind){
-        const t = KIND_CN[n.kind] || n.kind, bw = cjkWidth(t) + 12;
-        const bx = n.gate ? n.x + n.w/2 - bw - 14 : n.x + n.w/2 - bw/2;
-        badge += '<rect x="'+bx+'" y="'+(n.y-20)+'" width="'+bw+'" height="15" rx="2" fill="'+(KIND_COLOR[n.kind]||'#64748b')+'" opacity=".93"/>' +
-          '<text class="kbadge-t" x="'+(bx+bw/2)+'" y="'+(n.y-9)+'" text-anchor="middle">'+escXml(t)+'</text>';
+        head += '<circle cx="'+(n.x + CARD_PAD + 4)+'" cy="'+(titleY-4)+'" r="3.6" fill="'+(KIND_COLOR[n.kind]||'#64748b')+'"/>';
+        tx = n.x + CARD_PAD + 14;
+      }
+      const titleTxt = fitText((n.subflow ? '▸ ' : '') + String(n.label||''), n.w - (tx - n.x) - CARD_PAD - (n.gate ? 34 : 0));
+      head += '<text class="nd-t" x="'+tx+'" y="'+titleY+'" font-size="12.5">'+escXml(titleTxt)+'</text>';
+      if (n.gate){
+        const gT = String(n.gate);
+        const gw = gT.length * 6.6 + 10;
+        head += '<rect class="badge-r" x="'+(n.x+n.w-CARD_PAD-gw)+'" y="'+(titleY-11)+'" width="'+gw+'" height="14" rx="3"/>' +
+          '<text class="badge-t" x="'+(n.x+n.w-CARD_PAD-gw/2)+'" y="'+(titleY)+'" text-anchor="middle">'+escXml(gT)+'</text>';
+      }
+      // 正文区：多行说明（图3 的卡片中段文字）
+      let bodyTxt = '';
+      if (n.shape !== 'diamond' && n.h > CARD_HEAD + CARD_FILE){
+        const raw = String(n.doc || n.body || n.label || '');
+        const lines = ntWrapText(raw, n.w - CARD_PAD * 2, Math.max(CARD_MIN_BODY, n.bodyLines || CARD_MIN_BODY), 11);
+        const y0 = n.y + Math.min(CARD_HEAD, n.h) + CARD_PAD;
+        lines.forEach((ln, i) => {
+          bodyTxt += '<text class="nd-b" x="'+(n.x+CARD_PAD)+'" y="'+(y0 + i * CARD_LINE + 10)+'">'+escXml(ln)+'</text>';
+        });
+      }
+      // 底部文件名条（图3 的 "05-预检通过/STEP.md"）
+      let fileTxt = '';
+      const fileName = n.file || (n.subflow ? n.subflow : '');
+      if (fileName && n.h > CARD_HEAD + CARD_FILE){
+        fileTxt = '<text class="nd-file" x="'+(n.x+CARD_PAD)+'" y="'+(n.y+n.h-5)+'">'+escXml(fitText(fileName, n.w - CARD_PAD*2))+'</text>';
       }
       const durMs = durs.get(n.id) || 0;
       const durTxt = fmtDurMs(durMs, LANG);
       const durHtml = durTxt ? '<text class="nd-dur" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h+12)+'" text-anchor="middle">⏱ '+escXml(durTxt)+'</text>' : '';
-      const port = anchors(n).out;
-      const txt = (n.subflow ? '▸ ' : '') + fitText(n.label, n.w - 16);
+      // v0.27.0 端口：左右各一空心圆（图3 的 ◯ 端口）
+      const a = anchors(n);
+      const pi = a.inn, po = a.out;
       return '<g data-node="'+escXml(n.id)+'">' +
-        (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body +
-        '<text class="nd-t" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h/2+4.5)+'" text-anchor="middle" pointer-events="none">'+escXml(txt)+'</text>' + badge + durHtml +
-        '<circle class="port" cx="'+port.x+'" cy="'+port.y+'" r="5.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/></g>';
+        (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body + head + bodyTxt + fileTxt + durHtml +
+        '<circle class="port" cx="'+pi.x+'" cy="'+pi.y+'" r="4.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/>' +
+        '<circle class="port" cx="'+po.x+'" cy="'+po.y+'" r="4.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/></g>';
     }).join('');
 
     let overlayHtml = '';
@@ -4198,11 +4426,18 @@ if (typeof document !== "undefined") var UI = function(){
     if (name === 'trace') renderTrace();
     if (name === 'qa') renderQa();
     if (name === 'nn') renderNn();
+    else if (curView !== 'nn' && typeof nnStopLoop === 'function'){ /* nn 循环已在帧内自停 */ }
     if (name === 'canvas') applyView();
   }
   document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
   $('btnCtl2').addEventListener('click', () => showView('ctl'));
   $('btnDist2').addEventListener('click', () => showView('dist'));
+  // v0.27.0 「跟随当前」开关：开启后切到分布工作区自动滚到并高亮当前对话画布
+  if ($('distFollow')) $('distFollow').addEventListener('change', ev => {
+    distFollowOn = !!ev.target.checked;
+    if (distFollowOn) distFollowCurrent(true);
+    toast(distFollowOn ? T('已开启：自动跟随当前对话画布') : T('已关闭自动跟随'));
+  });
   if ($('agRefresh')) $('agRefresh').addEventListener('click', () => renderAgents(true));
 
   // ---------- 工作流操作（分布工作区卡片 / 总控表格共用） ----------
@@ -4278,6 +4513,24 @@ if (typeof document !== "undefined") var UI = function(){
     root.querySelectorAll('[data-ren]').forEach(b => b.addEventListener('click', () => { renameWf(b.dataset.ren); if (curView === 'dist') renderDist(); if (curView === 'ctl') renderCtl(); }));
     root.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { deleteWf(b.dataset.del); if (curView === 'dist') renderDist(); if (curView === 'ctl') renderCtl(); }));
     root.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', () => exportWf(b.dataset.exp)));
+    // v0.25.0 一键跳转对话：到「💬 问答」并按该会话过滤
+    root.querySelectorAll('[data-qa]').forEach(b => b.addEventListener('click', () => {
+      const p = String(b.dataset.qa).split('|');
+      qaGotoSession(p[0] || 'zcode', p[1] || '');
+    }));
+  }
+  // v0.25.0 一键跳转对话：切换到问答视图，按客户端 + 裸会话号过滤（对话画布卡片 / 画布协作条共用）
+  let qaSessFilter = '';
+  function qaGotoSession(client, bareSess){
+    if (!bareSess) return toast(T('该画布没有关联会话'));
+    qaSessFilter = String(bareSess).replace(/^sess_/, '');
+    if ($('qaClient')) $('qaClient').value = client || 'all';
+    if ($('qaWho')) $('qaWho').value = 'all';
+    showView('qa');
+    renderQa();
+    const box = $('qaOut');
+    if (box) box.scrollTop = 0;
+    toast(tx('已按会话 {0} 过滤问答', qaSessFilter.slice(0, 13)));
   }
 
   // ---------- 🛰 分布工作区 ----------
@@ -4338,7 +4591,7 @@ if (typeof document !== "undefined") var UI = function(){
           '<b>' + escXml(c.label) + '</b>' + agentStateChip(c.state) +
           (c.tokens ? '<span class="agchip ag-tok">' + T('含令牌') + '</span>' : '<span class="agchip ag-idle">' + T('无令牌') + '</span>') +
           '<span style="flex:1"></span>' +
-          '<span class="hint">' + T('主会话 {0} · 子智能体 {1}', c.sessions || 0, c.subagents || 0) + '</span>' +
+          '<span class="hint">' + tx('主会话 {0} · 子智能体 {1}', c.sessions || 0, c.subagents || 0) + '</span>' +
           (c.lastActive ? '<span class="hint" style="margin-left:10px">' + T('最近') + ' ' + escXml(c.lastActive) + '</span>' : '') +
           '</div>' +
           '<div class="agpath" title="' + escXml(c.dir || '') + '">' + escXml(c.dir || T('（目录未配置）')) + '</div>' +
@@ -4384,18 +4637,90 @@ if (typeof document !== "undefined") var UI = function(){
       '</div>';
   }
 
+  // v0.27.0 分布工作区：按项目分组「框起来」，卡片标题用真实对话题目（不再是「问答画布」），
+  // 当前对话画布自动跟随（滚动/高亮），非点击驱动。
+  let distFollowOn = true, distLastActive = null;
+  function distCardHtml(w){
+    const d = w.data || {};
+    const gates = [...new Set((d.nodes||[]).filter(n=>n.gate).map(n=>n.gate))];
+    const subs = [...new Set((d.nodes||[]).filter(n=>n.subflow).map(n=>n.subflow))];
+    const isConv = !!(w.src && w.src.session);
+    // 卡片标题：会话画布显示「真实对话题目」（去掉画布文件名式的前缀噪声），流程框架显示自身名
+    const title = isConv
+      ? (sessionTaskName(w.src.session) || (w.src.task || '').trim() || w.name)
+      : w.name;
+    const isActive = w.name === WF.active;
+    let agentRow = '';
+    if (isConv){
+      const ci = qaClientInfo(w.src.client || 'zcode');
+      const turns = w.src.turns || [];
+      const subsN = turns.reduce((a, t) => a + (t.subs || []).length, 0);
+      const proj = projectKeyOf(w);
+      const collab = projectCollaboration(WF.list, proj);
+      const hand = [];
+      collab.links.forEach(l => {
+        if (l.to === (w.src.client || 'zcode') && l.from !== (w.src.client || 'zcode')) hand.push('<span class="handin" title="' + T('该会话接手了前一会话的工作') + '">⬅ ' + T('从') + ' ' + escXml(qaClientInfo(l.from).label.replace(/ CLI$/, '')) + ' ' + T('接手') + '</span>');
+        if (l.from === (w.src.client || 'zcode') && l.to !== (w.src.client || 'zcode')) hand.push('<span class="handout" title="' + T('该会话把工作交给了下一个智能体') + '">' + escXml(qaClientInfo(l.to).label.replace(/ CLI$/, '')) + ' ' + T('接手') + ' ➡</span>');
+      });
+      agentRow = '<div class="agrow">' +
+        '<span class="wfdot" style="background:' + ci.color + '"></span><b>' + escXml(ci.label) + '</b>' +
+        (subsN ? '<span class="agtag">🤖 ' + subsN + '</span>' : '') +
+        '<span class="agtag">💬 ' + turns.length + '</span>' +
+        (hand.length ? '<span class="aghand">' + hand.join(' ') + '</span>' : '') +
+        '<button class="small" data-qa="' + escXml((w.src.client || 'zcode') + '|' + qaBare(w.src.session)) + '" title="' + T('到「💬 问答」查看这段对话') + '">💬 ' + T('对话') + '</button></div>';
+    }
+    const convMeta = isConv
+      ? '<div class="meta">📁 ' + escXml(projectKeyOf(w)) + (w.src.parent ? ' · ' + T('挂在：') + escXml(w.src.parent) : '') + '</div>'
+      : '';
+    return '<div class="wfcard' + (isActive ? ' wfcur' : '') + '" data-card="' + escXml(w.name) + '">' +
+      '<h5><span title="' + escXml(title) + '">' + escXml(title) + '</span>' +
+      (isActive ? '<span class="cur" title="' + T('当前对话画布（自动跟随）') + '">' + T('当前') + '</span>' : '') + '</h5>' +
+      (isConv ? '' : '<div class="meta">' + escXml(w.name) + '</div>') +
+      '<div class="meta">' + tx('节点 {0} · 连线 {1}', (d.nodes||[]).length, (d.edges||[]).length) + (gates.length ? ' · ' + T('门') + ' ' + escXml(gates.join(',')) : '') + (subs.length ? '<br>' + T('子流程 → ') + escXml(subs.join('、')) : '') + '</div>' + agentRow + convMeta +
+      '<div class="ops"><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button><button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button><button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button><button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button></div></div>';
+  }
   function renderDist(){
     const grid = $('wfGrid');
-    grid.innerHTML = WF.list.map(w => {
-      const d = w.data || {};
-      const gates = [...new Set((d.nodes||[]).filter(n=>n.gate).map(n=>n.gate))];
-      const subs = [...new Set((d.nodes||[]).filter(n=>n.subflow).map(n=>n.subflow))];
-      const convMeta = w.src ? '<div class="meta">🗂 ' + T('对话画布') + (w.src.client ? ' · ' + escXml(qaClientInfo(w.src.client).label) : '') + (w.src.task ? ' · ' + escXml(w.src.task) : '') + ' · ' + tx('{0} 小对话', (w.src.turns || []).length) + (w.src.parent ? ' · ' + T('挂在：') + escXml(w.src.parent) : '') + '</div>' : '';
-      return '<div class="wfcard"><h5><span>' + escXml(w.name) + '</span>' + (w.name === WF.active ? '<span class="cur">' + T('当前') + '</span>' : '') + '</h5>' +
-        '<div class="meta">' + tx('节点 {0} · 连线 {1}', (d.nodes||[]).length, (d.edges||[]).length) + (gates.length ? ' · ' + T('门') + ' ' + escXml(gates.join(',')) : '') + (subs.length ? '<br>' + T('子流程 → ') + escXml(subs.join('、')) : '') + '</div>' + convMeta +
-        '<div class="ops"><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button><button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button><button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button><button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button></div></div>';
-    }).join('');
+    // 按项目分组：同一项目的多个智能体会话「框起来」共处一框
+    const groups = groupByProject(WF.list);
+    const parts = [];
+    groups.forEach(grp => {
+      const convs = grp.convs.slice().sort((a, b) => ((b.src && b.src.ts) || 0) - ((a.src && a.src.ts) || 0));
+      const others = grp.others || [];
+      if (!convs.length && !others.length) return;
+      // 项目框头：项目名 + 智能体/会话计数 + 协作接力链
+      const agents = agentsInProject(WF.list, grp.project);
+      const collab = projectCollaboration(WF.list, grp.project);
+      const nSub = agents.reduce((a, g) => a + g.subs, 0);
+      const chain = agents
+        .sort((a, b) => (a.first || 0) - (b.first || 0))
+        .map(g => '<span class="pgchip" style="border-color:' + g.color + '"><i style="background:' + g.color + '"></i>' + escXml(g.label.replace(/ CLI$/, '')) + '</span>')
+        .join('<span class="pgarr">→</span>');
+      const isFramework = grp.frame;
+      parts.push('<section class="pfgroup' + (isFramework ? ' pfgroup-fw' : '') + '" data-proj="' + escXml(grp.project) + '">' +
+        '<header class="pfhead">' +
+          '<span class="pfname">' + (isFramework ? '🧩 ' : '📁 ') + escXml(grp.project) + '</span>' +
+          '<span class="pfstat">' + tx('{0} 智能体 · {1} 会话', agents.length || 1, convs.length) + (nSub ? ' · 🤖 ' + nSub : '') + '</span>' +
+          (chain ? '<span class="pfchain" title="' + T('协作接力顺序') + '">' + chain + '</span>' : '') +
+        '</header>' +
+        '<div class="pfbody">' + convs.concat(others).map(distCardHtml).join('') + '</div>' +
+      '</section>');
+    });
+    grid.innerHTML = parts.join('') || '<p class="hint">' + T('暂无画布。先到「💬 问答」同步本地记录，再生成对话画布。') + '</p>';
     bindWfOps(grid);
+    distFollowCurrent(true);
+  }
+  // 自动跟随当前对话画布：滚到可见 + 高亮（不是点哪个哪个才当前）
+  function distFollowCurrent(force){
+    if (!distFollowOn || curView !== 'dist') return;
+    const grid = $('wfGrid');
+    if (!grid) return;
+    const el = grid.querySelector('.wfcard.wfcur');
+    if (!el) return;
+    if (!force && distLastActive === WF.active) return;
+    distLastActive = WF.active;
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    try { el.scrollIntoView({ block:'center', behavior: force ? 'auto' : 'smooth' }); } catch (e){ /* 老浏览器忽略 */ }
   }
 
   // ---------- 🧭 总控流程（关系图 + 关系表） ----------
@@ -5108,7 +5433,7 @@ if (typeof document !== "undefined") var UI = function(){
   }
   async function initHttpWatch(){
     const w = PAYLOAD && PAYLOAD.watch;
-    if (!w || !/^https?:$/.test(location.protocol)) return;
+    if (!/^https?:$/.test(location.protocol)) return;
     if (fh || pendingFh) return;                  // 文件句柄优先，互斥
     if (httpTimer){ clearInterval(httpTimer); httpTimer = null; }
     if (httpRetryTimer){ clearTimeout(httpRetryTimer); httpRetryTimer = null; }
@@ -5119,8 +5444,22 @@ if (typeof document !== "undefined") var UI = function(){
       if (r.ok) info = await r.json();
     } catch(e){}
     if (info && info.ok) httpCaps = info;         // 记住服务器能力（usage / tokens / clients 端点是否可用）
+    if (httpCaps){
+      // 能力探测与数据载入不依赖 PAYLOAD.watch：直接打开编辑器（无工作副本）同样要有
+      // Token / 使用量 / 设置 / 问答自动同步——此前这些被下面的 watch 守卫一起拦掉，Token 区块永远空白
+      loadHttpUsage(); loadHttpTokens(); loadHttpClientUsage(); loadHttpSettings();   // usage.jsonl / rollout / 多客户端用量 / 模型单价
+      skillHint();                                          // 技能工坊能力提示随之刷新
+      startQaSync();                                        // 问答视图：最新会话 + 全部子智能体自动同步（每 6s）
+    }
+    if (!w){
+      // 无同步文件（直接打开编辑器）：不做双向同步；服务未启动则提示并 4 秒后重试（服务稍后启动也能自动接上）
+      if (!httpCaps){
+        syncStatus('⚠ ' + T('本地服务未连接：画布不会自动同步。启动 ') + 'python flow_serve.py --dir <流程目录>' + T(' 后每 4 秒自动重连'));
+        scheduleHttpRetry();
+      }
+      return;
+    }
     const base = new URL(w, location.href).href.split('?')[0];
-    let ok = false;
     try {
       const r = await fetch(base + '?_=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -5138,14 +5477,10 @@ if (typeof document !== "undefined") var UI = function(){
       }
       if (!httpTimer) httpTimer = setInterval(pollHttpFile, 1500);
       refreshSyncHint();
-      ok = true;
     } catch(e){
       syncStatus('⚠ ' + T('本地服务未连接：画布不会自动同步。启动 ') + 'python flow_serve.py --dir <流程目录>' + T(' 后每 4 秒自动重连'));
       scheduleHttpRetry();                        // 服务重启后自动恢复同步（画布不同步问题根因）
     }
-    if (httpCaps){ loadHttpUsage(); loadHttpTokens(); loadHttpClientUsage(); loadHttpSettings(); }   // usage.jsonl / rollout / 多客户端用量 / 模型单价自动载入
-    skillHint();                                          // 技能工坊能力提示随之刷新
-    startQaSync();                                        // 问答视图：最新会话 + 全部子智能体自动同步（每 6s）
   }
   let httpFailN = 0;
   async function pollHttpFile(){
@@ -5531,8 +5866,7 @@ if (typeof document !== "undefined") var UI = function(){
     }
     qaByKey.set(key, it); qaItems.push(it); return true;
   }
-  const QA_CLIENTS = { zcode: { label: 'ZCode', color: '#2563eb' }, codex: { label: 'Codex CLI', color: '#0d9488' }, qoder: { label: 'Qoder CLI', color: '#7c3aed' }, gemini: { label: 'Gemini (Antigravity)', color: '#ea580c' }, wb: { label: 'WorkBuddy', color: '#db2777' }, qwen: { label: 'Qwen Code', color: '#ca8a04' }, kimi: { label: 'Kimi', color: '#0e7490' } };
-  function qaClientInfo(c){ return QA_CLIENTS[c] || QA_CLIENTS.zcode; }
+  // QA_CLIENTS / qaClientInfo 定义在 __CORE 区（分组/协作/神经网络与 UI 共用一份）
   function qaBare(s){ return String(s || '').replace(/^sess_/, ''); }
   // 从问答条目推断所属项目工作目录：优先子智能体/主会话的 cwd，取出现次数最多者
   function qaCwdOf(items){
@@ -5601,6 +5935,7 @@ if (typeof document !== "undefined") var UI = function(){
     const chip = (x, who) => '<span class="kwchip ' + (who === 'master' ? 'mk' : 'sk') + (cur === x.kw ? ' on' : '') + '" data-kw="' + escXml(x.kw) + '" title="' + T('点击按该关键词过滤') + '">' + escXml(x.kw) + '<b>' + x.count + '</b></span>';
     const row = (icon, lab, arr) => '<div class="kwrow"><span class="kwlab">' + icon + ' ' + lab + '</span><span>' + (arr.map(x => chip(x, icon === '🧠' ? 'master' : 'sub')).join('') || '<span class="hint">—</span>') + '</span></div>';
     box.innerHTML = row('🧠', T('任务关键词'), dig.master) + row('🤖', T('子智能体关键词'), dig.sub) +
+      (qaSessFilter ? '<p class="hint" style="margin:2px 0 0">' + T('会话过滤：') + '<b>' + escXml(qaSessFilter.slice(0, 13)) + '…</b> <a href="#" id="qaSessClear">' + T('清除') + '</a></p>' : '') +
       (cur ? '<p class="hint" style="margin:2px 0 0">' + T('当前关键词过滤：') + '<b>' + escXml(cur) + '</b> <a href="#" id="qaKwClear">' + T('清除') + '</a></p>' : '');
   }
   function genQaSummary(){
@@ -5617,7 +5952,7 @@ if (typeof document !== "undefined") var UI = function(){
       box.innerHTML = '<p class="hint">' + T('flow_serve.py 托管时自动同步最新会话与全部子智能体；file:// 下可「📂 选择会话记录」（~/.zcode/cli/rollout/ 下的 model-io-sess_*.jsonl）或「🤖 选择子智能体目录」（~/.zcode/cli/agents/ 下的 sess_* 文件夹），即可逐项展开查看问答与关键词。') + '</p>';
       return;
     }
-    const items = qaFilter(qaItems, { who: $('qaWho').value, client: $('qaClient') ? $('qaClient').value : 'all', kw: $('qaKw').value });
+    const items = qaFilter(qaItems, { who: $('qaWho').value, client: $('qaClient') ? $('qaClient').value : 'all', kw: $('qaKw').value, sess: qaSessFilter });
     lastQaItems = items;
     const fmt = ts => {
       if (!ts) return '—';
@@ -5758,6 +6093,7 @@ if (typeof document !== "undefined") var UI = function(){
   $('qaWho').addEventListener('change', renderQa);
   if ($('qaClient')) $('qaClient').addEventListener('change', renderQa);
   $('qaKwBar').addEventListener('click', ev => {
+    if (ev.target.closest('#qaSessClear')){ ev.preventDefault(); qaSessFilter = ''; renderQa(); return; }
     if (ev.target.closest('#qaKwClear')){ ev.preventDefault(); $('qaKw').value = ''; renderQa(); return; }
     const c = ev.target.closest('.kwchip');
     if (!c) return;
@@ -5855,7 +6191,11 @@ if (typeof document !== "undefined") var UI = function(){
     const first = sorted.find(it => it.who !== 'sub' && String(it.q || '').trim() && !isQaContinuation(it.q))
       || sorted.find(it => it.who !== 'sub' && String(it.q || '').trim()) || items[0] || {};
     const single = sids.length === 1;
-    const task = single ? (qaLabel(first).replace(/\s+/g, ' ').trim().slice(0, 18) || T('对话')) : T('问答画布');
+    // v0.27.0 画布名一律取真实对话题目：单会话取首问句，多会话取首问句 + 会话数后缀（不再叫「问答画布」）
+    const headline = qaLabel(first).replace(/\s+/g, ' ').trim();
+    const task = single
+      ? (headline.slice(0, 18) || T('对话'))
+      : ((headline.slice(0, 14) || (cwd ? projectOf(cwd) : T('多会话'))) + tx(' 等 {0} 会话', sids.length));
     const cwd = qaCwdOf(items);
     const name = storeConversationCanvas({ client: single ? (first.client || '') : '', session: single ? sids[0] : '', cwd: cwd, project: projectOf(cwd) }, task, parsed, r);
     if (name) switchWorkflow(name);
@@ -6090,254 +6430,878 @@ if (typeof document !== "undefined") var UI = function(){
   $('qaHttpLoad').addEventListener('click', () => loadHttpQa(false));
 
   // =====================================================================
-  // 🧠 v0.24.0 智能体总结神经网络（芯片脑图）
-  //   把 WF 树 + 问答关键词，压成一张可缩放/可点击跳转的神经元芯片：
-  //   芯片(项目) → 神经元(会话/知识) → 突触(协作/继承/关键词共现) + 脉冲动画
   // =====================================================================
-  // ---- 渲染（DOM 层） ----
-  let nnState = null, nnZ = 1, nnX = 0, nnY = 0, nnRaf = 0, nnPulses = [];
-  function nnKwPerSess(){
-    const out = {};
-    const bySess = new Map();
-    (qaItems || []).forEach(it => {
-      const sid = qaBare(it.sessionId || '');
-      if (!sid) return;
-      const e = WF.list.find(w => w.src && w.src.session && qaBare(w.src.session) === sid);
-      if (!e) return;
-      const kws = (it.kw || []).filter(k => k && String(k).length >= 2);
-      const arr = bySess.get(e.name) || [];
-      kws.forEach(k => arr.push(String(k)));
-      bySess.set(e.name, arr);
-    });
-    bySess.forEach((arr, name) => {
-      const cnt = {};
-      arr.forEach(k => cnt[k] = (cnt[k] || 0) + 1);
-      out[name] = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 6);
-    });
-    return out;
+  // 🧠 v0.27.0 智能体总结神经网络 —— 「代码地图」文字树图（treemap of text）
+  //   完全重写：不再用圆点/神经元表示，而是**矩形 + 内部文字/代码纹理填充**。
+  //   参考 Peeter95/code-map（Peeter95，Chromium 5100 万行 120fps）：
+  //     · 每个矩形 = 一个实体（项目 / 智能体 / 会话 / 对话轮），面积 ∝ 行数/轮数
+  //     · 矩形内部按「每行像素」三档 LOD：
+  //         line_px < 0.6  → 纯色块（远看只是一片纹理）
+  //         0.6 ≤ line_px < 9 → 代码条带（用短横条模拟字符纹理，即图1 的密字效果）
+  //         line_px ≥ 9    → 真实可读文字（带行号/高亮，即图2 的放大效果）
+  //     · 对数空间飞行相机 + 每帧预算 + 屏外裁剪 + 悬停聚焦压暗
+  //   层级：项目 → 智能体 → 会话 → 对话轮，四层 squarified treemap 嵌套。
+  // =====================================================================
+  let nnTextState = null, nnTextView = null, nnTextRaf = 0, nnTextHover = null, nnTextFocus = null;
+  let nnTextFps = 0, nnTextFpsT = 0, nnTextDrag = null, nnTextSearch = '', nnTextSearchOn = false;
+  let nnTextMatches = [], nnTextMatchAt = -1;
+  const NT_STRIPS_FROM_PX = 0.6;    // 每行像素 < 0.6 → 纯色块（code-map STRIPS_FROM_PX）
+  const NT_TEXT_FROM_PX = 9.0;      // 每行像素 ≥ 9 → 真实文本（code-map TEXT_FROM_PX）
+  const NT_LABEL_BUDGET = 420;      // 每帧标签上限
+  const NT_RECT_BUDGET = 12000;     // 每帧矩形上限
+  const NT_ZMIN = 0.05, NT_ZMAX = 240;
+  const NT_FLY_K = 0.2;             // 飞行平滑（code-map k）
+  const NT_DIM = 0.22;              // 聚焦压暗
+  const NT_LINE_CHARS = 100;        // 一列 100 字符（code-map COL_CHARS）
+  const NT_CHAR_W = 0.5;            // 字符宽 / 行高（code-map CHAR_W）
+  const NT_CODE_COLS = 52;          // 一个「轮代码块」的折行列数（半角列，CJK 占 2 列）
+  const NT_MAX_LINES = 8;           // 单轮最多折行数（超出用 … 截断）
+  const NT_SESS_HEAD_H = 1.0;       // 会话抬头占比（以行高为单位）
+  const NT_AGENT_HEAD_H = 1.15;     // 智能体标题条（以行高为单位）
+  const NT_PROJ_HEAD_H = 1.6;       // 项目标题栏（以行高为单位）
+
+  // 会话「对话正文行」：优先取该会话的问答问题，组成可供 treemap 逐行铺展的文本。
+  function ntSessionLines(canvasName, list, qaArr){
+    const w = list.find(x => x.name === canvasName);
+    const bare = w && w.src && w.src.session ? qaBare(w.src.session) : '';
+    const lines = [];
+    if (w && w.src){
+      (w.src.turns || []).forEach(t => {
+        const q = String((t && t.q) || '').replace(/\s+/g, ' ').trim();
+        if (q) lines.push(q);
+        ((t && t.subs) || []).forEach(() => lines.push('  🤖 子智能体执行'));
+      });
+    }
+    if (!lines.length && bare){
+      qaArr.filter(it => qaBare(it.sessionId) === bare).slice(0, 60).forEach(it => {
+        const q = qaLabel(it).replace(/\s+/g, ' ').trim();
+        if (q && q !== '(无提问)') lines.push(q);
+      });
+    }
+    if (!lines.length && w) lines.push(String((w.src && w.src.task) || w.name));
+    return lines;
   }
-  function nnSvgEl(tag, attrs){
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    if (attrs) Object.keys(attrs).forEach(k => el.setAttribute(k, attrs[k]));
-    return el;
+
+  // 建树：把「项目 → 智能体 → 会话 → 对话轮」组织成可 treemap 的层级（每层带 weight）。
+  function ntBuildTree(list, qaArr){
+    // 面积权重模式（#nnLayout）：lines 按文字行数 / turns 按对话轮数 / even 等面积
+    const wmode = ($('nnLayout') && $('nnLayout').value) || 'lines';
+    const L = (list || []).filter(w => w && w.data && w.src && w.src.session);
+    const groups = groupByProject(L).filter(g => g.convs.length);
+    const root = { id: 'root', kind: 'root', label: '全部项目', children: [], weight: 0,
+      sub: groups.length + ' 项目 · ' + L.length + ' 对话' };
+    groups.forEach(grp => {
+      const agents = agentsInProject(L, grp.project);
+      const nSub = agents.reduce((a, g) => a + g.subs, 0);
+      const pnode = { id: 'p:' + grp.project, kind: 'proj', label: grp.project,
+        sub: agents.length + ' 智能体 · ' + grp.convs.length + ' 对话' + (nSub ? ' · 🤖' + nSub : ''),
+        convs: grp.convs.length, children: [], weight: 0, group: grp };
+      grp.convs.slice().sort((a, b) => ((a.src && a.src.ts) || 0) - ((b.src && b.src.ts) || 0)).forEach(w => {
+        const cid = (w.src && w.src.client) || 'zcode';
+        const ci = (typeof QA_CLIENTS !== 'undefined' && QA_CLIENTS[cid]) || { label: cid, color: '#2563eb' };
+        let anode = pnode.children.find(x => x.client === cid);
+        if (!anode){
+          anode = { id: 'a:' + grp.project + ':' + cid, kind: 'agent', label: String(ci.label).replace(/ CLI$/, ''),
+            client: cid, color: ci.color, proj: grp.project, children: [], weight: 0, convs: 0 };
+          pnode.children.push(anode);
+        }
+        const lines = ntSessionLines(w.name, list, qaArr);
+        const turns = (w.src && w.src.turns) || [];
+        const nSub2 = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
+        const snode = { id: 's:' + w.name, kind: 'sess', label: String((w.src && w.src.task) || w.name),
+          client: cid, color: ci.color, canvas: w.name, ts: (w.src && w.src.ts) || 0, proj: grp.project,
+          sub: String(ci.label).replace(/ CLI$/, '') + ' · 💬' + turns.length + (nSub2 ? ' · 🤖' + nSub2 : ''),
+          lines: lines, children: [], weight: 0, codeLines: 0 };
+        // 对话轮作为最内层「代码块」：每个轮 = 一段多行文本（code-map 的 file）
+        // 关键：轮的权重 = 它的代码行数，布局时按行数分配高度，
+        // 这样「一行」在世界坐标里始终 ≈ 1 个行高，放大后才是可读的多行代码（图2）。
+        // NT_CODE_COLS 是「列数」，换算成 ntWrapText 需要的像素宽度（半角 7.5px/列）。
+        const wrapPx = NT_CODE_COLS * 7.5;
+        const turnTexts = lines.slice(0, 40);
+        turnTexts.forEach((q, i) => {
+          const wrapped = ntWrapText(String(q || ''), wrapPx, NT_MAX_LINES, 10);
+          const nL = Math.max(1, wrapped.length);
+          snode.children.push({ id: snode.id + '#' + i, kind: 'turn', label: q,
+            sess: snode, line: i, lines: wrapped, nLines: nL, weight: nL });
+          snode.codeLines += nL;
+        });
+        if (!snode.children.length){
+          const wrapped = ntWrapText(String(snode.label || ''), wrapPx, NT_MAX_LINES, 10);
+          snode.children.push({ id: snode.id + '#0', kind: 'turn', label: snode.label,
+            sess: snode, line: 0, lines: wrapped, nLines: Math.max(1, wrapped.length), weight: Math.max(1, wrapped.length) });
+          snode.codeLines = Math.max(1, wrapped.length);
+        }
+        anode.children.push(snode);
+        anode.convs++;
+      });
+    // 叶子权重：会话面积 ∝ 它的代码行数（code-map 用行数当权重），保证「一行」≈ 等高的行
+    pnode.children.forEach(a => {
+      a.children.forEach(s => {
+        s.weight = wmode === 'even' ? 1
+          : wmode === 'turns' ? Math.max(1, (s.children || []).length)
+          : Math.max(1, s.codeLines || s.lines.length);
+        a.weight += s.weight;
+      });
+      pnode.weight += a.weight;
+    });
+      pnode.weight = Math.max(1, pnode.weight);
+      root.children.push(pnode);
+      root.weight += pnode.weight;
+    });
+    root.weight = Math.max(1, root.weight);
+    return root;
   }
+
+  // 布局：四层 squarified treemap（项目 → 智能体 → 会话 → 轮），矩形写入 rects，文字行写入 lines。
+  // 布局：四层 squarified treemap（项目 → 智能体 → 会话 → 轮）。
+  // 与早期版本的关键区别：**行是固定行高的基本单位**（code-map line_h）。
+  // 会话/智能体/项目的可用高度按「行数预算」切分，所以一个 turn 里每一行
+  // 在世界坐标里都 ≈ NT_ROW_H，放大后自然呈现图2 那样的「多行可读代码」。
+  const NT_ROW_H = 10;              // 世界坐标里的标准行高（缩放 1× 时 10px/行）
+  function ntLayoutTree(root, W, H){
+    W = W || 1200; H = H || 760;
+    const rects = [];                       // {kind,id,x,y,w,h,label,sub,color,depth,node}
+    const world = { x: 8, y: 8, w: W - 16, h: H - 16 };
+    const byW = (a, b) => b.weight - a.weight;
+    if (!root || !root.children.length){ root.rects = rects; return rects; }
+    // 第一层：项目。项目高度 ∝ 其内部总行数，宽度按行数占比切开（行宽守恒）。
+    const totalLines = root.children.reduce((a, c) => a + Math.max(1, c.weight), 0);
+    nnSquarify(root.children.map(c => ({ id: c.id, w: Math.max(1, c.weight), node: c })).sort(byW), world)
+      .forEach(rc => {
+        const p = rc.node;
+        if (!p) return;
+        const rec = { kind: 'proj', id: p.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, label: p.label, sub: p.sub, depth: 0, node: p };
+        rects.push(rec); p.rect = rc;
+        // 项目标题栏：以「行高」为单位换算（保证缩放后视觉一致）
+        const lineH = Math.max(1.5, rc.h / Math.max(1, totalLines) * (root.children.length ? 1 : 1));
+        const head = Math.max(NT_ROW_H * NT_PROJ_HEAD_H, Math.min(rc.h * 0.16, rc.h * 0.3));
+        const pad = 2;
+        const inner = { x: rc.x + pad, y: rc.y + head + pad, w: rc.w - pad * 2, h: rc.h - head - pad * 2 };
+        if (inner.w <= 6 || inner.h <= 6) return;
+        // 第二层：智能体（高度 ∝ 其会话总行数）
+        p.innerLineH = Math.max(1.5, inner.h / Math.max(1, Math.max(1, p.weight)));
+        ntSquarifyChildren(p.children, inner, 'agent', p, rects, (anode, arc) => {
+          const ah = Math.max(NT_ROW_H * NT_AGENT_HEAD_H, Math.min(arc.h * 0.17, 18));
+          const ainner = { x: arc.x + 1, y: arc.y + ah + 1, w: arc.w - 2, h: arc.h - ah - 2 };
+          if (ainner.w <= 4 || ainner.h <= 4) return;
+          // 第三层：会话（高度 ∝ 其代码行数）
+          ntSquarifyChildren(anode.children, ainner, 'sess', anode, rects, (snode, src2) => {
+            const sh = Math.max(NT_ROW_H * NT_SESS_HEAD_H, Math.min(src2.h * 0.2, 16));
+            const sinner = { x: src2.x + 1, y: src2.y + sh + 1, w: src2.w - 2, h: src2.h - sh - 2 };
+            if (sinner.w <= 3 || sinner.h <= 3) return;
+            // 第四层：对话轮 = 多行代码块。
+            // 目标观感（图1/图2）：整个会话体被「密排代码行」铺满，行高在整个会话内均匀。
+            // 做法：先按可用高算出「能放多少行」，再把每一轮的逻辑行按此容量切开；
+            // 若轮数/行数不足以铺满，就把内容按行循环续写补足（dense packing），
+            // 而不是把少量文字拉伸到大块空白里。
+            snode.lineRects = [];
+            const kids = snode.children;
+            const capRows = Math.max(1, Math.round(sinner.h / NT_ROW_H));   // 这个会话体目标行数
+            const rawLines = [];
+            kids.forEach(t => { const L = (t.lines && t.lines.length) ? t.lines : [String(t.label || '')]; L.forEach(s => rawLines.push(String(s || ''))); });
+            const packed = ntPackRows(rawLines, capRows);                   // 恰好 capRows 行
+            // 把 packed 按 kids 的原始 nLines 比例回填到每个 turn
+            const totW = kids.reduce((a, t) => a + Math.max(1, t.nLines || 1), 0) || 1;
+            const rowH = sinner.h / capRows;
+            let pi = 0;
+            let cy = sinner.y;
+            kids.forEach((t, i) => {
+              // 该轮分到的行数（至少 1，且不超过剩余）
+              let n = Math.max(1, Math.round((Math.max(1, t.nLines || 1) / totW) * capRows));
+              if (i === kids.length - 1) n = Math.max(1, capRows - pi);
+              n = Math.min(n, Math.max(1, capRows - pi));
+              const seg = packed.slice(pi, pi + n);
+              pi += n;
+              const th = (i === kids.length - 1) ? (sinner.y + sinner.h - cy) : (rowH * n);
+              const lr = { x: sinner.x, y: cy, w: sinner.w, h: Math.max(0.8, th) };
+              t.lineRect = lr;
+              t.rowH = rowH;
+              snode.lineRects.push(lr);
+              // 每个对话轮 = 一段可读代码块（最内层 LOD 的载体）
+              rects.push({ kind: 'turn', id: t.id, x: lr.x, y: lr.y, w: lr.w, h: lr.h,
+                label: t.label, lines: seg, rowH: rowH, sub: '', color: snode.color, depth: 3, node: t,
+                session: snode, canvas: snode.canvas, client: snode.client, proj: snode.proj, sessId: snode.id });
+              cy += lr.h;
+            });
+          });
+        });
+      });
+    root.rects = rects;
+    return rects;
+  }
+  function ntSquarifyChildren(children, area, kind, parent, rects, deeper){
+    if (!children || !children.length) return;
+    const items = children.map(c => ({ id: c.id, w: Math.max(1, c.weight || 1), node: c })).sort((a, b) => b.w - a.w);
+    nnSquarify(items, area).forEach(rc => {
+      const c = rc.node;
+      if (!c) return;
+      rects.push({ kind: kind, id: c.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, label: c.label, sub: c.sub,
+        color: c.color, depth: kind === 'agent' ? 1 : 2, node: c, canvas: c.canvas, client: c.client });
+      c.rect = rc;
+      if (deeper) deeper(c, rc);
+    });
+  }
+
+  // 「每行像素」ntLinePx / ntVisibleChars 定义在 __CORE 区（纯函数，可单测），此处不再重复定义。
+
+  // 渲染循环：显式生命周期（离开视图即停，不再空转）
+  function ntStartLoop(){ if (nnTextRaf) return; nnTextFpsT = 0; nnTextRaf = requestAnimationFrame(ntFrame); }
+  function ntStopLoop(){ if (nnTextRaf){ cancelAnimationFrame(nnTextRaf); nnTextRaf = 0; } }
+
   function renderNn(){
-    const svg = $('nnSvg');
-    if (!svg) return;
-    const box = svg.parentElement;
+    const cv = $('nnCv');
+    if (!cv) return;
+    const box = cv.parentElement;
+    // 优先用真实容器尺寸；视图刚切过来还没完成布局时（clientWidth=0）先渲染一次，
+    // 再由 ntRelayoutIfNeeded 在下一帧用真实尺寸重排，避免坐标空间错位。
     const W = Math.max(680, box.clientWidth || 900), H = Math.max(420, box.clientHeight || 620);
-    const mode = ($('nnLayout') && $('nnLayout').value) || 'chip';
-    const graph = nnBuildGraph(WF.list, qaItems, nnKwPerSess());
-    const pos = nnLayout(graph, mode, W, H);
-    nnState = { W: W, H: H, graph: graph, pos: pos, mode: mode };
-    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    svg.setAttribute('width', W); svg.setAttribute('height', H);
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    const defs = nnSvgEl('defs');
-    const gl = nnSvgEl('radialGradient', { id: 'nnGlow' });
-    gl.innerHTML = '<stop offset="0%" stop-color="var(--accent)" stop-opacity=".55"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>';
-    defs.appendChild(gl); svg.appendChild(defs);
-    const gW = nnSvgEl('g', { id: 'nnWorld' });
-    svg.appendChild(gW);
-    // 网格底纹（工程感）
-    const grid = nnSvgEl('g', { opacity: '.35' });
-    for (let x = 0; x <= W; x += 40) grid.appendChild(nnSvgEl('line', { x1: x, y1: 0, x2: x, y2: H, stroke: 'var(--line)', 'stroke-width': '.5' }));
-    for (let y = 0; y <= H; y += 40) grid.appendChild(nnSvgEl('line', { x1: 0, y1: y, x2: W, y2: y, stroke: 'var(--line)', 'stroke-width': '.5' }));
-    gW.appendChild(grid);
-    // 芯片底板（每个项目）
-    graph.groups.forEach(grp => {
-      const p = graph.nodes.find(n => n.id === 'p:' + grp.project);
-      if (!p) return;
-      const pp = pos.get(p.id);
-      const kids = graph.nodes.filter(n => (n.kind === 'sess' || n.kind === 'kw') && n.proj === grp.project);
-      let x1 = pp.x, y1 = pp.y, x2 = pp.x, y2 = pp.y;
-      kids.forEach(k => { const kp = pos.get(k.id); if (!kp) return; x1 = Math.min(x1, kp.x); y1 = Math.min(y1, kp.y); x2 = Math.max(x2, kp.x); y2 = Math.max(y2, kp.y); });
-      const pad = 56;
-      const bx = x1 - pad, by = y1 - pad - 22, bw = Math.max(150, x2 - x1 + pad * 2), bh = Math.max(110, y2 - y1 + pad * 2 + 22);
-      const chip = nnSvgEl('g', { class: 'fadein' });
-      chip.appendChild(nnSvgEl('rect', { class: 'chip', x: bx, y: by, width: bw, height: bh, rx: 8 }));
-      // 引脚（左右各 6 根，芯片封装感）
-      for (let i = 0; i < 6; i++){
-        const yy = by + 18 + i * ((bh - 36) / 5);
-        chip.appendChild(nnSvgEl('line', { class: 'pin', x1: bx - 12, y1: yy, x2: bx, y2: yy }));
-        chip.appendChild(nnSvgEl('line', { class: 'pin', x1: bx + bw, y1: yy, x2: bx + bw + 12, y2: yy }));
-      }
-      const txEl = nnSvgEl('text', { class: 'chiphdr', x: bx + 10, y: by + 18, fill: 'var(--ink)' });
-      txEl.textContent = '📁 ' + grp.project;
-      chip.appendChild(txEl);
-      const mt = nnSvgEl('text', { class: 'chipcty', x: bx + 10, y: by + 33 });
-      const collab = projectCollaboration(WF.list, grp.project);
-      mt.textContent = tx('{0} 智能体 · {1} 对话', agentsInProject(WF.list, grp.project).length, grp.convs.length) +
-        (collab.links.length ? ' · 🤝 ' + collab.links.map(l => qaClientInfo(l.from).label.replace(/ CLI$/, '') + '→' + qaClientInfo(l.to).label.replace(/ CLI$/, '')).join(' ') : '');
-      chip.appendChild(mt);
-      gW.appendChild(chip);
-    });
-    // 突触
-    const ge = nnSvgEl('g');
-    graph.edges.forEach((e, i) => {
-      const a = pos.get(e.from), b = pos.get(e.to);
-      if (!a || !b) return;
-      const cls = 'syn ' + (e.k === 1 ? 'l1' : (e.k === 2 ? 'l2' : 'l3'));
-      let d;
-      if (e.kind === 'coop'){
-        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - Math.abs(b.x - a.x) * 0.18 - 24;
-        d = 'M' + a.x + ',' + a.y + ' Q' + mx + ',' + my + ' ' + b.x + ',' + b.y;
-      } else if (e.kind === 'sub' || e.kind === 'kw'){
-        d = 'M' + a.x + ',' + a.y + ' L' + b.x + ',' + b.y;
-      } else {
-        const mx = (a.x + b.x) / 2;
-        d = 'M' + a.x + ',' + a.y + ' C' + mx + ',' + a.y + ' ' + mx + ',' + b.y + ' ' + b.x + ',' + b.y;
-      }
-      const path = nnSvgEl('path', { class: cls, d: d, 'data-eg': i });
-      ge.appendChild(path);
-    });
-    gW.appendChild(ge);
-    // 神经元
-    const gn = nnSvgEl('g');
-    graph.nodes.forEach(n => {
-      const p = pos.get(n.id); if (!p) return;
-      const g1 = nnSvgEl('g', { class: 'nrn clickable', transform: 'translate(' + p.x + ',' + p.y + ')', 'data-nn': n.id });
-      const col = n.color || (n.kind === 'hub' ? 'var(--accent)' : (n.kind === 'proj' ? '#2563eb' : 'var(--accent)'));
-      if (n.id !== 'hub') g1.appendChild(nnSvgEl('circle', { class: 'halo', r: (n.w || 20) / 2 + 6 }));
-      g1.appendChild(nnSvgEl('circle', { class: 'core', r: (n.w || 20) / 2 }));
-      if (n.kind === 'hub'){
-        g1.setAttribute('class', 'nrn clickable hub');
-        g1.appendChild(nnSvgEl('circle', { class: 'hubring', r: (n.w || 46) / 2 + 9 }));
-        const t1 = nnSvgEl('text', { class: 'hubtxt', y: -2 });
-        t1.textContent = '🧠';
-        g1.appendChild(t1);
-        const t2 = nnSvgEl('text', { class: 'hubtxt', y: 13 });
-        t2.setAttribute('style', 'font-size:9.5px');
-        t2.textContent = T('智能体总结');
-        g1.appendChild(t2);
-      } else {
-        const t = nnSvgEl('text', { class: 'txt', x: (n.w || 20) / 2 + 6, y: -1 });
-        t.textContent = n.label;
-        g1.appendChild(t);
-        const s = nnSvgEl('text', { class: 'sub', x: (n.w || 20) / 2 + 6, y: 11 });
-        s.textContent = n.sub || '';
-        g1.appendChild(s);
-      }
-      g1.style.setProperty('--nnc', col);
-      gn.appendChild(g1);
-    });
-    gW.appendChild(gn);
-    nnApplyView();
-    if (!nnRaf) nnTick();
-    // HUD
-    const hud = $('nnHud');
-    if (hud) hud.innerHTML =
-      '<span class="chip2">' + tx('🧠 神经元 {0}', graph.nodes.length) + '</span>' +
-      '<span class="chip2">' + tx('突触 {0}', graph.edges.length) + '</span>' +
-      '<span class="chip2">' + tx('📁 项目 {0}', graph.groups.length) + '</span>' +
-      '<span class="chip2">' + T('滚轮缩放 · 拖拽平移 · 点击跳转') + '</span>';
-    bindNnEvents(svg, gW);
+    const tree = ntBuildTree(WF.list, qaItems);
+    ntLayoutTree(tree, W, H);
+    nnTextState = { tree: tree, W: W, H: H, bw: 0, bh: 0, dpr: 1, born: performance.now(),
+      rects: tree.rects || [], th: ntTheme(), thSig: document.documentElement.getAttribute('data-theme') || '' };
+    resizeNnCanvas(true);
+    nnTextView = { x: 0, y: 0, z: 1, tx: 0, ty: 0, tz: 1, vx: 0, vy: 0, flying: false };
+    nnTextHover = null; nnTextFocus = null; nnTextDrag = null;
+    ntRunSearch(nnTextSearch);
+    ntFitView(true);
+    ntUpdateHud();
+    bindNnEvents();
+    ntFrame._laid = 0;
+    ntStartLoop();
+    ntRelayoutIfNeeded();
   }
-  function nnApplyView(){
-    const g = document.getElementById('nnWorld');
-    if (g) g.setAttribute('transform', 'translate(' + nnX + ',' + nnY + ') scale(' + nnZ + ')');
-    // 放大后浮现文字：低缩放时弱化标签
-    const svg = $('nnSvg');
-    if (svg) svg.style.setProperty('--nnz', String(nnZ));
-    document.querySelectorAll('#nnSvg .nrn').forEach(el => {
-      const t = el.querySelector('.txt'), s = el.querySelector('.sub');
-      const show = nnZ > 0.72;
-      if (t) t.style.opacity = show ? '' : '0';
-      if (s) s.style.opacity = nnZ > 1.05 ? '' : '0';
-    });
+  // 视图切换后容器刚显示出来时，clientWidth 可能仍是 0（上一帧没布局）。
+  // 这里在下一帧复查：尺寸与建树时用的不一致就整棵重排，保证「屏幕坐标 ↔ 世界坐标」一致。
+  function ntRelayoutIfNeeded(){
+    const cv = $('nnCv');
+    if (!cv || !nnTextState) return;
+    const box = cv.parentElement;
+    const cw = box.clientWidth || 0, ch = box.clientHeight || 0;
+    if (!cw || !ch) return;
+    const W = Math.max(680, cw), H = Math.max(420, ch);
+    if (Math.abs(W - nnTextState.W) < 2 && Math.abs(H - nnTextState.H) < 2) return;
+    const tree = ntBuildTree(WF.list, qaItems);
+    ntLayoutTree(tree, W, H);
+    nnTextState.tree = tree; nnTextState.W = W; nnTextState.H = H; nnTextState.rects = tree.rects || [];
+    resizeNnCanvas(true);
+    ntRunSearch(nnTextSearch);
+    ntFitView(true);
+    ntUpdateHud();
   }
-  function bindNnEvents(svg, gW){
-    if (svg.dataset.bound) return;
-    svg.dataset.bound = '1';
-    svg.addEventListener('wheel', ev => {
-      ev.preventDefault();
-      const r = svg.getBoundingClientRect();
-      const mx = ev.clientX - r.left, my = ev.clientY - r.top;
-      const f = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
-      const nz = Math.max(0.32, Math.min(6, nnZ * f));
-      const k = nz / nnZ;
-      nnX = mx - (mx - nnX) * k; nnY = my - (my - nnY) * k; nnZ = nz;
-      nnApplyView();
-    }, { passive: false });
-    let drag = null;
-    svg.addEventListener('mousedown', ev => { drag = { x: ev.clientX - nnX, y: ev.clientY - nnY, moved: false }; svg.classList.add('drag'); });
-    window.addEventListener('mousemove', ev => {
-      if (!drag) return;
-      if (Math.abs(ev.clientX - nnX - drag.x) + Math.abs(ev.clientY - nnY - drag.y) > 3) drag.moved = true;
-      nnX = ev.clientX - drag.x; nnY = ev.clientY - drag.y; nnApplyView();
-    });
-    window.addEventListener('mouseup', () => { if (drag){ setTimeout(() => { drag = null; }, 0); } svg.classList.remove('drag'); });
-    svg.addEventListener('click', ev => {
-      const g1 = ev.target.closest && ev.target.closest('.nrn');
-      if (!g1) return;
-      if (drag && drag.moved) return;
-      const n = nnState && nnState.graph.nodes.find(x => x.id === g1.dataset.nn);
-      if (!n) return;
-      if (n.canvas){ switchWorkflow(n.canvas); toast(tx('已跳转：{0}', n.canvas)); }
-      else { toast(n.label + (n.sub ? ' · ' + n.sub : '')); }
-    });
-    svg.addEventListener('mousemove', ev => {
-      const g1 = ev.target.closest && ev.target.closest('.nrn');
-      const tip = $('nnTip');
-      document.querySelectorAll('#nnSvg .nrn.hot').forEach(x => x.classList.remove('hot'));
-      if (!g1){ if (tip) tip.style.display = 'none'; return; }
-      g1.classList.add('hot');
-      const n = nnState && nnState.graph.nodes.find(x => x.id === g1.dataset.nn);
-      if (!n || !tip) return;
-      const r = svg.parentElement.getBoundingClientRect();
-      tip.innerHTML = '<b>' + (n.kind === 'hub' ? '🧠 ' : (n.kind === 'proj' ? '📁 ' : '🧩 ')) + escXml(n.label) + '</b>' +
-        '<div class="row">' + escXml(n.sub || '') + '</div>' +
-        (n.proj ? '<div class="row">' + T('项目：') + escXml(n.proj) + '</div>' : '') +
-        (n.canvas ? '<div class="row">' + T('点击跳转画布 →') + '</div>' : '');
-      tip.style.display = 'block';
-      tip.style.left = Math.min(r.width - 350, ev.clientX - r.left + 14) + 'px';
-      tip.style.top = Math.min(r.height - 90, ev.clientY - r.top + 14) + 'px';
-    });
+  function ntTheme(){
+    const cs = getComputedStyle(document.documentElement);
+    const get = k => { const v = (cs.getPropertyValue(k) || '').trim(); return v || '#888888'; };
+    const dark = (document.documentElement.getAttribute('data-theme') || '') === 'dark';
+    const bg = (cs.getPropertyValue('--canvas') || '').trim();
+    return { ink: get('--ink'), muted: get('--muted'), line: get('--line'), panel: get('--panel'),
+      canvas: bg || (dark ? '#0b1020' : '#f4f6fb'), accent: get('--accent'), dark: dark,
+      code: dark ? '#0d1117' : '#eef1f6', codeInk: dark ? '#c9d1d9' : '#24292f' };
   }
-  // 脉冲动画：沿突触流动的光点（神经网络「学习」的视觉）
-  function nnSpawnPulses(){
-    const svg = $('nnSvg');
-    if (!svg || !nnState) return;
-    const gW = document.getElementById('nnWorld');
-    if (!gW) return;
-    gW.querySelectorAll('.pulse').forEach(p => p.remove());
-    nnPulses = [];
-    const paths = [...gW.querySelectorAll('path.syn')];
-    if (!paths.length) return;
-    const n = Math.min(14, Math.max(5, Math.round(paths.length / 6)));
-    for (let i = 0; i < n; i++){
-      const path = paths[Math.floor(Math.random() * paths.length)];
-      let len = 100; try { len = path.getTotalLength(); } catch(e){ continue; }
-      const dot = nnSvgEl('circle', { class: 'pulse k' + (1 + (i % 3)), r: 3 });
-      gW.appendChild(dot);
-      nnPulses.push({ el: dot, path: path, len: len, t: Math.random(), sp: 0.006 + Math.random() * 0.008 });
+  function resizeNnCanvas(force){
+    const cv = $('nnCv');
+    if (!cv || !nnTextState) return;
+    const box = cv.parentElement;
+    const bw = Math.max(320, box.clientWidth || 0), bh = Math.max(240, box.clientHeight || 0);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (force || bw !== nnTextState.bw || bh !== nnTextState.bh || dpr !== nnTextState.dpr){
+      nnTextState.bw = bw; nnTextState.bh = bh; nnTextState.dpr = dpr;
+      cv.width = Math.round(bw * dpr); cv.height = Math.round(bh * dpr);
     }
   }
-  function nnTick(){
-    nnRaf = requestAnimationFrame(nnTick);
-    if (!nnPulses.length || !nnState || curView !== 'nn') return;
-    if (document.hidden) return;
-    nnPulses.forEach(p => {
-      p.t += p.sp; if (p.t > 1) p.t = 0;
-      let pt; try { pt = p.path.getPointAtLength(p.len * p.t); } catch(e){ return; }
-      p.el.setAttribute('cx', pt.x); p.el.setAttribute('cy', pt.y);
-      p.el.setAttribute('opacity', String(Math.sin(Math.PI * p.t)));
+  // 当前 LOD 档位（色块档 / 条带档 / 文字档）：由当前缩放推算，独立于帧循环，随时可读
+  function ntUpdateLod(){
+    const el = $('nnLod');
+    if (!el || !nnTextView) return;
+    const px = ntRowPx();                     // 当前「一行」在屏幕上的像素高
+    el.textContent = px >= NT_TEXT_FROM_PX ? T('文字档') + ' ' + nnTextView.tz.toFixed(2) + '×'
+      : px >= NT_STRIPS_FROM_PX ? T('条带档') + ' ' + nnTextView.tz.toFixed(2) + '×'
+      : T('色块档') + ' ' + nnTextView.tz.toFixed(2) + '×';
+  }
+  // 当前「一行代码」的屏幕像素高：取所有 turn 里 (块高/行数) 的中位数，再乘缩放
+  function ntRowPx(){
+    const st = nnTextState;
+    if (!st || !st.rects) return 0;
+    const arr = [];
+    for (const r of st.rects){
+      if (r.kind !== 'turn') continue;
+      const nL = (r.lines && r.lines.length) || 1;
+      arr.push(r.h / nL);
+      if (arr.length >= 400) break;
+    }
+    if (!arr.length) return 0;
+    arr.sort((a, b) => a - b);
+    const med = arr[arr.length >> 1];
+    return med * (nnTextView ? nnTextView.tz : 1);
+  }
+  function ntUpdateHud(){
+    const hud = $('nnHud');
+    if (!hud || !nnTextState) return;
+    const r = nnTextState.rects;
+    const nProj = r.filter(x => x.kind === 'proj').length;
+    const nSess = r.filter(x => x.kind === 'sess').length;
+    const nTurn = r.filter(x => x.kind === 'turn').length;
+    const searchChip = nnTextSearchOn ? '<span class="chip2">' + tx('🔎 {0} 命中', nnTextMatches.length) + '</span>' : '';
+    hud.innerHTML =
+      '<span class="chip2">' + tx('📁 项目 {0}', nProj) + '</span>' +
+      '<span class="chip2">' + tx('🧩 会话 {0}', nSess) + '</span>' +
+      '<span class="chip2">' + tx('💬 文本行 {0}', nTurn) + '</span>' +
+      searchChip +
+      '<span class="chip2" id="nnFps">— fps</span>' +
+      '<span class="chip2">' + T('滚轮缩放 · 拖拽平移 · 点击跳转') + '</span>';
+    ntUpdateLod();
+  }
+  function ntFitView(instant){
+    if (!nnTextState) return;
+    const rects = nnTextState.rects.filter(r => r.kind === 'proj');
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    rects.forEach(r => { x1 = Math.min(x1, r.x); y1 = Math.min(y1, r.y); x2 = Math.max(x2, r.x + r.w); y2 = Math.max(y2, r.y + r.h); });
+    if (!isFinite(x1)){ x1 = 0; y1 = 0; x2 = nnTextState.W; y2 = nnTextState.H; }
+    const pad = 24;
+    const bw = Math.max(60, x2 - x1 + pad * 2), bh = Math.max(60, y2 - y1 + pad * 2);
+    const scale = Math.max(NT_ZMIN, Math.min(NT_ZMAX, Math.min(nnTextState.bw / bw, nnTextState.bh / bh) * 0.94));
+    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    if (instant){
+      nnTextView.tz = scale; nnTextView.tx = nnTextState.bw / 2 - cx * scale; nnTextView.ty = nnTextState.bh / 2 - cy * scale;
+      nnTextView.z = scale; nnTextView.x = nnTextView.tx; nnTextView.y = nnTextView.ty; nnTextView.flying = false;
+    } else ntFlyTo(cx, cy, scale);
+    ntUpdateLod();
+  }
+  function ntFlyTo(cxw, cyw, scale){
+    const v = nnTextView;
+    if (!v) return;
+    v.tz = Math.max(NT_ZMIN, Math.min(NT_ZMAX, scale));
+    v.tx = nnTextState.bw / 2 - cxw * v.tz;
+    v.ty = nnTextState.bh / 2 - cyw * v.tz;
+    v.vx = 0; v.vy = 0; v.flying = true;
+    ntStartLoop();
+  }
+  function ntZoomBy(f){
+    if (!nnTextView) return;
+    ntFlyTo((-nnTextView.tx + nnTextState.bw / 2) / nnTextView.z, (-nnTextView.ty + nnTextState.bh / 2) / nnTextView.z, nnTextView.tz * f);
+  }
+  function ntFlyToRect(rc){
+    if (!rc) return;
+    const pad = 30;
+    const bw = Math.max(60, rc.w + pad * 2), bh = Math.max(60, rc.h + pad * 2);
+    const scale = Math.max(NT_ZMIN, Math.min(NT_ZMAX, Math.min(nnTextState.bw / bw, nnTextState.bh / bh) * 0.9));
+    ntFlyTo(rc.x + rc.w / 2, rc.y + rc.h / 2, scale);
+  }
+  function ntRunSearch(q){
+    nnTextSearch = (q || '').trim().toLowerCase();
+    nnTextSearchOn = nnTextSearch.length > 0;
+    nnTextMatches = []; nnTextMatchAt = -1;
+    if (!nnTextSearchOn || !nnTextState) return;
+    nnTextState.rects.forEach(r => {
+      const hay = (String(r.label || '') + ' ' + String(r.sub || '') + ' ' + String(r.canvas || '')).toLowerCase();
+      if (hay.indexOf(nnTextSearch) >= 0) nnTextMatches.push(r);
+    });
+    nnTextMatches.sort((a, b) => (a.depth - b.depth) || (b.w * b.h - a.w * a.h));
+    if (nnTextMatches.length) nnTextMatchAt = 0;
+  }
+  function ntFlyToNextMatch(){
+    if (!nnTextMatches.length) return;
+    nnTextMatchAt = (nnTextMatchAt + 1) % nnTextMatches.length;
+    const r = nnTextMatches[nnTextMatchAt];
+    ntFlyToRect(r);
+    toast(tx('匹配 {0}/{1}：{2}', nnTextMatchAt + 1, nnTextMatches.length, r.label));
+  }
+  // 命中：由内向外（turn → sess → agent → proj），矩形包含判定
+  function nnHitTest(mx, my){
+    if (!nnTextState) return null;
+    const v = nnTextView;
+    const wx = (mx - v.x) / v.z, wy = (my - v.y) / v.z;
+    const order = ['turn', 'sess', 'agent', 'proj'];
+    for (const kind of order){
+      for (let i = nnTextState.rects.length - 1; i >= 0; i--){
+        const r = nnTextState.rects[i];
+        if (r.kind !== kind) continue;
+        if (wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h) return r;
+      }
+    }
+    return null;
+  }
+  // 聚焦集合：委托 __CORE 的纯函数 ntFocusSetIn（可单测）
+  function ntFocusSet(rc){
+    if (!rc || !nnTextState) return null;
+    return ntFocusSetIn(nnTextState.rects, rc);
+  }
+  function ntFrame(now){
+    const st = nnTextState;
+    if (!st || document.hidden || curView !== 'nn'){ ntStopLoop(); nnTextFpsT = 0; return; }
+    nnTextRaf = requestAnimationFrame(ntFrame);
+    if (nnTextFpsT){
+      const dt = now - nnTextFpsT;
+      if (dt > 0 && dt < 500) nnTextFps = nnTextFps ? nnTextFps * 0.92 + (1000 / dt) * 0.08 : 1000 / dt;
+    }
+    nnTextFpsT = now;
+    const sig = document.documentElement.getAttribute('data-theme') || '';
+    if (sig !== st.thSig){ st.thSig = sig; st.th = ntTheme(); }
+    resizeNnCanvas(false);
+    // 首次进入视图时容器刚完成布局 → 用真实尺寸重排一次（只会在尺寸变化时触发）
+    if (!ntFrame._laid){ ntFrame._laid = 1; ntRelayoutIfNeeded(); }
+    const v = nnTextView;
+    if (Math.abs(Math.log(v.tz) - Math.log(v.z)) > 0.0008) v.z = Math.exp(Math.log(v.z) + (Math.log(v.tz) - Math.log(v.z)) * NT_FLY_K);
+    else v.z = v.tz;
+    if (Math.abs(v.tx - v.x) > 0.08 || Math.abs(v.ty - v.y) > 0.08){ v.x += (v.tx - v.x) * NT_FLY_K; v.y += (v.ty - v.y) * NT_FLY_K; }
+    else { v.x = v.tx; v.y = v.ty; }
+    if (!nnTextDrag && (Math.abs(v.vx) > 0.04 || Math.abs(v.vy) > 0.04)){
+      v.x += v.vx; v.y += v.vy; v.tx = v.x; v.ty = v.y; v.vx *= 0.9; v.vy *= 0.9;
+    }
+    drawNn(now);
+    const el = $('nnFps');
+    if (el && now - (ntFrame._hud || 0) > 500){ ntFrame._hud = now; el.textContent = Math.round(nnTextFps) + ' fps'; ntUpdateLod(); }
+  }
+  // ---------------------------------------------------------------------
+  // 绘制：文字树图（treemap of text）—— 矩形 + 内部文字/代码纹理填充
+  //   渲染顺序：背景 → 每个矩形的「内部内容」→ 边框/标题（自外向内，保证子矩形压在父矩形上）
+  //   三档 LOD（按「每行像素」line_px = 行高 × 缩放）：
+  //     line_px <  0.6  → 纯色块（solid，远看是一片密色纹理）
+  //     0.6 ≤ line_px < 9 → 代码条带（strips，用短横条模拟字符，即图1 的密字效果）
+  //     line_px ≥  9    → 真实文字（text，带行号/高亮，即图2 放大后能读代码的效果）
+  // ---------------------------------------------------------------------
+  function ntRoundRect(ctx, x, y, w, h, r){
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    if (ctx.roundRect){ ctx.roundRect(x, y, w, h, r); return; }
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function ntMix(a, b, t){
+    const pa = ntHex(a), pb = ntHex(b);
+    const c = i => Math.round(pa[i] + (pb[i] - pa[i]) * t);
+    return 'rgb(' + c(0) + ',' + c(1) + ',' + c(2) + ')';
+  }
+  function ntHex(h){
+    h = String(h || '#888').trim();
+    if (h.charAt(0) === '#') h = h.slice(1);
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    const n = parseInt(h, 16);
+    return isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [136, 136, 136];
+  }
+
+  function drawNn(now){
+    const st = nnTextState, cv = $('nnCv');
+    if (!st || !cv) return;
+    const ctx = cv.getContext('2d');
+    const v = nnTextView, th = st.th;
+    const dpr = st.dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, st.bw, st.bh);
+    // 背景（对齐 #nnCv CSS 的渐变底色，重绘一次保证一致）
+    ctx.fillStyle = th.canvas;
+    ctx.fillRect(0, 0, st.bw, st.bh);
+
+    const X = wx => wx * v.z + v.x;
+    const Y = wy => wy * v.z + v.y;
+    const z = v.z;
+    const focus = nnTextHover ? ntFocusSet(nnTextHover) : null;
+
+    // 视口世界矩形（屏外剔除）
+    const vx1 = (-v.x) / z, vy1 = (-v.y) / z;
+    const vx2 = (st.bw - v.x) / z, vy2 = (st.bh - v.y) / z;
+
+    let quads = 0, labels = 0;
+    let hoverRect = null;
+
+    // ---------- 1) 先铺父层底色（proj → agent → sess），再画最内层的 turn 内容 ----------
+    //    注意顺序：会话底色会覆盖整块区域，必须在 turn 之前画，否则会把 turn 文字擦掉。
+    const bgLayers = ['proj', 'agent', 'sess'];
+    for (const layer of bgLayers){
+      for (const r of st.rects){
+        if (r.kind !== layer) continue;
+        if (r.x > vx2 || r.y > vy2 || r.x + r.w < vx1 || r.y + r.h < vy1) continue;   // 屏外剔除
+        if (r.w * z < 0.6 || r.h * z < 0.6) continue;                                 // 亚像素剔除
+        if (quads++ > NT_RECT_BUDGET) break;
+        const dim = focus && !focus.has(r.id);
+        ntDrawRectContent(ctx, st, v, th, r, X, Y, dim);
+      }
+    }
+    // 最内层：turn 的真实文字 / 代码条带（压在所有底色之上）
+    {
+      const layer = 'turn';
+      for (const r of st.rects){
+        if (r.kind !== layer) continue;
+        if (r.x > vx2 || r.y > vy2 || r.x + r.w < vx1 || r.y + r.h < vy1) continue;
+        if (r.w * z < 0.6 || r.h * z < 0.6) continue;
+        if (quads++ > NT_RECT_BUDGET) break;
+        const dim = focus && !focus.has(r.id);
+        ntDrawRectContent(ctx, st, v, th, r, X, Y, dim);
+        if (dim) ntDrawFrame(ctx, st, v, th, r, X, Y, true);
+      }
+    }
+    // 边框 + 标题（自外向内：先 proj 后 sess，保证内层边框压在外层之上）
+    for (const layer of ['proj', 'agent', 'sess']){
+      for (const r of st.rects){
+        if (r.kind !== layer) continue;
+        if (r.x > vx2 || r.y > vy2 || r.x + r.w < vx1 || r.y + r.h < vy1) continue;
+        if (r.w * z < 1.5 || r.h * z < 1.5) continue;
+        const dim = focus && !focus.has(r.id);
+        ntDrawFrame(ctx, st, v, th, r, X, Y, dim);
+        if (!dim && labels++ < NT_LABEL_BUDGET) ntDrawTitle(ctx, st, v, th, r, X, Y);
+      }
+    }
+    // ---------- 2) 搜索命中金色描边 + 当前命中呼吸 ----------
+    if (nnTextSearchOn && nnTextMatches.length){
+      nnTextMatches.forEach((r, i) => {
+        const on = i === nnTextMatchAt;
+        ctx.save();
+        ctx.strokeStyle = on ? '#f59e0b' : '#eab308';
+        ctx.lineWidth = on ? 2.6 : 1.4;
+        ctx.globalAlpha = on ? 0.7 + 0.3 * Math.abs(Math.sin(now / 420)) : 0.55;
+        ntRoundRect(ctx, X(r.x) + 0.5, Y(r.y) + 0.5, Math.max(2, r.w * z - 1), Math.max(2, r.h * z - 1), 3);
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+    // ---------- 3) 悬停矩形高亮 + tooltip ----------
+    const tip = $('nnTip');
+    if (nnTextHover){
+      hoverRect = nnTextHover;
+      ctx.save();
+      ctx.strokeStyle = th.accent;
+      ctx.lineWidth = 2;
+      ntRoundRect(ctx, X(hoverRect.x) - 1, Y(hoverRect.y) - 1, Math.max(3, hoverRect.w * z + 2), Math.max(3, hoverRect.h * z + 2), 4);
+      ctx.stroke();
+      ctx.restore();
+      if (tip){
+        const nm = hoverRect.kind === 'sess' ? (hoverRect.canvas || hoverRect.label)
+          : hoverRect.kind === 'turn' ? hoverRect.label
+          : hoverRect.label;
+        const meta = [];
+        if (hoverRect.sub) meta.push(hoverRect.sub);
+        if (hoverRect.kind === 'turn') meta.push(T('对话轮') + ' #' + (hoverRect.node && hoverRect.node.line != null ? hoverRect.node.line + 1 : ''));
+        if (z < 0.4) meta.push(T('滚轮放大可读真实文字'));
+        tip.innerHTML = '<b>' + escXml(nm || '') + '</b>' + (meta.length ? '<i>' + escXml(meta.join(' · ')) + '</i>' : '');
+        tip.style.display = 'block';
+        const tw = 260;
+        tip.style.left = Math.max(4, Math.min(st.bw - tw - 4, X(hoverRect.x))) + 'px';
+        tip.style.top = Math.max(4, Y(hoverRect.y) - 6) + 'px';
+      }
+    } else if (tip) tip.style.display = 'none';
+
+  // 左上角「当前缩放档」提示
+  ntUpdateLod();
+}
+
+  // 单个矩形的「内部内容」
+  function ntDrawRectContent(ctx, st, v, th, r, X, Y, dim){
+    const z = v.z, a = dim ? NT_DIM : 1;
+    ctx.save();
+    ctx.globalAlpha = a;
+    const x = X(r.x), y = Y(r.y), w = r.w * z, h = r.h * z;
+    if (r.kind === 'turn'){
+      ntDrawTurnLine(ctx, st, v, th, r, x, y, w, h);
+    } else if (r.kind === 'sess'){
+      ntDrawSessionBody(ctx, st, v, th, r, x, y, w, h);
+    } else if (r.kind === 'agent'){
+      ctx.fillStyle = ntMix(th.code, r.color || th.accent, th.dark ? 0.16 : 0.07);
+      ctx.fillRect(x, y, w, h);
+    } else if (r.kind === 'proj'){
+      ctx.fillStyle = ntMix(th.canvas, r.color || th.accent, th.dark ? 0.10 : 0.045);
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.restore();
+  }
+
+  // 对话轮 = 一段「代码块」（多行）。三档 LOD 的核心：
+  //   每行像素 line_px = (块高 / 行数) × 缩放，与 code-map 的 line_px = line_h * scale 同义。
+  function ntDrawTurnLine(ctx, st, v, th, r, x, y, w, h){
+    const z = v.z;
+    const lines = (r.lines && r.lines.length) ? r.lines : [String(r.label || '')];
+    const nL = Math.max(1, lines.length);
+    const rowH = h / nL;                            // 每行像素
+    const lpx = rowH;                               // 每行像素 = 屏幕行高
+    const fs = Math.min(15, Math.max(6, rowH * 0.78));
+    if (lpx < NT_STRIPS_FROM_PX){
+      // 纯色块：远看只是一片密色
+      ctx.fillStyle = ntMix(th.code, th.codeInk, th.dark ? 0.55 : 0.35);
+      ctx.fillRect(x, y + h * 0.18, w, Math.max(0.7, h * 0.55));
+      return;
+    }
+    if (lpx < NT_TEXT_FROM_PX){
+      // 代码条带：用短横条模拟字符纹理（图1 的密字观感），每行一条
+      const barH = Math.max(0.9, Math.min(2.4, rowH * 0.34));
+      const gap = Math.max(1.6, fs * 0.52);
+      for (let li = 0; li < nL; li++){
+        const ly = y + li * rowH;
+        if (ly > y + h) break;
+        const txt = String(lines[li] || '');
+        const seed = ntHash(txt);
+        let bx = x + 1, i = 0;
+        ctx.fillStyle = ntMix(th.codeInk, th.code, 0.32);
+        while (bx < x + w - 1.5){
+          const rr = ntHash(txt + '#' + i);
+          const bl = Math.max(2, ((seed + rr) % 9) + 2) * gap;   // 2~10 字符的宽度
+          ctx.fillRect(bx, ly + (rowH - barH) / 2, Math.min(bl, x + w - bx - 1), barH);
+          bx += bl + gap;
+          i++;
+        }
+      }
+      return;
+    }
+    // 真实文字档（图2 效果）：铺满整块的多行等宽文字 + 行号 + 语法高亮 + 视口裁剪
+    const baseNo = r.node && typeof r.node.line === 'number' ? r.node.line : 0;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.textBaseline = 'middle';
+    const nRows = Math.max(1, nL);                   // 已由布局按容量切好的行数
+    const lh = h / nRows;                            // 屏幕上行走距（= 每行像素）
+    const fsR = Math.round(Math.max(6.5, Math.min(15, lh * 0.72)));
+    ctx.font = fsR + 'px ' + (th.mono || 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+    const noW = (w > 60) ? (String(baseNo + nRows).length * fsR * 0.62 + 8) : 0;
+    if (noW){
+      ctx.fillStyle = th.dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.05)';
+      ctx.fillRect(x + noW - 1, y, 1, h);
+    }
+    for (let li = 0; li < nRows; li++){
+      const ly = y + li * lh;
+      if (ly > y + h + 1) break;
+      const ty = ly + lh / 2;
+      if (noW){
+        ctx.fillStyle = th.dark ? 'rgba(255,255,255,.26)' : 'rgba(0,0,0,.26)';
+        ctx.textAlign = 'right';
+        ctx.fillText(String(baseNo + li + 1), x + noW - 5, ty);
+        ctx.textAlign = 'left';
+      }
+      const txt = String(lines[li] == null ? '' : lines[li]);
+      const cont = txt.charAt(0) === ' ' && txt.charAt(1) === ' ';   // 续行降透明度
+      if (cont) ctx.globalAlpha = 0.72;
+      const toks = ntTokenize(txt);
+      let cx = x + noW;
+      for (const tk of toks){
+        const tw = ntTextW(ctx, tk.t, fsR);
+        if (cx > x + w - 1) break;
+        ctx.fillStyle = tk.c || (tk.k === 'str' ? (th.dark ? '#a5d6ff' : '#0a3069')
+          : tk.k === 'num' ? (th.dark ? '#79c0ff' : '#0550ae')
+          : tk.k === 'cmt' ? (th.dark ? '#8b949e' : '#6e7781')
+          : tk.k === 'kw' ? (th.dark ? '#ff7b72' : '#cf222e')
+          : th.codeInk);
+        if (cx + tw > x + w){ ctx.save(); ctx.beginPath(); ctx.rect(cx, ly, x + w - cx, lh); ctx.clip(); ctx.fillText(tk.t, cx, ty); ctx.restore(); break; }
+        ctx.fillText(tk.t, cx, ty);
+        cx += tw;
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+  // 把若干逻辑行铺满成恰好 want 行的「密排代码块」。
+  // 内容不足时循环续写（按源行顺序轮转 → 视觉上更像真实代码块），超出则截断。
+  function ntPackRows(rawLines, want){
+    const want2 = Math.max(1, want || 1);
+    const src = (rawLines || []).map(s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (!src.length) return new Array(want2).fill('');
+    // 去重后仍不足时，用「去重前的原始序列」循环，保证纹理有变化
+    const uniq = [];
+    const seen = new Set();
+    src.forEach(s => { if (!seen.has(s)){ seen.add(s); uniq.push(s); } });
+    const pool = uniq.length ? uniq : src;
+    const out = [];
+    for (let i = 0; i < want2; i++){
+      const t = pool[i % pool.length];
+      // 第 2 轮起的行加缩进，读起来像代码续写
+      out.push(i < pool.length ? t : ('  ' + t));
+    }
+    return out;
+  }
+  // 会话体：标题条 + 内部行（行由 turn 矩形单独绘制，这里只补「会话抬头」与底色）
+  // 会话体：底色 + 抬头条 + 左侧智能体色条（x/y/w/h 均为屏幕坐标）
+  function ntDrawSessionBody(ctx, st, v, th, r, x, y, w, h){
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();       // 严格裁到本会话矩形，避免抬头条溢出
+    ctx.fillStyle = th.code;
+    ctx.fillRect(x, y, w, h);
+    // 抬头条高度固定为「一个屏幕行高」量级，不再乘缩放（x/y/w/h 已是屏幕坐标）
+    const headH = Math.min(h, Math.max(9, Math.min(15, h * 0.16)));
+    if (h > 3){
+      ctx.fillStyle = ntMix(th.code, r.color || th.accent, th.dark ? 0.30 : 0.16);
+      ctx.fillRect(x, y, w, headH);
+    }
+    // 左侧色条（智能体标识）
+    if (w > 6){
+      ctx.fillStyle = r.color || th.accent;
+      ctx.fillRect(x, y, Math.max(1.5, Math.min(3, w * 0.02)), h);
+    }
+    ctx.restore();
+  }
+
+  // 矩形边框（code-map frame()：线宽随缩放收敛到 1px，颜色按层级/主题）
+  function ntDrawFrame(ctx, st, v, th, r, X, Y, dim){
+    const z = v.z;
+    const x = X(r.x), y = Y(r.y), w = r.w * z, h = r.h * z;
+    if (w < 1 || h < 1) return;
+    ctx.save();
+    ctx.globalAlpha = dim ? NT_DIM * 0.8 : 1;
+    const isProj = r.kind === 'proj', isAgent = r.kind === 'agent', isSess = r.kind === 'sess';
+    ctx.lineWidth = isProj ? 1.6 : isAgent ? 1.1 : 0.8;
+    ctx.strokeStyle = isProj ? ntMix(th.line, th.ink, th.dark ? 0.35 : 0.45)
+      : isAgent ? ntMix(th.line, r.color || th.accent, th.dark ? 0.45 : 0.35)
+      : ntMix(th.line, th.ink, th.dark ? 0.18 : 0.22);
+    ntRoundRect(ctx, x + 0.5, y + 0.5, Math.max(1, w - 1), Math.max(1, h - 1), isProj ? 4 : isSess ? 2 : 3);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 矩形标题：项目/智能体/会话 三级标题条（图1 中的黑色标题带 + 白色文件名）
+  function ntDrawTitle(ctx, st, v, th, r, X, Y){
+    const z = v.z;
+    const x = X(r.x), y = Y(r.y), w = r.w * z, h = r.h * z;
+    if (w < 26 || h < 9) return;
+    const isProj = r.kind === 'proj', isAgent = r.kind === 'agent';
+    const barH = Math.max(11, Math.min(h * (isProj ? 0.16 : 0.2), isProj ? 20 : 16));
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, barH); ctx.clip();
+    ctx.fillStyle = isProj
+      ? (th.dark ? 'rgba(10,14,26,.92)' : 'rgba(17,24,39,.86)')
+      : isAgent ? ntMix(r.color || th.accent, '#000000', th.dark ? 0.35 : 0.15)
+      : (th.dark ? 'rgba(22,27,34,.92)' : 'rgba(255,255,255,.9)');
+    ctx.globalAlpha = 0.94;
+    ctx.fillRect(x, y, w, barH);
+    ctx.globalAlpha = 1;
+    const fs = Math.max(7, Math.min(12, barH * 0.68));
+    const ty = y + barH / 2 + 0.5;
+    let tx = x + 5;
+    // 色点（智能体/会话）
+    if (!isProj && r.color){
+      ctx.fillStyle = r.color;
+      ctx.beginPath(); ctx.arc(x + 5, y + barH / 2, Math.max(1.6, fs * 0.28), 0, Math.PI * 2); ctx.fill();
+      tx = x + 5 + fs * 0.7 + 4;
+    }
+    const label = r.kind === 'sess' ? String(r.canvas || r.label || '') : String(r.label || '');
+    const maxW = w - (tx - x) - 6;
+    ctx.font = (isProj ? '600 ' : '') + Math.round(fs) + 'px system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = (isProj || isAgent) ? '#f3f4f6' : (th.dark ? '#e6edf3' : '#111827');
+    ctx.fillText(ntFit(ctx, label, maxW), tx, ty);
+    ctx.restore();
+  }
+  // 文本像素宽度：优先 measureText，不可用时按等宽字体经验值兜底
+  function ntTextW(ctx, t, fs){
+    const s = String(t == null ? '' : t);
+    if (!s) return 0;
+    if (ctx && typeof ctx.measureText === 'function'){
+      const w = ctx.measureText(s).width;
+      if (w > 0) return w;
+    }
+    // 兜底：基本拉丁 ≈0.60em，CJK/全角 ≈1.0em
+    let em = 0;
+    for (const ch of s) em += (ch.codePointAt(0) > 0x2e80) ? 1 : 0.6;
+    return em * fs;
+  }
+  function ntFit(ctx, t, maxW){
+    const s = String(t || '');
+    if (ctx.measureText(s).width <= maxW) return s;
+    let out = '', w = 0;
+    const ew = ctx.measureText('…').width;
+    for (const ch of s){
+      const cw = ctx.measureText(ch).width;
+      if (w + cw + ew > maxW) return out + '…';
+      w += cw; out += ch;
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------
+  // 交互：滚轮缩放（以光标为锚）、拖拽平移、点击跳转、悬停聚焦、搜索
+  // ---------------------------------------------------------------------
+  function bindNnEvents(){
+    const cv = $('nnCv');
+    if (!cv || cv.dataset.ntBound) return;
+    cv.dataset.ntBound = '1';
+    const pos = ev => { const r = cv.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
+
+    cv.addEventListener('wheel', ev => {
+      if (!nnTextView) return;
+      ev.preventDefault();
+      const p = pos(ev);
+      const v = nnTextView;
+      const wx = (p.x - v.x) / v.z, wy = (p.y - v.y) / v.z;
+      const f = Math.pow(1.0016, -ev.deltaY);
+      const nz = Math.max(NT_ZMIN, Math.min(NT_ZMAX, v.tz * f));
+      v.tz = nz;
+      v.tx = p.x - wx * nz;
+      v.ty = p.y - wy * nz;
+      v.flying = false;
+      ntStartLoop();
+    }, { passive: false });
+
+    cv.addEventListener('pointerdown', ev => {
+      if (!nnTextView) return;
+      cv.setPointerCapture(ev.pointerId);
+      const p = pos(ev);
+      nnTextDrag = { sx: p.x, sy: p.y, ox: nnTextView.x, oy: nnTextView.y, lx: p.x, ly: p.y, vx: 0, vy: 0, moved: false, t: performance.now() };
+    });
+    cv.addEventListener('pointermove', ev => {
+      const p = pos(ev);
+      if (nnTextDrag){
+        const dx = p.x - nnTextDrag.sx, dy = p.y - nnTextDrag.sy;
+        if (Math.abs(dx) + Math.abs(dy) > 3) nnTextDrag.moved = true;
+        const v = nnTextView;
+        v.x = nnTextDrag.ox + dx; v.y = nnTextDrag.oy + dy; v.tx = v.x; v.ty = v.y;
+        const now = performance.now(), dt = Math.max(1, now - nnTextDrag.t);
+        v.vx = (p.x - nnTextDrag.lx) / dt * 12; v.vy = (p.y - nnTextDrag.ly) / dt * 12;
+        nnTextDrag.lx = p.x; nnTextDrag.ly = p.y; nnTextDrag.t = now;
+        cv.classList.add('drag');
+        return;
+      }
+      const hit = nnHitTest(p.x, p.y);
+      if (hit !== nnTextHover){ nnTextHover = hit; ntStartLoop(); }
+      cv.style.cursor = hit ? 'pointer' : 'grab';
+    });
+    const up = ev => {
+      if (!nnTextDrag) return;
+      const d = nnTextDrag; nnTextDrag = null;
+      cv.classList.remove('drag');
+      if (!d.moved){
+        const p = pos(ev);
+        const hit = nnHitTest(p.x, p.y);
+        if (hit) ntActivate(hit);
+      }
+    };
+    cv.addEventListener('pointerup', up);
+    cv.addEventListener('pointercancel', () => { nnTextDrag = null; cv.classList.remove('drag'); });
+    cv.addEventListener('pointerleave', () => { nnTextHover = null; const t = $('nnTip'); if (t) t.style.display = 'none'; ntStartLoop(); });
+    cv.addEventListener('dblclick', ev => {
+      const p = pos(ev);
+      const hit = nnHitTest(p.x, p.y);
+      if (hit) ntFlyToRect(hit);
     });
   }
-  if ($('nnLayout')) $('nnLayout').addEventListener('change', () => { nnZ = 1; nnX = 0; nnY = 0; renderNn(); });
-  if ($('nnRefresh')) $('nnRefresh').addEventListener('click', () => renderNn());
-  if ($('nnReplay')) $('nnReplay').addEventListener('click', () => nnSpawnPulses());
-  if ($('nnFit')) $('nnFit').addEventListener('click', () => { nnZ = 1; nnX = 0; nnY = 0; nnApplyView(); });
-  if ($('nnFit2')) $('nnFit2').addEventListener('click', () => { nnZ = 1; nnX = 0; nnY = 0; nnApplyView(); });
-  if ($('nnIn')) $('nnIn').addEventListener('click', () => { nnZoomBy(1.2); });
-  if ($('nnOut')) $('nnOut').addEventListener('click', () => { nnZoomBy(1 / 1.2); });
-  function nnZoomBy(f){
-    const svg = $('nnSvg'); if (!svg) return;
-    const r = svg.getBoundingClientRect();
-    const mx = r.width / 2, my = r.height / 2;
-    const nz = Math.max(0.32, Math.min(6, nnZ * f)); const k = nz / nnZ;
-    nnX = mx - (mx - nnX) * k; nnY = my - (my - nnY) * k; nnZ = nz; nnApplyView();
+
+  // 点击矩形：会话/项目 → 跳转到该对话画布；其它 → 飞过去
+  function ntActivate(hit){
+    if (!hit) return;
+    if (hit.kind === 'sess' && hit.canvas){ switchWorkflow(hit.canvas); toast(tx('已跳转：{0}', hit.canvas)); return; }
+    if (hit.kind === 'turn' && hit.node && hit.node.sess && hit.node.sess.canvas){
+      switchWorkflow(hit.node.sess.canvas); toast(tx('已跳转：{0}', hit.node.sess.canvas)); return;
+    }
+    if (hit.kind === 'sess' && hit.node && hit.node.canvas){ switchWorkflow(hit.node.canvas); return; }
+    ntFlyToRect(hit);
   }
+
+  // 工具栏 / 缩放按钮 / 搜索框 绑定
+  if ($('nnLayout')) $('nnLayout').addEventListener('change', () => { renderNn(); });
+  if ($('nnRefresh')) $('nnRefresh').addEventListener('click', () => renderNn());
+  if ($('nnFit')) $('nnFit').addEventListener('click', () => ntFitView(false));
+  if ($('nnFit2')) $('nnFit2').addEventListener('click', () => ntFitView(false));
+  if ($('nnIn')) $('nnIn').addEventListener('click', () => { ntZoomBy(1.25); });
+  if ($('nnOut')) $('nnOut').addEventListener('click', () => { ntZoomBy(1 / 1.25); });
+  if ($('nnSearch')){
+    $('nnSearch').addEventListener('input', ev => { ntRunSearch(ev.target.value); ntUpdateHud(); });
+    $('nnSearch').addEventListener('keydown', ev => {
+      if (ev.key === 'Enter'){ ev.preventDefault(); if (!nnTextMatches.length && $('nnSearch').value) ntRunSearch($('nnSearch').value); ntFlyToNextMatch(); }
+      else if (ev.key === 'Escape'){ ev.target.value = ''; ntRunSearch(''); ntUpdateHud(); }
+    });
+  }
+  if (typeof window !== 'undefined' && !window.__nnResizeBound){
+    window.__nnResizeBound = true;
+    window.addEventListener('resize', () => { if (curView === 'nn' && nnTextState){ resizeNnCanvas(true); ntFitView(false); } });
+  }
+
 
   // ---------- 启动 ----------
   $('defs').innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>' +
@@ -6400,7 +7364,7 @@ if (typeof document !== "undefined") var UI = function(){
   window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, ensureQaSession, importSessionToCanvas, openSetDlg, renderSetDlg, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }),
     wf: () => WF, exportWfTree, importWfTreeText, pushWfBackup, restoreWfBackup, wfTreeObj, fillWfSel, renderCrumb, activeDurs, openSubDlg, subItemForNode,
     fmtDurMs, wfDurOfTurns, wfTreeParse, wfMergeEntries, subNodeLabel, costOfModel, priceFor, fmtCost, priceCfg: () => priceCfg, loadHttpSettings,
-    projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnBuildGraph, nnLayout, renderNn, openQuickSwitch, paintQuick };
+    projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, ntBuildTree, ntLayoutTree, ntSquarifyChildren, ntLinePx, ntVisibleChars, ntTokenize, ntFocusSet, renderNn, nnTextState: () => nnTextState, nnTextView: () => nnTextView, ntFitView, ntFlyTo, ntFlyToRect, ntZoomBy, ntRowPx, ntUpdateLod, nnHitTest, ntRunSearch, ntFlyToNextMatch, nnTextMatches: () => nnTextMatches, nnTextSearchOn: () => nnTextSearchOn, ntStartLoop, ntStopLoop, drawNn, switchWorkflow, distFollowCurrent, distFollow: () => distFollowOn, openQuickSwitch, paintQuick };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

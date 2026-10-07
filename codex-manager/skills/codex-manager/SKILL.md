@@ -42,7 +42,57 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **同项目智能体大框**：`agentsInProject(list, project)` 按客户端聚合出 `{client, canvases, masters, subs}`；左侧列表每个客户端渲染一个彩色「智能体框」（🧠 主智能体 + 🤖 N 子智能体）。
 - **同项目跨智能体协作**：`projectCollaboration(list, project)` 按时间序生成接力链 `{links:[{from,to,ts}], clients, events}`，列表显示「🤝 协作链 ZCode→Codex→Gemini」。
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
-- **🧠 智能体总结神经网络视图**（`viewNn`）：`nnBuildGraph(list, qaArr, kwPerSess)` 建图（hub / proj / sess / kw / skill 五类节点 + branch/coop/kw/sub 四类突触），`nnLayout(graph, mode, W, H)` 三布局（`chip` 芯片阵列 / `net` 神经网络环 / `tree` 知识树）；渲染层绘制芯片底板 + 引脚 + 神经元 + 突触，滚轮缩放（`nnZ` 越大文字越全，`nnApplyView` 控制标签透明度）、拖拽平移、点击神经元 `switchWorkflow(n.canvas)` 跳转、悬停 tooltip、脉冲光点沿突触流动（`nnSpawnPulses` / `nnTick`）。测试钩子 `__flow` 已含 `nnBuildGraph` / `nnLayout` 相关纯函数。
+- **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
+
+**v0.27.1 关键行为**（神经网络「文字树图」落地修复 + 视觉验收；v0.27.0 只是骨架，实际渲染有 5 个真 bug）：
+- **行高语义（最重要）**：一个「对话轮」= **一段多行代码块**（不是一行）。`ntBuildTree` 里 `snode.children[i] = { lines: ntWrapText(q, NT_CODE_COLS*7.5, NT_MAX_LINES, 10), nLines, weight: nLines }`；会话权重 = `codeLines`（各轮 `nLines` 之和）。布局按行数分配高度，使**「一行」在世界坐标里恒为 `NT_ROW_H`(=10)**，对齐 code-map 的 `line_px = line_h × scale`。旧实现一个 rect 占满会话体（35px+）、`fs = h*0.68` 画出巨型单行 → 永远读不到多行代码。
+- **LOD 阈值可达性**：`ntRowPx()` 取**所有 turn 的 `h / lines.length` 中位数** × 缩放，作为 `ntUpdateLod` 的「每行像素」。旧实现按 rect 高度算 → 必须缩放到 ~10× 才进文字档；现在 **1.08×** 即可。
+- **绘制顺序（关键坑）**：`drawNn` 必须 **先铺父层底色 `['proj','agent','sess']`，最后画 `turn` 文字**。旧实现先画 turn 再画 sess，而 `ntDrawSessionBody` 会 `fillRect` 整个会话 → **把 turn 文字全部擦掉，会话体永远空白**。
+- **画布↔布局尺寸一致性**：`renderNn` 在视图未显示时 `box.clientWidth === 0` → 回退 900×620 建树，但画布 backing store 只有 320×240 → 屏幕坐标与世界坐标错位、切过去一片空白。新增 **`ntRelayoutIfNeeded()`**：下一帧复查真实容器尺寸，不一致就整棵重排；`ntFrame` 用 `ntFrame._laid` 保证进入视图后跑一次，`renderNn` 里重置为 0。
+- **抬头条双重缩放**：`ntDrawSessionBody` 里 `x/y/w/h` 已是屏幕坐标，`headH` 不能再乘 `z`（旧代码 `Math.max(10, Math.min(h*0.2, 16)) * z` 会让抬头条溢出会话宽度）；改为固定屏幕像素并 `ctx.rect(x,y,w,h); ctx.clip()` 裁到会话矩形。
+- **密排代码观感**（对齐参考图1/图2）：新增 **`ntPackRows(rawLines, want)`** —— 会话内各轮文本去重后按容量循环铺满，`capRows = round(会话体高 / NT_ROW_H)`，块内行数按各轮 `nLines` 占比回填；不再出现「少量文字拉在大块空白里」。行号列 + 续行 2 空格缩进 + `ntTokenize` 语法高亮。
+- **`ntWrapText` 参数口径坑**：第二个参数是 **像素宽度**（CJK≈14px / 西文≈7.5px），**不是列数**。旧调用 `ntWrapText(q, NT_CODE_COLS, …)` 把 46 当像素 → 中文每行只放 2~3 字。正确写法 `NT_CODE_COLS * 7.5`。
+- **视觉验收脚本**：`tests/shots-closeup.mjs`（注入 PAYLOAD 样例工作流 → 截「神经网络总览密排代码树图 / 文字档放大可读代码 / 画布卡片+正交连线 / 分布工作区分框」四张图）。注意 `ntFlyTo` 有 `NT_FLY_K=0.2` 缓动，截图前需直接把 `nnTextView.z/x/y` 落到终点，否则截到飞行中途。
+- **回归**：单测 87/87、i18n `missing 0`、`http-caps-guard` 4/4、`inject-guard` 4/4。
+
+**v0.27.0 关键行为**（神经网络彻底重写为「文字代码树图」+ 画布卡片视觉 + 分布工作区，按用户 3 张参考图）：
+- **不再是圆点**：删除全部神经元/芯片/突触方案（`nnBuildGraph` / `nnLayout` / `nnRelax` / `nnRadiusOf` 及其 Canvas 渲染器）。改为 **矩形 + 内部文字/代码纹理填充** 的 squarified treemap，层级 `项目 → 智能体 → 会话 → 对话轮`（四层嵌套）。渲染入口 `drawNn(now)`（`#nnCv`）。
+- **三档像素级 LOD**（`NT_STRIPS_FROM_PX=0.6` / `NT_TEXT_FROM_PX=9.0`，`line_px = 行高 × 缩放`）：
+  - `< 0.6` → **纯色块**（远看只是一片密色纹理）
+  - `0.6 ~ 9` → **代码条带**（`ntHash` FNV-1a 生成确定性短横条模拟字符，即参考图1 的密字观感）
+  - `≥ 9` → **真实可读文字**（等宽字体 + 左侧行号 + `ntTokenize` 语法高亮：关键字/字符串/数字/注释 + 视口裁剪，即参考图2 放大后可读代码）
+  - 左上角 `#nnLod` 实时显示当前档位与倍率（色块档 / 条带档 / 文字档 + `N.NN×`）。
+- **面积权重可选**：`#nnLayout` 由旧「四布局」改为「📏 按文字行数 / 💬 按对话轮数 / ▦ 等面积」——直接映射 code-map 的「面积 ∝ 行数」。
+- **画布卡片视觉重做**（参考图3）：节点 = 圆角卡片，三段式 **标题区**（色点 + 类型徽章 + 标题）+ **多行正文**（`ntWrapText` 折行）+ **底部文件名条**（`n.file` / `n.subflow`），带 `nd-head` / `nd-headline` 分隔；端口 = 左右两个空心圆 `◯`（`anchors()` 取卡片左/右边缘中点）；连线 = `edgePath` 输出**「横—竖—横」正交折线 + 圆角拐弯**（LR/TD 双方向、平行边分道 `laneIdx`、反馈边外绕走卡片外侧）；条件标签 = 小圆角胶囊（如「否」）。
+- **卡片尺寸自适应**：`nodeW()` 固定 `CARD_W=236`；`sizeNode()` 按正文行数算高 `CARD_HEAD + PAD + lines×CARD_LINE + PAD + CARD_FILE`（`cardBodyLines`）；`autoLayout` 的蛇形分支与栅格分支改用**实际高度**（旧版固定 `NODE_H=40`，卡片变高后会重叠），同行按最高卡片居中。
+- **分布工作区重做**：`renderDist` 按项目分组「框起来」——`groupByProject` 新增 `frame` / `recent` 字段并改排序（会话项目优先、按会话数↔时间倒序），`agentsInProject` 新增 `first` / `last` / `label` / `color`。项目框 `.pfgroup`（左侧色条 + 项目头 `N 智能体 · M 会话 · 🤖子智能体` + 协作接力芯片链 `ZCode→Codex→Gemini`），框内 `.pfbody` 网格。
+- **卡片标题 = 真实对话题目**：不再出现「问答画布」。`distCardHtml` 会话卡片标题取 `sessionTaskName(w.src.session)`（回退 `w.src.task`）；`genQaCanvas` 多会话也改取首问句 + `等 N 会话`（此前多会话一律命名「问答画布」）。
+- **当前画布自动跟随**（不是「点哪个哪个才当前」）：新增 `#distFollow` 开关 + `distFollowCurrent(force)`——切画布即 `scrollIntoView` 到可见并加 `.wfcur` / `.flash` 呼吸高亮；`switchWorkflow` 内联动调用。
+- **`__CORE` 新增纯函数**（可单测）：`nnSquarify`（squarified treemap，Bruls et al. 2000，贪心行打包 + 最差长宽比 `worst()`）、`ntLinePx`、`ntVisibleChars`、`ntTokenize`、`ntHash`、`ntFocusSetIn`、`ntWrapText`；`QA_CLIENTS` / `qaClientInfo` 一并上移 CORE，供分组/协作/神经网络/UI 共用一份（原先 UI 内重复定义）。
+- **坑**：`ntTokenize` 正则里 **注释与字符串必须排在标点之前**，否则 `// 注释` 会被标点组吞掉（回归测试已覆盖）；`ntWrapText` 截断时须在 `break` 后补 `…`，不能在 `break` 前。
+- 回归测试 **87/87**（新增 `nnSquarify` 3 项 / `ntLinePx` / `ntVisibleChars` / `ntTokenize` / `ntHash` / `ntFocusSetIn` / `ntWrapText`）；`e2e-nn.mjs` 改为断言文字树图（四层矩形计数 / 不重叠且包含 `/ 三档 LOD / 三种权重 / 点击跳转 / 分布工作区分框与自动跟随）。
+
+**v0.26.0 关键行为**（神经网络功能重写，对齐 Peeter95/code-map）：
+- ~~**三档像素级 LOD**：`nnRadiusOf(n)` / `nnLinePx(n, z)`~~ → **已被 v0.27.0 的 `ntLinePx` 取代**（圆点方案整体移除）。
+- **每帧硬预算 + 剔除**：`NN_QUAD_BUDGET` 图元上限、屏外 AABB 剔除、亚像素剔除（两维皆 `<0.5px` 跳过）、标签预算 `NN_LABEL_BUDGET=500`（code-map LABEL_BUDGET）、脉冲预算 `NN_PULSE_BUDGET=26`。
+- **渲染循环生命周期**：`nnStartLoop()` / `nnStopLoop()` 显式管理 rAF；`document.hidden` 或离开 nn 视图立即 `cancelAnimationFrame`，不再空转占帧（旧版只在帧内 early-return）。
+- **对数空间飞行相机**：`NN_FLY_K=0.2` 与 code-map `step_flight` 同款；`nnView.flying` 标记飞行态，滚轮缩放/拖拽即取消飞行；`resize` 自动重排。
+- **搜索**：顶部 `#nnSearch` —— 关键字命中金色描边（`#ffd93b`，code-map 搜索匹配色 `(1,0.85,0.2)`）、HUD 显命中数、`Enter` 飞下一个、`Esc` 清空。**v0.27.0 沿用**（函数改名为 `ntRunSearch` / `ntFlyToNextMatch`）。
+- ~~**神经元半径严格单调**~~ / ~~**map 微条带**~~ → **v0.27.0 随圆点方案一并移除**（改为矩形 treemap 的文字 LOD）。
+- **主题感知**：`ntTheme()` 读 `--canvas` 与 `data-theme`，浅色主题下 Canvas 不再残留暗底（v0.27.0 沿用）。
+- ~~回归测试 87/87（`nnRadiusOf` / `nnLinePx`）~~ → v0.27.0 已把这些用例替换为 treemap / 分词 / 折行用例。
+
+**v0.25.0 关键行为**（协作可视 + 神经网络重写）：
+- **侧栏两行布局修复字体溢出**：`.wfph` / `.wfah` 改两行——第一行 名称（`.wr1` flex + ellipsis），第二行 计数/角色徽章（可截断带 title）；修掉三处实测溢出（项目头 205px 塞 141px、智能体框头 194px 塞 121px 且 overflow:visible、项目名被挤到 3px）。
+- **分布工作区智能体标注 + 一键跳转对话**：`renderDist` 卡片新增 `.agrow` 智能体徽章行（色点+客户端名+🤖子数+💬轮数）与接力方向（⬅从X接手 / X接手➡，来自 `projectCollaboration`）；`data-qa="client|bareSession"` 按钮 → `qaGotoSession(client, sess)`：切问答视图、设 `qaClient`、置 `qaSessFilter`；`qaFilter(items, {sess})` 按裸会话号过滤（子智能体按 parentSession 归入），问答页 `#qaSessClear` 可清除。
+- **画布协作链条**：`renderCrumb` 末尾调 `renderCollabStrip(e)` → `#cvCollab`（`#cvwrap` 内、面包屑下方）：同项目多智能体时间序芯片链，当前客户端标「（本画布）」，旁注 从X接手·交给Y；点击芯片 `switchWorkflow` 到该客户端同项目最新画布。
+- ~~**神经网络视图重写（Canvas 渲染器，参考 Peeter95/code-map 的 GPU treemap）**~~ → **v0.27.0 已整体重写**：`<canvas id="nnCv">` 保留，但内部从「芯片/神经元/突触 + 四布局」换成「矩形文字树图 + 三档 LOD」，函数前缀由 `nn*` 改为 `nt*`（`ntBuildTree` / `ntLayoutTree` / `drawNn` / `ntFrame`）。旧 `nnBuildGraph` / `nnLayout` / `nnRelax` / `nnSquarify`（旧签名）/ `nnRadiusOf` / `nnLinePx` 均已删除；`nnSquarify` 保留原名但改为标准 squarified 实现并移入 `__CORE`。
+- 回归测试 85 项（v0.25.0 时期）；`__flow` 钩子补 `nnState/nnView/nnFitView/nnFlyToNode/nnRelax/nnSquarify`（v0.27.0 改为 `nnTextState/nnTextView/ntFitView/ntFlyToRect/ntRunSearch/ntLinePx` 等）。
+
+**v0.24.2 关键行为**（修复「Token 使用量区块空白」）：
+- **HTTP 能力探测与数据载入不依赖 PAYLOAD.watch**：直接打开编辑器（无注入工作副本）时，`initHttpWatch` 仍会请求 `__flow_ping` 设置 `httpCaps` 并自动载入 🪙 Token / 📦 使用量 / ⚙ 设置，并启动 💬 问答自动同步；无 `PAYLOAD.watch` 只跳过「双向文件同步」部分。服务未启动时仍每 4 秒自动重连。
+- **「已连接智能体」卡片计数**：主会话/子智能体数字用 `tx()` 填充占位符（`T()` 不做替换，曾显示字面 `{0}/{1}`）。
+- 回归守卫：`tests/http-caps-guard.mjs`（4 项）。
 
 **v0.23.0 关键行为**（修复「只显示 ZCode / 重开清空记录 / 同步节点过少」）：
 - **问答同步按全量会话**：编辑器 `loadHttpQa` 对每个客户端同步**全部会话**（手动/首次载入上限 `QA_SYNC_CAP_FULL=200`，6 秒自动轮询只补最新 `QA_SYNC_CAP_AUTO=12`），不再只取最新 1 个。

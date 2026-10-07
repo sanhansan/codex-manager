@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnBuildGraph, nnLayout };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -31,7 +31,7 @@ const core = await import(pathToFileURL(corePath).href);
   fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries,
   priceFor, costOfModel, fmtCost,
   projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration,
-  nnBuildGraph, nnLayout,
+  nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText,
 } = core;
 
 let pass = 0, fail = 0;
@@ -926,41 +926,117 @@ t("projectCollaboration：跨智能体按时间序生成接力链", () => {
   eq(projectCollaboration(list, "p2").links.length, 0);
 });
 
-t("nnBuildGraph：项目→会话→子智能体三层 + 协作/关键词突触", () => {
-  const list = [
-    { name: "主流程", data: { nodes: [{ id: "a" }] } },
-    { name: "a1", src: { session: "s1", client: "zcode", cwd: "/w/p1", ts: 100, turns: [{ node: "n1", q: "任务一", ts: 100, subs: ["x"] }] }, data: { nodes: [] } },
-    { name: "b1", src: { session: "s2", client: "codex", cwd: "/w/p1", ts: 200, turns: [{ node: "n2", q: "任务二", ts: 200, subs: [] }] }, data: { nodes: [] } },
-  ];
-  const graph = nnBuildGraph(list, [], { a1: ["导出", "统计"] });
-  eq(graph.groups.length, 1);
-  const kinds = graph.nodes.reduce((m, n) => { m[n.kind] = (m[n.kind] || 0) + 1; return m; }, {});
-  eq(kinds.hub, 1, "一个汇总中心");
-  eq(kinds.proj, 1, "一个项目芯片");
-  eq(kinds.sess, 2, "两个会话神经元");
-  eq(kinds.skill, 1, "一个流程框架神经元");
-  okTest(graph.nodes.some(n => n.kind === "kw" && n.sub === "子智能体"), "含子智能体知识神经元");
-  okTest(graph.nodes.some(n => n.kind === "kw" && n.label === "导出"), "含关键词知识神经元");
-  okTest(graph.edges.some(e => e.kind === "coop"), "含跨智能体协作突触");
-  okTest(graph.edges.every(e => graph.nodes.some(n => n.id === e.from) && graph.nodes.some(n => n.id === e.to)), "所有突触两端都存在");
-  const ids = graph.nodes.map(n => n.id);
-  eq(new Set(ids).size, ids.length, "神经元 id 唯一");
+t("nnSquarify：squarified treemap 面积按权重、互不重叠、恰好铺满", () => {
+  const rect = { x: 10, y: 10, w: 400, h: 300 };
+  const items = [{ id: "a", w: 4 }, { id: "b", w: 2 }, { id: "c", w: 1 }, { id: "d", w: 1 }];
+  const out = nnSquarify(items, rect);
+  eq(out.length, 4, "四个矩形");
+  const area = r => r.w * r.h;
+  const total = out.reduce((s, r) => s + area(r), 0);
+  okTest(Math.abs(total - rect.w * rect.h) < 1, "总面积等于容器");
+  eq(Math.round(area(out.find(r => r.id === "a")) / total * 100), 50, "权重 4 占 50%");
+  for (let i = 0; i < out.length; i++){
+    okTest(out[i].x >= rect.x - 0.5 && out[i].y >= rect.y - 0.5, "不出上/左边界");
+    okTest(out[i].x + out[i].w <= rect.x + rect.w + 0.5 && out[i].y + out[i].h <= rect.y + rect.h + 0.5, "不出下/右边界");
+    okTest(out[i].w > 0 && out[i].h > 0, "宽高为正");
+    for (let j = i + 1; j < out.length; j++){
+      const A = out[i], B = out[j];
+      const overlap = A.x < B.x + B.w - 0.5 && B.x < A.x + A.w - 0.5 && A.y < B.y + B.h - 0.5 && B.y < A.y + A.h - 0.5;
+      okTest(!overlap, "矩形互不重叠：" + A.id + "/" + B.id);
+    }
+  }
 });
 
-t("nnLayout：三种布局均给全部神经元坐标，无重叠堆原点", () => {
-  const list = [
-    { name: "主流程", data: { nodes: [] } },
-    { name: "a1", src: { session: "s1", client: "zcode", cwd: "/w/p1", ts: 1, turns: [{ node: "n1", q: "q1", ts: 1, subs: [] }] }, data: { nodes: [] } },
-    { name: "b1", src: { session: "s2", client: "codex", cwd: "/w/p2", ts: 2, turns: [{ node: "n2", q: "q2", ts: 2, subs: [] }] }, data: { nodes: [] } },
+t("nnSquarify：权重为 0 / 空数组 / 零面积容器等退化输入不抛异常", () => {
+  eq(nnSquarify([], { x: 0, y: 0, w: 100, h: 100 }).length, 0, "空输入返回空");
+  eq(nnSquarify([{ id: "a", w: 0 }], { x: 0, y: 0, w: 100, h: 100 }).length, 0, "全零权重返回空");
+  eq(nnSquarify([{ id: "a", w: 1 }], { x: 0, y: 0, w: 0, h: 100 }).length, 0, "零宽容器返回空");
+  const odd = nnSquarify([{ id: "a", w: 1 }, { id: "b", w: 1 }, { id: "c", w: 1 }], { x: 0, y: 0, w: 7, h: 3 });
+  okTest(odd.every(r => Number.isFinite(r.x) && Number.isFinite(r.w)), "极端长宽比下坐标仍有限");
+});
+
+t("nnSquarify：长宽比优于朴素横切（squarified 的意义）", () => {
+  const rect = { x: 0, y: 0, w: 400, h: 300 };
+  const items = [30, 20, 15, 12, 10, 8, 6, 5, 4, 3, 2, 1].map((w, i) => ({ id: "n" + i, w }));
+  const out = nnSquarify(items, rect);
+  const worst = Math.max.apply(null, out.map(r => Math.max(r.w / r.h, r.h / r.w)));
+  okTest(worst < 8, "最差长宽比 < 8（越小越方）：" + worst.toFixed(2));
+});
+
+t("ntLinePx：LOD 行像素 = 行高 × 缩放（决定三档阈值）", () => {
+  okTest(ntLinePx({ h: 20 }, 1, 1) === 20, "h=20,n=1,z=1 → 20");
+  okTest(ntLinePx({ h: 40 }, 2, 1) === 20, "行高按行数均分");
+  okTest(ntLinePx({ h: 10 }, 1, 4) > ntLinePx({ h: 10 }, 1, 1), "缩放越大每行像素越大");
+  okTest(ntLinePx({ h: 10 }, 1, 1) === ntLinePx({ h: 10 }, 1, 1), "同输入确定性输出");
+  okTest(Number.isFinite(ntLinePx(null, 0, 0)) && ntLinePx(null, 0, 0) > 0, "退化输入仍为正有限值");
+  // 三档阈值语义：0.6 以下纯色块 / 9 以上真实文字
+  okTest(ntLinePx({ h: 10 }, 50, 1) < 0.6, "远看落入色块档");
+  okTest(ntLinePx({ h: 20 }, 1, 20) >= 9, "放大后落入文字档");
+});
+
+t("ntVisibleChars：可见字符数随宽度线性增长、字号越大越少", () => {
+  okTest(ntVisibleChars(200, 10) > ntVisibleChars(100, 10), "宽度越大字符越多");
+  okTest(ntVisibleChars(200, 10) > ntVisibleChars(200, 20), "字号越大字符越少");
+  eq(ntVisibleChars(0, 10), 0, "零宽为零字符");
+  okTest(ntVisibleChars(-5, 10) === 0, "负宽不为负字符");
+});
+
+t("ntTokenize：代码分词（关键字/字符串/数字/注释/标识符）", () => {
+  const toks = ntTokenize('const x = 42; // 注释');
+  okTest(toks.some(t => t.k === "kw" && t.t === "const"), "识别关键字 const");
+  okTest(toks.some(t => t.k === "num" && t.t === "42"), "识别数字 42");
+  okTest(toks.some(t => t.k === "cmt" && t.t.indexOf("注释") >= 0), "识别行注释");
+  okTest(toks.some(t => t.k === "id" && t.t === "x"), "识别标识符 x");
+  const str = ntTokenize('let s = "hi there";');
+  okTest(str.some(t => t.k === "str" && t.t === '"hi there"'), "整段字符串不被拆散");
+  const joined = ntTokenize("a+b*2").map(t => t.t).join("");
+  eq(joined, "a+b*2", "分词可无损拼回原文");
+  eq(ntTokenize("").length, 0, "空串无 token");
+});
+
+t("ntHash：内容哈希稳定且分布合理（条带纹理确定性）", () => {
+  eq(ntHash("abc"), ntHash("abc"), "同内容同哈希");
+  okTest(ntHash("abc") !== ntHash("abd"), "不同内容不同哈希");
+  okTest(ntHash("") >= 0 && ntHash("") <= 0xffffffff, "落在 uint32 范围");
+  const buckets = new Set();
+  for (let i = 0; i < 200; i++) buckets.add(ntHash("line-" + i) % 16);
+  okTest(buckets.size >= 12, "哈希散列到 ≥12/16 个桶：" + buckets.size);
+});
+
+t("ntFocusSetIn：悬停聚焦集合（祖先链 + 子孙高亮，其余压暗）", () => {
+  const rects = [
+    { id: "p:P1", kind: "proj", label: "P1", proj: "P1" },
+    { id: "a:P1:zcode", kind: "agent", proj: "P1", client: "zcode" },
+    { id: "s:c1", kind: "sess", proj: "P1", client: "zcode" },
+    { id: "s:c1#0", kind: "turn", proj: "P1" },
+    { id: "s:c1#1", kind: "turn", proj: "P1" },
+    { id: "s:c2", kind: "sess", proj: "P1", client: "zcode" },
+    { id: "p:P2", kind: "proj", label: "P2", proj: "P2" },
+    { id: "s:c9", kind: "sess", proj: "P2", client: "codex" },
   ];
-  const graph = nnBuildGraph(list, [], {});
-  ["chip", "net", "tree"].forEach(mode => {
-    const pos = nnLayout(graph, mode, 1200, 760);
-    eq([...pos.keys()].length, graph.nodes.length, mode + "：每个神经元都有坐标");
-    const uniq = new Set([...pos.values()].map(p => Math.round(p.x) + "," + Math.round(p.y)));
-    okTest(uniq.size > graph.nodes.length * 0.6, mode + "：坐标不应大面积重合");
-    [...pos.values()].forEach(p => okTest(Number.isFinite(p.x) && Number.isFinite(p.y), mode + "：坐标有限"));
-  });
+  const f1 = ntFocusSetIn(rects, rects[2]);      // 悬停会话 s:c1
+  okTest(f1.has("s:c1") && f1.has("s:c1#0") && f1.has("s:c1#1"), "会话自身与全部对话轮高亮");
+  okTest(f1.has("a:P1:zcode") && f1.has("p:P1"), "祖先链（智能体/项目）高亮");
+  okTest(!f1.has("s:c2") && !f1.has("p:P2"), "同项目其他会话与无关项目压暗");
+  const f2 = ntFocusSetIn(rects, rects[0]);      // 悬停项目 P1
+  okTest(f2.has("p:P1") && f2.has("a:P1:zcode") && f2.has("s:c1") && f2.has("s:c2"), "项目高亮：本项目全部后代");
+  okTest(!f2.has("p:P2") && !f2.has("s:c9"), "其他项目压暗");
+  const f3 = ntFocusSetIn(rects, rects[4]);      // 悬停单个对话轮
+  okTest(f3.has("s:c1#1") && f3.has("s:c1"), "轮次高亮其所属会话");
+  okTest(!f3.has("s:c1#0"), "同会话其他轮不因轮级悬停而高亮");
+  eq(ntFocusSetIn(rects, null).size, 0, "空目标返回空集合");
+});
+
+t("ntWrapText：按显示宽度折行、限行数并补省略号", () => {
+  const lines = ntWrapText("abcdefghijklmnopqrstuvwxyz0123456789", 100, 3, 11);
+  okTest(lines.length <= 3, "不超过限行数");
+  okTest(lines.length >= 2, "长文本被折成多行");
+  const one = ntWrapText("短", 200, 3, 11);
+  eq(one.length, 1, "短文本单行");
+  eq(ntWrapText("", 200, 3, 11).length, 0, "空文本零行");
+  const clipped = ntWrapText("一二三四五六七八九十".repeat(10), 60, 2, 11);
+  okTest(clipped.length <= 2, "硬限 2 行");
+  okTest(clipped[clipped.length - 1].indexOf("…") >= 0, "溢出末行补省略号");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
