@@ -25,8 +25,9 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall  # 卸载
 ## 统计口径
 
 - **用量来源**：会话记录中的 `function_call`（`namespace` 以 `mcp__` 开头记为对应 MCP 服务器）、`custom_tool_call`（exec 等原生工具）、`collaboration` 等内置命名空间。
-- **已安装插件**：读取 `~/.codex/config.toml` 的 `[plugins."名称@市场"]` 清单。
-- **令牌**：取 `token_usage_record` 的 `total_token_usage`；经历过上下文压缩（compaction）的会话为最后一次上下文窗口的累计值，报表会自动标注。
+- **插件使用量**：读取 `~/.codex/config.toml` 的 `[plugins."名称@市场"]` 清单（`enabled = false` 跳过），并扫描插件缓存 `~/.codex/plugins/cache/*/*/*/.mcp.json`（含 `plugin.json` 内指针）建立 **MCP 服务器 → 插件归属**；报表中每个插件列出提供的 MCP 服务器、调用次数、会话数与最近调用（已安装未使用的也列出）。
+- **任务消耗**：按 `task_started → task_complete` 划分任务并绑定该任务的用户指令；令牌取 `token_usage_record.turn_token_usage`（任务内累计，按 turn_id 差分，回放/续接任务与累计值重置均有保护），报表给出「任务消耗 Top 10」与逐任务明细。
+- **令牌（会话级）**：取 `token_usage_record.thread_token_usage`（线程累计，会话级为最后一条）；旧格式回退 `event_msg:token_count`。经历过上下文压缩（compaction）的会话会标注。
 - **隐私**：全部本地解析，不联网上传。
 
 ## 直接用 CLI（不装提示词/MCP 也可以）
@@ -41,7 +42,7 @@ python codex_manager.py flow --session <ID片段> --json       # 输出 JSON 事
 
 | 文件 | 作用 |
 | --- | --- |
-| `codex_manager.py` | 核心：会话解析、用量聚合、Excel/CSV 导出、流程提取（无第三方依赖，openpyxl 按需） |
+| `codex_manager.py` | 核心：会话解析、用量聚合（插件归属 / 任务消耗）、Excel/CSV 导出、流程提取（无第三方依赖，openpyxl 按需） |
 | `mcp_server.py` | MCP 服务器（stdio JSON-RPC），暴露 3 个工具给 Codex |
 | `prompts/codex-usage.md` | 自定义命令 `/codex-usage` |
 | `prompts/codex-flow.md` | 自定义命令 `/codex-flow` |

@@ -16,12 +16,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import codex_manager as cm  # noqa: E402
 
-SERVER_INFO = {"name": "codex-manager", "version": "0.1.0"}
+SERVER_INFO = {"name": "codex-manager", "version": "0.2.0"}
 
 TOOLS = [
     {
         "name": "codex_usage",
-        "description": "统计 OpenAI Codex 的会话与工具用量：MCP 服务器/内置工具调用次数、会话数、令牌消耗，返回 Markdown 表格。",
+        "description": "统计 OpenAI Codex 的会话与工具用量：MCP 服务器/内置工具调用次数、插件使用量（config.toml 已安装插件与其 MCP 调用归属）、任务消耗（每任务令牌）、会话级令牌，返回 Markdown 表格。",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -54,12 +54,11 @@ TOOLS = [
 
 def tool_codex_usage(args):
     days = args.get("days")
-    sessions = cm.load_all(None, int(days) if days else None)
-    if not sessions:
+    bundle = cm.analyze_usage(None, int(days) if days else None)
+    if not bundle:
         return "EMPTY：未找到会话记录。"
-    detail, kind_totals, totals = cm.aggregate_usage(sessions)
-    scope = f"最近 {days} 天" if days else "全部记录"
-    return cm.render_usage_markdown(sessions, detail, kind_totals, totals, scope)
+    return cm.render_usage_markdown(bundle["sessions"], bundle["detail"], bundle["kind_totals"],
+                                    bundle["totals"], bundle["scope"], bundle["plugins"])
 
 
 def tool_codex_flow(args):
