@@ -2,6 +2,16 @@
 
 本项目由 [@sanhansan](https://github.com/sanhansan) 维护。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循语义化版本。
 
+## [0.20.0] - 2026-10-07
+
+### 编辑器 v11：「科技朴素」视觉重写 · 克制的工程感微动效
+
+- **「科技朴素」视觉重写（全量换肤）**：整套界面重写为中性工程风——中性灰阶去蓝调（亮色 `--line #d9dbdf` / `--canvas #f4f5f6`，暗色改中性近黑 `#101214` / `#0b0d0f` 去海军蓝）、圆角统一 2px（弹窗/遮罩 3px）、**删除全部阴影与悬浮抬升**（hover 改为边框变强调色）、侧栏选中态改「inset 2px 强调色左条 + 画布底 + 强调色文字」、正文与表格数字启用 tabular-nums、KPI / 时间戳 / 路径改 Consolas 等宽、画布点阵改为 **24px 细线工程网格**（双向 linear-gradient 绘制）、toast 与 Token 悬浮提示改深色终端款（方角 + 细边框 + 等宽）、细滚动条（webkit）、区块标题（`.hsec`）改底横线款；**JS 生成的 SVG 几何同步改小圆角**——节点 `rx` 8→2、徽章 7→2、子智能体框 12→2、标签底 6→2、总控关系图 10→2（round 起止节点保持胶囊形以维持起止语义），KIND_COLOR / 客户端色 / 技能来源 chip 等硬编码功能色不动；CSS 变量名 / 类名 / 选择器全部保持不变（仅重写取值与规则，不破坏既有 JS 寻址）
+- **克制的工程感微动效（新增，14 组 keyframes）**：统一 120–220ms、ease-out，只动透明度 / 描边 / 位移——按钮按压（`:active` 下沉 1px）、视图切换淡入（`.view.show`）、**工作流卡片错峰入场**（`.view.enter #wfGrid .wfcard`，480ms 后移除门控类避免重渲染重播）、toast 改 `.on` 类滑入（带防抖定时器）、对话框 / 遮罩 / 就地编辑框淡入、**新建节点与新建连线闪光**（`flashNodes` / `flashEdge`，连线按 `data-eg` 索引定位避免 DOM 顺序 ≠ edges 下标错位，900ms 自动清除、重渲染不重播）、节点与端口 hover 描边强调色（`.port:hover{r:7.5}`）、**KPI 数字 0→终值缓出计数**（`animKpi`，支持 `≈ $1.23` 与千分位、`—` 跳过，420ms easeOutCubic）、使用量条形图 `barIn` 生长、按日直方图 `dayIn`、**Token 折线图绘入**（polyline `pathLength="1"` + dasharray 描线，数据点错峰 16ms 上限 360ms）、总控关系图虚线**常驻流动**（`medgeflow`，−9px / 1.6s）、`scroll-behavior: smooth`；**`prefers-reduced-motion: reduce` 全量降级**（CSS 动画关闭 + JS 计数 / 平滑滚动跳过）
+- 回归测试 71 项全通过，i18n 覆盖率 529 用键 / 555 词典 / 0 缺失（纯样式与动效改动，CORE 纯函数无改动）
+- 浏览器端到端验证（browser-use 逐视图截图 + 数值断言）：toast 中段 opacity 0.588 → 1 且带滑入 transform；KPI 在途数字 36 → 124 滚动至终值（终值 124 / 8 / 10 / 101 与 token 数逐位一致）；折线 `pathLength=1` + tldraw 绘入、数据点 delay 0.016s / 0.032s；关系图 medgeflow 1.6s 生效；条形图 barIn 生长；模拟拖拽新建连线 → 新边 `.eg-flash` 描边为强调色 `rgb(29,78,216)`、900ms 后清除、Ctrl+Z 撤销恢复 7 边；真 hover 节点描边变强调色；亮 / 暗双主题逐视图截图核对；console 零报错；验证后画布数据恢复原状（8 节点 / 7 连线，rev 04d16db208 不变）
+- ZCode 插件清单与市场清单版本号同步至 0.20.0，`/codex-flow-edit` 命令文档与双语 README 同步更新（科技朴素皮肤 / 工程感微动效）
+
 ## [0.19.0] - 2026-10-07
 
 ### 编辑器 v10：整树导出/导入 · 服务端自动备份 · 子智能体输出查看 · 耗时标注 · Token 成本估算
