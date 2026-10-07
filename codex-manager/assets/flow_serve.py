@@ -18,24 +18,38 @@
   9. GET  /__flow_rollout_file?name=... → 读单个会话文件原文（编辑器问答视图自动载入/同步）；
  10. GET  /__flow_agents → 列 agents 目录下 sess_*/agent_*/ 的子智能体（元信息+输出大小）；
  11. GET  /__flow_agent?path=sess_x/agent_y → 读该子智能体的 metadata.json 与 output.txt 原文；
- 12. GET  /__flow_clients → 列三个代码客户端（ZCode / Codex CLI / Qoder CLI）的会话文件（含 Qoder 子智能体）；
- 13. GET  /__flow_client_file?client=&id=&tail= → 读指定客户端会话原文（tail=末尾字节数，大文件增量浏览）；
- 14. GET  /__flow_client_usage → 多客户端用量聚合（ZCode+Codex 令牌明细、Qoder 模型调用数，20s 缓存）；
- 15. GET  /__flow_settings → 数据来源目录设置视图（saved/cli/default/effective/exists/prices）；
+ 12. GET  /__flow_agents_registry → 注册表视图：所有「已知智能体」的连接状态（已连接/未安装/未发现）
+     与对话画布统计（会话数、子智能体数、最近活跃时间）；编辑器「已连接智能体」分类用；
+ 13. GET  /__flow_clients → 列所有已连接智能体的会话文件（遍历适配器注册表；含各客户端子智能体）；
+ 14. GET  /__flow_client_file?client=&id=&tail= → 读指定客户端会话原文（tail=末尾字节数，大文件增量浏览）；
+ 15. GET  /__flow_client_usage → 多智能体用量聚合（遍历注册表：有令牌的给令牌明细，无令牌的给调用数，20s 缓存）；
+ 16. GET  /__flow_settings → 数据来源目录设置视图（saved/cli/default/effective/exists/prices）；
  16. POST /__flow_settings {"paths":{...},"prices":{...}} → 保存数据来源目录（usage/rollout/agents/
      codex/qoder）与模型单价（估算费用用，每百万 token 美元），写入
      ~/.zcode/codex-manager/flow-settings.json 并立即生效（空串=清除覆盖；
      启动参数指定的路径优先，不受设置覆盖）；
- 17. GET  /__flow_wf_state → 工作流树自动备份（整树 JSON，含对话画布与小对话结构）；
- 18. POST /__flow_wf_state {"tree":{...}} → 原子写入 ~/.zcode/codex-manager/wf-backup.json
+ 17. POST /__flow_settings {"paths":{...},"prices":{...}} → 保存数据来源目录（usage/rollout/agents/
+     codex/qoder/gemini）与模型单价（估算费用用，每百万 token 美元），写入
+     ~/.zcode/codex-manager/flow-settings.json 并立即生效（空串=清除覆盖；
+     启动参数指定的路径优先，不受设置覆盖）；
+ 18. GET  /__flow_wf_state → 工作流树自动备份（整树 JSON，含对话画布与小对话结构）；
+ 19. POST /__flow_wf_state {"tree":{...}} → 原子写入 ~/.zcode/codex-manager/wf-backup.json
      （编辑器每次改动防抖回传；rev 重播种/清空浏览器存档后可从它恢复对话画布）。
+
+多智能体接入架构（v0.21.0 起）
+  原本硬编码 ZCode / Codex CLI / Qoder CLI 三家，现改为「适配器注册表」：
+  每个智能体客户端实现一个 Adapter（list_sessions / resolve / scan_usage / capabilities），
+  注册进 ADAPTERS 后，/__flow_clients、/__flow_client_file、/__flow_client_usage、
+  /__flow_agents_registry 与 ⚙ 设置全部自动遍历它。
+  · 新增一个智能体只需：写一个探测函数（返回 sessions 列表 + 用量聚合）+ 加一条 ADAPTERS 记录 + 可选加一个 SETTINGS 路径键。
+  · 已知但未安装 / 装了但无会话的智能体，也会出现在注册表里并如实标注状态（never 编造会话）。
+  · 已内置适配器：ZCode、Codex CLI、Qoder CLI、Gemini（Antigravity）。
 
 安全约束：只绑定 127.0.0.1；写回目标固定为 --watch 指定的单个文件、技能目录下的
 SKILL.md、设置文件 flow-settings.json 或工作流备份 wf-backup.json，slug 必须匹配
 ^[a-z0-9][a-z0-9-]{0,63}$，会话/子智能体/客户端文件路径按名字正则校验且解析后的真实
-路径必须位于对应根目录之内（防目录穿越）；设置键固定为 5 个数据来源目录且值必须为
-绝对路径字符串；单价须为有限非负数；工作流备份须为含 list 数组的对象且 ≤8MB；
-会话文件与客户端文件读取均有字节上限。
+路径必须位于对应根目录之内（防目录穿越）；设置值必须为绝对路径字符串；单价须为有限
+非负数；工作流备份须为含 list 数组的对象且 ≤8MB；会话文件与客户端文件读取均有字节上限。
 """
 import argparse
 import glob
@@ -567,30 +581,642 @@ def _empty_client(label, tokens, note=""):
             "bySession": [], "files": 0}
 
 
-def client_usage(rollout_dir, codex_dir, qoder_dir):
-    """三个代码客户端（ZCode / Codex CLI / Qoder CLI）用量聚合；带 20s 缓存避免重复全量扫描。"""
-    key = (rollout_dir or "", codex_dir or "", qoder_dir or "")
+# ---------------------------------------------------------------------------
+# Gemini（Antigravity）适配器：会话存储在 brain/<uuid>/ 目录树（不是单一 jsonl）
+# ---------------------------------------------------------------------------
+
+GEMINI_MSG_MAX_BYTES = 6 * 1024 * 1024   # 单个 transcript 读取上限
+
+
+def _gemini_session_dir(gemini_dir, sid):
+    """会话 id → brain/<sid> 绝对路径；id 不合法或越界返回 None。"""
+    if not (gemini_dir and isinstance(sid, str) and ID_RE.match(sid)):
+        return None
+    try:
+        root = os.path.realpath(os.path.join(gemini_dir, "brain"))
+        p = os.path.realpath(os.path.join(root, sid))
+        if os.path.commonpath([root, p]) != root:
+            return None
+        return p
+    except Exception:
+        return None
+
+
+def _gemini_transcript(sdir):
+    """在会话目录里找对话正文（transcript.jsonl 优先），返回 (绝对路径, 相对路径)。
+
+    Antigravity 的正文位于 .system_generated/logs/transcript.jsonl（完整版另有
+    transcript_full.jsonl）。早期版本若无该文件，退化为「目录内最大的 .jsonl」。
+    """
+    logs = os.path.join(sdir, ".system_generated", "logs")
+    for fn in ("transcript.jsonl", "transcript_full.jsonl"):
+        fp = os.path.join(logs, fn)
+        if os.path.isfile(fp):
+            return fp, os.path.join(".system_generated", "logs", fn).replace(os.sep, "/")
+    # 退化路径：全目录找最大的 jsonl（排除附件与缓存目录）
+    best, best_sz = None, -1
+    for dirpath, dirnames, filenames in os.walk(sdir):
+        dirnames[:] = [d for d in dirnames if d not in ("tempmediaStorage", ".user_uploaded")]
+        for fn in filenames:
+            if not fn.lower().endswith(".jsonl"):
+                continue
+            fp = os.path.join(dirpath, fn)
+            try:
+                sz = os.stat(fp).st_size
+            except OSError:
+                continue
+            if sz > best_sz:
+                best, best_sz = fp, sz
+    if not best:
+        return None, ""
+    return best, os.path.relpath(best, sdir).replace(os.sep, "/")
+
+
+def list_gemini_sessions(gemini_dir, limit=80):
+    """列 Gemini / Antigravity 会话（brain/<uuid>/ 目录树，uuid 即会话 id）。
+
+    与另外三家的扁平 jsonl 不同：这里一个会话是一个目录，正文文件由其内部的
+    transcript / messages 形态决定，故只返回目录级元信息 + 正文相对路径。
+    """
+    items = []
+    broot = os.path.join(gemini_dir or "", "brain")
+    if not (gemini_dir and os.path.isdir(broot)):
+        return items
+    root = os.path.realpath(broot)
+    try:
+        names = sorted(os.listdir(root))
+    except OSError:
+        return items
+    for sid in names:
+        if sid == "tempmediaStorage" or not ID_RE.match(sid):
+            continue
+        sdir = os.path.join(root, sid)
+        if not os.path.isdir(sdir):
+            continue
+        fp, rel = _gemini_transcript(sdir)
+        mt, size = 0, 0
+        try:
+            mt = int(os.stat(sdir).st_mtime)
+        except OSError:
+            pass
+        if fp:
+            try:
+                st = os.stat(fp)
+                mt = max(mt, int(st.st_mtime))
+                size = st.st_size
+            except OSError:
+                pass
+        cwd = ""
+        for line in _read_head_lines(os.path.join(sdir, ".system_generated", "logs", "metadata.json"), 4) \
+                if os.path.isfile(os.path.join(sdir, ".system_generated", "logs", "metadata.json")) else []:
+            try:
+                o = json.loads(line)
+                cwd = str(o.get("cwd") or o.get("workspace") or cwd)
+            except Exception:
+                continue
+        items.append({"id": sid, "name": sid, "session": sid, "cwd": cwd,
+                      "sub": False, "parent": "", "file": rel, "size": size,
+                      "mtime": mt,
+                      "mtimeText": datetime.fromtimestamp(mt).strftime("%Y-%m-%d %H:%M") if mt else ""})
+    items.sort(key=lambda x: -x["mtime"])
+    return items[:limit]
+
+
+def scan_gemini_usage(gemini_dir, limit=80):
+    """扫 Gemini / Antigravity 会话的模型调用。
+
+    实测（2026-10，Antigravity）transcript.jsonl 只有 step_index / source / type /
+    status / created_at / content / thinking，**不含任何 token 计数字段**，故本适配器
+    tokens=False，只按模型响应步数统计调用次数——不编造 token 数。
+    若将来版本加入 usageMetadata/promptTokenCount 之类的字段，下面的宽容解析会自动
+    认出来并把 tokens 翻成 True。
+    """
+    zero = lambda: {"calls": 0, "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}
+    out = {"ok": True, "available": True, "tokens": False, "label": "Gemini (Antigravity)",
+           "note": "Antigravity transcript 不记录令牌数（实测无 usage 字段），按模型响应步数统计调用",
+           "totals": dict(zero(), sessions=0), "byDay": {}, "byDayModel": {}, "byModel": {},
+           "bySession": {}, "files": 0, "badLines": 0}
+    if not (gemini_dir and os.path.isdir(os.path.join(gemini_dir, "brain"))):
+        out["available"] = False
+        return out
+    # 产生模型响应/规划的记录类型：一个「步」即一次模型调用
+    MODEL_KINDS = {"PLANNER_RESPONSE", "MODEL_RESPONSE", "MODEL", "ASSISTANT"}
+    got_tokens = False
+    for item in list_gemini_sessions(gemini_dir, limit):
+        sdir = _gemini_session_dir(gemini_dir, item["id"])
+        if not sdir:
+            continue
+        fp, _rel = _gemini_transcript(sdir)
+        if not fp:
+            continue
+        out["files"] += 1
+        sid, cwd = item["session"], item["cwd"]
+        # 会话级模型名：Antigravity 在 USER_INPUT 正文的 <USER_SETTINGS_CHANGE> 里声明
+        # 「Model Selection from X to Y」，先扫一遍头部拿到它，作为该会话后续步的模型归属。
+        sess_model = ""
+        for hline in _read_head_lines(fp, 40):
+            hm = re.search(r"Model Selection`?\s*(?:from [^\n]*?)?\s*to ([^\n.<\"]{1,64})", hline)
+            if hm:
+                sess_model = hm.group(1).strip()
+                break
+        try:
+            fh = open(fp, encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        with fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    out["badLines"] += 1
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                rtype = str(rec.get("type") or rec.get("kind") or "")
+                u = rec.get("usage") or rec.get("usageMetadata") \
+                    or (rec.get("response") or {}).get("usageMetadata") or {}
+                has_u = isinstance(u, dict) and any(
+                    isinstance(u.get(k), (int, float)) and not isinstance(u.get(k), bool)
+                    for k in ("promptTokenCount", "prompt_token_count", "inputTokens", "input_tokens",
+                              "totalTokenCount", "total_tokens"))
+                # 既不是模型响应步，又没有可认的 usage → 跳过（用户输入/工具输出等）
+                if rtype not in MODEL_KINDS and not has_u:
+                    continue
+                ts = _local_dt(rec.get("created_at") or rec.get("timestamp")
+                               or rec.get("ts") or rec.get("createdAt"))
+                model = str(rec.get("model") or (rec.get("response") or {}).get("model") or "")
+                if model:
+                    mname = model
+                elif sess_model:
+                    mname = sess_model
+                else:
+                    # 从本条正文里再尽一次力（会话中途切换模型的场景）
+                    body = str(rec.get("content") or "")
+                    m = re.search(r"Model Selection`?\s*(?:from [^\n]*?)?\s*to ([^\n.<\"]{1,64})", body)
+                    mname = m.group(1).strip() if m else "Gemini (未标注)"
+                nums = (0, 0, 0, 0, 0)
+                if has_u:
+                    def got(*ks):
+                        return next((int(u[k]) for k in ks
+                                     if isinstance(u.get(k), (int, float)) and not isinstance(u.get(k), bool)), 0)
+                    i = got("promptTokenCount", "prompt_token_count", "inputTokens", "input_tokens")
+                    o = got("candidatesTokenCount", "candidates_token_count", "outputTokens", "output_tokens")
+                    cr = got("cachedContentTokenCount", "cacheReadTokens", "cache_read_input_tokens")
+                    cw = got("cacheWriteTokens", "cache_write_input_tokens")
+                    t = got("totalTokenCount", "total_tokens", "totalTokens") or (i + o)
+                    nums = (max(0, i - cr), o, cr, cw, t)
+                    got_tokens = True
+                day = ts.strftime("%Y-%m-%d") if ts else None
+                for j, k in ((0, "input"), (1, "output"), (2, "cacheRead"), (3, "cacheWrite"), (4, "total")):
+                    out["totals"][k] += nums[j]
+                out["totals"]["calls"] += 1
+                _bump5(out["byModel"], mname, nums)
+                if ts:
+                    _bump5(out["byDay"], day, nums)
+                    _bump5(out["byDayModel"], (day, mname), nums)
+                s = out["bySession"].setdefault(sid, dict(zero(), session=sid, cwd=cwd, days={}, first="", last=""))
+                for j, k in ((0, "input"), (1, "output"), (2, "cacheRead"), (3, "cacheWrite"), (4, "total")):
+                    s[k] += nums[j]
+                s["calls"] += 1
+                if ts:
+                    _bump5(s["days"], day, nums)
+                    stamp = ts.strftime("%Y-%m-%d %H:%M")
+                    if not s["last"] or stamp > s["last"]:
+                        s["last"] = stamp
+                    if not s["first"] or stamp < s["first"]:
+                        s["first"] = stamp
+    if got_tokens:
+        # 该版本带 token 字段：翻成 True，note 也改成如实描述
+        out["tokens"] = True
+        out["note"] = "Antigravity 本地日志已含令牌字段，按宽容解析结果统计"
+    else:
+        out["totals"].update({k: 0 for k in ("input", "output", "cacheRead", "cacheWrite", "total")})
+    out["byDay"] = [dict(day=k, **v) for k, v in sorted(out["byDay"].items())]
+    out["byDayModel"] = [dict(day=k[0], model=k[1], **v) for k, v in sorted(out["byDayModel"].items())]
+    out["byModel"] = sorted((dict(model=k, **v) for k, v in out["byModel"].items()), key=lambda x: -x["calls"])
+    out["totals"]["sessions"] = len(out["bySession"])
+    out["totals"]["calls"] = sum(v["calls"] for v in out["bySession"].values())
+    sess = []
+    for k, v in out["bySession"].items():
+        v["days"] = [dict(day=dk, **dv) for dk, dv in sorted(v["days"].items())]
+        sess.append(v)
+    out["bySession"] = sorted(sess, key=lambda x: -x["calls"])[:40]
+    out["generated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Qwen Code 适配器：projects/<项目>/chats/<uuid>.runtime.json（仅运行时会话元信息）
+# ---------------------------------------------------------------------------
+
+def list_qwen_sessions(qwen_dir, limit=80):
+    """列 Qwen Code 会话（projects/<项目>/chats/<uuid>.runtime.json）。
+
+    Qwen Code 的 chats/ 下只写运行时会话元信息（session_id / work_dir / started_at /
+    qwen_version），**不含对话正文**，故本适配器只提供「有哪些会话」这一层信息。
+    """
+    items = []
+    if not qwen_dir:
+        return items
+    root = os.path.realpath(os.path.join(qwen_dir, "projects"))
+    if not os.path.isdir(root):
+        return items
+    for fp in glob.glob(os.path.join(root, "*", "chats", "*.runtime.json")):
+        try:
+            rel = os.path.relpath(fp, root).replace(os.sep, "/")
+            parts = rel.split("/")
+            if len(parts) != 3 or parts[1] != "chats":
+                continue
+            st = os.stat(fp)
+        except OSError:
+            continue
+        sid = os.path.basename(fp)[:-len(".runtime.json")]
+        cwd, proj = "", parts[0]
+        try:
+            with open(fp, encoding="utf-8", errors="replace") as f:
+                obj = json.load(f)
+            if isinstance(obj, dict):
+                sid = str(obj.get("session_id") or sid)
+                cwd = str(obj.get("work_dir") or "")
+        except Exception:
+            pass
+        relp = parts[0] + "/chats/" + os.path.basename(fp)
+        items.append({"id": relp, "name": os.path.basename(fp), "session": sid,
+                      "cwd": cwd, "project": proj, "sub": False, "parent": "",
+                      "size": st.st_size, "mtime": int(st.st_mtime),
+                      "mtimeText": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M")})
+    items.sort(key=lambda x: -x["mtime"])
+    return items[:limit]
+
+
+def scan_qwen_usage(qwen_dir, limit=80):
+    """Qwen Code：本地只留运行时会话元信息，无对话正文、无令牌字段 → 只统计会话数。"""
+    zero = lambda: {"calls": 0, "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}
+    out = {"ok": True, "available": True, "tokens": False, "label": "Qwen Code",
+           "note": "Qwen Code 本地仅保存会话元信息（无对话正文与令牌字段），只统计会话数量",
+           "totals": dict(zero(), sessions=0), "byDay": [], "byDayModel": [], "byModel": [],
+           "bySession": [], "files": 0}
+    if not (qwen_dir and os.path.isdir(os.path.join(qwen_dir, "projects"))):
+        out["available"] = False
+        return out
+    sess = []
+    for it in list_qwen_sessions(qwen_dir, limit):
+        out["files"] += 1
+        ts = datetime.fromtimestamp(it["mtime"])
+        sess.append({"session": it["session"], "cwd": it["cwd"], "calls": 1,
+                     "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0,
+                     "days": [], "first": ts.strftime("%Y-%m-%d %H:%M"),
+                     "last": ts.strftime("%Y-%m-%d %H:%M")})
+    out["totals"]["sessions"] = len(sess)
+    out["totals"]["calls"] = len(sess)
+    out["bySession"] = sorted(sess, key=lambda x: x["last"], reverse=True)[:40]
+    out["generated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Kimi 适配器：.kimi-work 仅存放可执行文件（无会话数据）
+# ---------------------------------------------------------------------------
+
+def list_kimi_sessions(kimi_dir, limit=80):
+    """Kimi：~/.kimi-work 下只有 bin/ 可执行文件，没有会话存储 → 恒为空。"""
+    return []
+
+
+def scan_kimi_usage(kimi_dir, limit=80):
+    """Kimi：本地无对话/用量数据可读，如实返回空并在 note 中说明。"""
+    zero = lambda: {"calls": 0, "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}
+    return {"ok": True, "available": bool(kimi_dir and os.path.isdir(kimi_dir)),
+            "tokens": False, "label": "Kimi",
+            "note": "Kimi 桌面版本地不保存会话记录（~/.kimi-work 只有可执行文件），无可读数据",
+            "totals": dict(zero(), sessions=0), "byDay": [], "byDayModel": [], "byModel": [],
+            "bySession": [], "files": 0,
+            "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+
+# ---------------------------------------------------------------------------
+# WorkBuddy 适配器：projects/<项目>/<会话>.jsonl（完整对话 + usage 令牌 + 模型名）
+# ---------------------------------------------------------------------------
+
+WB_USAGE_MAX_BYTES = 32 * 1024 * 1024
+
+
+def _wb_item(fp, proj, name):
+    """WorkBuddy 单个会话文件 → 列表项（cwd 从首行 payload 取）。"""
+    try:
+        st = os.stat(fp)
+    except OSError:
+        return None
+    cwd = ""
+    for line in _read_head_lines(fp, 4):
+        try:
+            o = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(o, dict) and o.get("cwd"):
+            cwd = str(o["cwd"])
+            break
+    return {"id": proj + "/" + name, "name": name, "session": name[:-len(".jsonl")],
+            "cwd": cwd, "project": proj, "sub": False, "parent": "",
+            "size": st.st_size, "mtime": int(st.st_mtime),
+            "mtimeText": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M")}
+
+
+def list_wb_sessions(wb_dir, limit=80):
+    """列 WorkBuddy 会话（projects/<项目>/<会话>.jsonl）。"""
+    items = []
+    if not wb_dir:
+        return items
+    root = os.path.realpath(os.path.join(wb_dir, "projects"))
+    if not os.path.isdir(root):
+        return items
+    try:
+        projs = sorted(os.listdir(root))
+    except OSError:
+        return items
+    for proj in projs:
+        if not DIRNAME_RE.match(proj):
+            continue
+        pp = os.path.join(root, proj)
+        if not os.path.isdir(pp):
+            continue
+        try:
+            names = os.listdir(pp)
+        except OSError:
+            continue
+        for name in names:
+            if not name.endswith(".jsonl"):
+                continue
+            it = _wb_item(os.path.join(pp, name), proj, name)
+            if it:
+                items.append(it)
+    items.sort(key=lambda x: -x["mtime"])
+    return items[:limit]
+
+
+def scan_wb_usage(wb_dir, limit=80):
+    """扫 WorkBuddy 会话的 providerData.usage（含 inputTokens/outputTokens/缓存读）与模型名。
+
+    口径：usage.inputTokens 是含缓存读的总输入，inputTokensDetails[].cached_tokens 为
+    其中缓存命中部分；展示时拆出（输入 = input - cached，≥0），合计 = inputTokens + outputTokens。
+    """
+    zero = lambda: {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0, "calls": 0}
+    out = {"ok": True, "available": True, "tokens": True, "label": "WorkBuddy",
+           "totals": dict(zero(), sessions=0), "byDay": {}, "byDayModel": {}, "byModel": {},
+           "bySession": {}, "files": 0, "badLines": 0}
+    if not (wb_dir and os.path.isdir(os.path.join(wb_dir, "projects"))):
+        out["available"] = False
+        return out
+    got = False
+    for item in list_wb_sessions(wb_dir, limit):
+        fp = os.path.join(wb_dir, "projects", *item["id"].split("/"))
+        if not os.path.isfile(fp):
+            continue
+        out["files"] += 1
+        sid, cwd = item["session"], item["cwd"]
+        model = ""
+        try:
+            fh = open(fp, encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        with fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                if '"usage"' not in line and '"rawUsage"' not in line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    out["badLines"] += 1
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                pd = rec.get("providerData") or {}
+                if not isinstance(pd, dict):
+                    continue
+                model = str(pd.get("model") or pd.get("requestModelName") or model)
+                u = pd.get("usage") or pd.get("rawUsage") or {}
+                if not isinstance(u, dict):
+                    continue
+                gi = lambda *ks: next((int(u[k]) for k in ks
+                                       if isinstance(u.get(k), (int, float)) and not isinstance(u.get(k), bool)), 0)
+                i = gi("inputTokens", "prompt_tokens")
+                o = gi("outputTokens", "completion_tokens")
+                t = gi("totalTokens", "total_tokens") or (i + o)
+                if not (i or o or t):
+                    continue
+                cached = 0
+                det = u.get("inputTokensDetails") or (u.get("prompt_tokens_details") or {})
+                if isinstance(det, list):
+                    cached = sum(int(d.get("cached_tokens") or 0) for d in det if isinstance(d, dict))
+                elif isinstance(det, dict):
+                    cached = int(det.get("cached_tokens") or 0)
+                cw = 0
+                nums = (max(0, i - cached), o, cached, cw, t)
+                got = True
+                ts = _local_dt(rec.get("timestamp"))
+                for j, k in ((0, "input"), (1, "output"), (2, "cacheRead"), (3, "cacheWrite"), (4, "total")):
+                    out["totals"][k] += nums[j]
+                out["totals"]["calls"] += 1
+                mname = model or "(未知模型)"
+                day = ts.strftime("%Y-%m-%d") if ts else None
+                if ts:
+                    _bump5(out["byDay"], day, nums)
+                    _bump5(out["byDayModel"], (day, mname), nums)
+                _bump5(out["byModel"], mname, nums)
+                s = out["bySession"].setdefault(sid, dict(zero(), session=sid, cwd=cwd,
+                                                          project=item.get("project", ""),
+                                                          days={}, first="", last=""))
+                for j, k in ((0, "input"), (1, "output"), (2, "cacheRead"), (3, "cacheWrite"), (4, "total")):
+                    s[k] += nums[j]
+                s["calls"] += 1
+                if ts:
+                    _bump5(s["days"], day, nums)
+                    stamp = ts.strftime("%Y-%m-%d %H:%M")
+                    if not s["last"] or stamp > s["last"]:
+                        s["last"] = stamp
+                    if not s["first"] or stamp < s["first"]:
+                        s["first"] = stamp
+    if not got:
+        out["tokens"] = False
+        out["note"] = "本机 WorkBuddy 会话中暂未解析到 usage 令牌字段"
+    out["byDay"] = [dict(day=k, **v) for k, v in sorted(out["byDay"].items())]
+    out["byDayModel"] = [dict(day=k[0], model=k[1], **v) for k, v in sorted(out["byDayModel"].items())]
+    out["byModel"] = sorted((dict(model=k, **v) for k, v in out["byModel"].items()), key=lambda x: -x["total"])
+    out["totals"]["sessions"] = len(out["bySession"])
+    sess = []
+    for k, v in out["bySession"].items():
+        v["days"] = [dict(day=dk, **dv) for dk, dv in sorted(v["days"].items())]
+        sess.append(v)
+    out["bySession"] = sorted(sess, key=lambda x: -x["total"])[:40]
+    out["generated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 适配器注册表：每个智能体客户端一条记录，全部端点与设置都从这里遍历
+# ---------------------------------------------------------------------------
+
+def _adapter(cid, label, attr, lister, usage, tokens=True, note="", group="cli"):
+    """构造一条适配器记录。
+
+    attr   → Handler 上保存该客户端目录的类属性名
+    lister → (dir, limit) -> sessions 列表
+    usage  → (dir, limit) -> 用量聚合 dict，或 None（无用量统计）
+    """
+    return {"id": cid, "label": label, "attr": attr, "lister": lister,
+            "usage": usage, "tokens": tokens, "note": note, "group": group}
+
+
+ADAPTERS = [
+    _adapter("zcode", "ZCode", "rollout_dir",
+             lambda d, n: [dict(f, id=f.get("session"), client="zcode", sub=False, cwd="")
+                           for f in rollout_files(d)[:n]],
+             lambda d, n: dict(scan_tokens(d), label="ZCode"),
+             tokens=True, group="cli"),
+    _adapter("codex", "Codex CLI", "codex_dir",
+             lambda d, n: [dict(f, client="codex", sub=False) for f in list_codex_sessions(d, n)],
+             lambda d, n: scan_codex_tokens(d, n),
+             tokens=True, group="cli"),
+    _adapter("qoder", "Qoder CLI", "qoder_dir",
+             lambda d, n: [dict(f, client="qoder") for f in list_qoder_sessions(d, n)],
+             lambda d, n: scan_qoder_calls(d, n),
+             tokens=False, note="Qoder CLI 本地日志不记录令牌数", group="cli"),
+    _adapter("gemini", "Gemini (Antigravity)", "gemini_dir",
+             lambda d, n: [dict(f, client="gemini") for f in list_gemini_sessions(d, n)],
+             lambda d, n: scan_gemini_usage(d, n),
+             tokens=False, group="ide"),
+    _adapter("wb", "WorkBuddy", "wb_dir",
+             lambda d, n: [dict(f, client="wb") for f in list_wb_sessions(d, n)],
+             lambda d, n: scan_wb_usage(d, n),
+             tokens=True, group="ide"),
+    _adapter("qwen", "Qwen Code", "qwen_dir",
+             lambda d, n: [dict(f, client="qwen") for f in list_qwen_sessions(d, n)],
+             lambda d, n: scan_qwen_usage(d, n),
+             tokens=False, note="本地仅保存会话元信息，无对话正文与令牌字段", group="cli"),
+    _adapter("kimi", "Kimi", "kimi_dir",
+             lambda d, n: [dict(f, client="kimi") for f in list_kimi_sessions(d, n)],
+             lambda d, n: scan_kimi_usage(d, n),
+             tokens=False, note="本地不保存会话记录（目录内只有可执行文件）", group="cli"),
+]
+ADAPTER_BY_ID = {a["id"]: a for a in ADAPTERS}
+
+
+def adapter_dirs(handler_cls):
+    """当前生效的各适配器目录（从 Handler 类属性取，设置改动即时反映）。"""
+    return {a["id"]: (getattr(handler_cls, a["attr"], "") or "") for a in ADAPTERS}
+
+
+def _safe_list(adapter, d, limit=80):
+    """调用适配器 lister，出错时记一条 stderr（便于排查），返回 (sessions, error)。
+
+    这里不再静默吞掉异常：适配器签名不匹配之类的问题会现形，而不是伪装成「0 个会话」。
+    """
+    if not d:
+        return [], ""
+    try:
+        return adapter["lister"](d, limit), ""
+    except Exception as e:
+        msg = "%s：%s" % (adapter["label"], e)
+        sys.stderr.write("  [flow_serve] 适配器扫描失败 %s\n" % msg)
+        return [], msg
+
+
+def clients_view(handler_cls):
+    """所有适配器的会话列表视图（/__flow_clients）。"""
+    out = []
+    for a in ADAPTERS:
+        d = getattr(handler_cls, a["attr"], "") or ""
+        sessions, err = _safe_list(a, d)
+        out.append({"id": a["id"], "label": a["label"], "dir": d, "tokens": a["tokens"],
+                    "note": a["note"], "group": a["group"], "error": err,
+                    "available": bool(d and os.path.isdir(d)),
+                    "sessions": sessions})
+    return {"ok": True, "clients": out}
+
+
+def agents_registry(handler_cls):
+    """「已连接智能体」注册表视图：连接状态 + 对话画布统计。
+
+    与 /__flow_clients 的区别：这里给的是分类导航用的汇总，不列具体会话文件，
+    但会如实区分「已连接（有会话）/ 已连接（暂无会话）/ 未安装」三种状态。
+    """
+    items = []
+    total_sessions = total_subs = 0
+    for a in ADAPTERS:
+        d = getattr(handler_cls, a["attr"], "") or ""
+        exists = bool(d and os.path.isdir(d))
+        sessions, err = _safe_list(a, d) if exists else ([], "")
+        mains = [s for s in sessions if not s.get("sub")]
+        subs = [s for s in sessions if s.get("sub")]
+        last = max((s.get("mtime") or 0 for s in sessions), default=0)
+        state = "connected" if mains else ("empty" if exists else "missing")
+        total_sessions += len(mains)
+        total_subs += len(subs)
+        items.append({
+            "id": a["id"], "label": a["label"], "group": a["group"], "dir": d,
+            "tokens": a["tokens"], "note": a["note"], "state": state,
+            "exists": exists, "sessions": len(mains), "subagents": len(subs),
+            "lastMtime": last, "error": err,
+            "lastActive": datetime.fromtimestamp(last).strftime("%Y-%m-%d %H:%M") if last else "",
+        })
+    items.sort(key=lambda x: (x["state"] != "connected", -x["lastMtime"]))
+    return {"ok": True,
+            "summary": {"known": len(ADAPTERS),
+                        "connected": sum(1 for i in items if i["state"] == "connected"),
+                        "empty": sum(1 for i in items if i["state"] == "empty"),
+                        "missing": sum(1 for i in items if i["state"] == "missing"),
+                        "sessions": total_sessions, "subagents": total_subs},
+            "clients": items}
+
+
+def client_usage_all(handler_cls):
+    """多智能体用量聚合（遍历注册表）+ 20s 缓存。"""
+    dirs = adapter_dirs(handler_cls)
+    key = tuple(sorted(dirs.items()))
     now = time.time()
-    if _USAGE_CACHE["v"] is not None and _USAGE_CACHE["key"] == key and (now - _USAGE_CACHE["t"]) < CLIENT_USAGE_TTL:
+    if _USAGE_CACHE["v"] is not None and _USAGE_CACHE["key"] == key \
+            and (now - _USAGE_CACHE["t"]) < CLIENT_USAGE_TTL:
         return _USAGE_CACHE["v"]
     clients = {}
-    if rollout_dir and os.path.isdir(rollout_dir):
-        zc = scan_tokens(rollout_dir)
-        zc.pop("badLines", None)
-        clients["zcode"] = dict(zc, label="ZCode", available=True, tokens=True)
-    else:
-        clients["zcode"] = _empty_client("ZCode", True)
-    if codex_dir and os.path.isdir(codex_dir):
-        cx = scan_codex_tokens(codex_dir)
-        cx.pop("badLines", None)
-        clients["codex"] = cx
-    else:
-        clients["codex"] = _empty_client("Codex CLI", True)
-    clients["qoder"] = scan_qoder_calls(qoder_dir) if (qoder_dir and os.path.isdir(qoder_dir)) \
-        else _empty_client("Qoder CLI", False)
+    for a in ADAPTERS:
+        d = dirs.get(a["id"]) or ""
+        if not (d and os.path.isdir(d)) or a["usage"] is None:
+            clients[a["id"]] = _empty_client(a["label"], a["tokens"], a["note"])
+            continue
+        try:
+            v = a["usage"](d, 80)
+            v.pop("badLines", None)
+        except Exception as e:
+            clients[a["id"]] = _empty_client(a["label"], a["tokens"], "扫描失败：%s" % e)
+            continue
+        if not isinstance(v, dict):
+            clients[a["id"]] = _empty_client(a["label"], a["tokens"], a["note"])
+            continue
+        v.setdefault("label", a["label"])
+        clients[a["id"]] = v
     v = {"ok": True, "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "clients": clients}
     _USAGE_CACHE.update({"t": now, "key": key, "v": v})
     return v
+
+
+def client_usage(rollout_dir, codex_dir, qoder_dir, gemini_dir=""):
+    """[兼容保留] 三/四家客户端用量聚合的旧签名。
+
+    新代码请用 client_usage_all(handler_cls)（遍历 ADAPTERS，自动包含后续新增的智能体）。
+    这里仅为外部调用方保留旧接口，内部已不再使用。
+    """
+    dirs = {"rollout_dir": rollout_dir, "codex_dir": codex_dir,
+            "qoder_dir": qoder_dir, "gemini_dir": gemini_dir}
+
+    class _Stub:
+        pass
+    for a in ADAPTERS:
+        setattr(_Stub, a["attr"], dirs.get(a["attr"], "") or "")
+    return client_usage_all(_Stub)
 
 
 def _skill_meta(path):
@@ -731,12 +1357,17 @@ def default_paths():
             os.path.join(home, ".zcode", "codex-manager", "skills"),
             os.path.join(repo, "skills"),
             os.path.join(home, ".codex", "sessions"),
-            os.path.join(home, ".qoder-cn"))
+            os.path.join(home, ".qoder-cn"),
+            os.path.join(home, ".gemini", "antigravity"),
+            os.path.join(home, ".workbuddy"),
+            os.path.join(home, ".qwen"),
+            os.path.join(home, ".kimi-work"))
 
 
-SETTINGS_KEYS = ("usage", "rollout", "agents", "codex", "qoder")
+SETTINGS_KEYS = ("usage", "rollout", "agents", "codex", "qoder", "gemini", "wb", "qwen", "kimi")
 KEY_ATTR = {"usage": "usage_path", "rollout": "rollout_dir", "agents": "agents_dir",
-            "codex": "codex_dir", "qoder": "qoder_dir"}
+            "codex": "codex_dir", "qoder": "qoder_dir", "gemini": "gemini_dir",
+            "wb": "wb_dir", "qwen": "qwen_dir", "kimi": "kimi_dir"}
 
 
 def settings_file():
@@ -819,6 +1450,10 @@ class Handler(SimpleHTTPRequestHandler):
     skills_install = ""
     codex_dir = ""
     qoder_dir = ""
+    gemini_dir = ""
+    wb_dir = ""
+    qwen_dir = ""
+    kimi_dir = ""
     settings_saved = {}      # flow-settings.json 中已保存的覆盖值（内存副本）
     settings_cli = {}        # 启动参数显式指定的路径（优先级最高，设置不可覆盖）
     settings_default = {}    # 各键的出厂默认路径
@@ -903,6 +1538,89 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return None
 
+    def gemini_path(self, sid):
+        """Gemini 会话 id（uuid）+ rel 正文相对路径 → 正文文件绝对路径；不合法或越界返回 None。"""
+        return _gemini_session_dir(self.gemini_dir, sid)
+
+    def gemini_content_path(self, sid, rel):
+        """brain/<sid>/<rel> → 绝对路径；rel 段全部校验且结果须落在会话目录内。
+
+        rel 缺省时自动定位标准正文（.system_generated/logs/transcript.jsonl 等），
+        这样调用方无需知道内部相对路径即可取到正文。
+        """
+        sdir = _gemini_session_dir(self.gemini_dir, sid)
+        if not sdir:
+            return None
+        if not isinstance(rel, str) or not rel:
+            found = _gemini_transcript(sdir)
+            fp = found[0] if isinstance(found, tuple) else found
+            return fp if (fp and os.path.isfile(fp)) else None
+        parts = rel.replace("\\", "/").split("/")
+        if not parts or not all(DIRNAME_RE.match(p) for p in parts):
+            return None
+        try:
+            p = os.path.realpath(os.path.join(sdir, *parts))
+            if os.path.commonpath([sdir, p]) != sdir:
+                return None
+            return p
+        except Exception:
+            return None
+
+    def qwen_path(self, rel):
+        """<项目>/chats/<文件>.runtime.json → 绝对路径；不合法或越界返回 None。"""
+        if not (self.qwen_dir and isinstance(rel, str)):
+            return None
+        parts = rel.replace("\\", "/").split("/")
+        if len(parts) != 3 or parts[1] != "chats" or not parts[2].endswith(".json"):
+            return None
+        if not all(DIRNAME_RE.match(p) for p in parts):
+            return None
+        try:
+            root = os.path.realpath(os.path.join(self.qwen_dir, "projects"))
+            p = os.path.realpath(os.path.join(root, *parts))
+            if os.path.commonpath([root, p]) != root:
+                return None
+            return p
+        except Exception:
+            return None
+
+    def wb_path(self, rel):
+        """<项目>/<会话>.jsonl → 绝对路径；不合法或越界返回 None。"""
+        if not (self.wb_dir and isinstance(rel, str)):
+            return None
+        parts = rel.replace("\\", "/").split("/")
+        if len(parts) != 2 or not parts[1].endswith(".jsonl"):
+            return None
+        if not all(DIRNAME_RE.match(p) for p in parts):
+            return None
+        try:
+            root = os.path.realpath(os.path.join(self.wb_dir, "projects"))
+            p = os.path.realpath(os.path.join(root, *parts))
+            if os.path.commonpath([root, p]) != root:
+                return None
+            return p
+        except Exception:
+            return None
+
+    def client_session_path(self, client, cid, rel=""):
+        """按适配器 id 解析会话正文文件绝对路径（统一入口，防目录穿越）。
+
+        zcode/codex/qoder 用 id 即可定位；gemini 一个会话是一个目录，需额外给正文相对路径 rel。
+        """
+        if client == "zcode":
+            return self.rollout_path("model-io-sess_" + str(cid) + ".jsonl") if ID_RE.match(str(cid)) else None
+        if client == "codex":
+            return self.codex_path(cid)
+        if client == "qoder":
+            return self.qoder_path(cid)
+        if client == "gemini":
+            return self.gemini_content_path(cid, rel)
+        if client == "wb":
+            return self.wb_path(cid)
+        if client == "qwen":
+            return self.qwen_path(cid)
+        return None
+
     def skill_path(self, slug, target):
         """slug + 目标（draft/install）→ SKILL.md 绝对路径；不合法或越界返回 None。"""
         root = self.skills_install if target == "install" else self.skills_dir
@@ -975,13 +1693,20 @@ class Handler(SimpleHTTPRequestHandler):
                 "skillsInstall": bool(self.skills_install),
                 "codex": bool(self.codex_dir and os.path.isdir(self.codex_dir)),
                 "qoder": bool(self.qoder_dir and os.path.isdir(self.qoder_dir)),
+                "gemini": bool(self.gemini_dir and os.path.isdir(self.gemini_dir)),
+                "wb": bool(self.wb_dir and os.path.isdir(self.wb_dir)),
+                "qwen": bool(self.qwen_dir and os.path.isdir(self.qwen_dir)),
+                "kimi": bool(self.kimi_dir and os.path.isdir(self.kimi_dir)),
                 "clients": True,  # /__flow_clients 端点存在（多客户端会话列表）
+                "registry": True, # /__flow_agents_registry 端点存在（已连接智能体分类）
                 "settings": True,  # /__flow_settings 端点存在（数据来源目录设置）
                 "wfstate": True,   # /__flow_wf_state 端点存在（工作流树自动备份/恢复）
-                "clientUsage": bool((self.rollout_dir and os.path.isdir(self.rollout_dir))
-                                    or (self.codex_dir and os.path.isdir(self.codex_dir))
-                                    or (self.qoder_dir and os.path.isdir(self.qoder_dir))),
+                "clientUsage": any(bool((getattr(self, a["attr"], "") or "") and os.path.isdir(getattr(self, a["attr"], "")))
+                                   for a in ADAPTERS),
             })
+            return
+        if path == "/__flow_agents_registry":
+            self.send_json(200, agents_registry(type(self)))
             return
         if path == "/__flow_settings":
             self.send_json(200, self.settings_view())
@@ -1059,22 +1784,13 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(200, {"ok": True, "path": rel, "meta": meta, "output": out})
             return
         if path == "/__flow_clients":
-            zc = [dict(f, id=f.get("session"), client="zcode", sub=False, cwd="") for f in rollout_files(self.rollout_dir)]
-            cx = [dict(f, client="codex", sub=False) for f in list_codex_sessions(self.codex_dir)]
-            qd = [dict(f, client="qoder") for f in list_qoder_sessions(self.qoder_dir)]
-            self.send_json(200, {"ok": True, "clients": [
-                {"id": "zcode", "label": "ZCode", "dir": self.rollout_dir, "tokens": True,
-                 "available": bool(self.rollout_dir and os.path.isdir(self.rollout_dir)), "sessions": zc},
-                {"id": "codex", "label": "Codex CLI", "dir": self.codex_dir, "tokens": True,
-                 "available": bool(self.codex_dir and os.path.isdir(self.codex_dir)), "sessions": cx},
-                {"id": "qoder", "label": "Qoder CLI", "dir": self.qoder_dir, "tokens": False,
-                 "available": bool(self.qoder_dir and os.path.isdir(self.qoder_dir)), "sessions": qd},
-            ]})
+            self.send_json(200, clients_view(type(self)))
             return
         if path == "/__flow_client_file":
             qs = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
             client = (qs.get("client") or [""])[0]
             cid = (qs.get("id") or [""])[0]
+            rel = (qs.get("rel") or [""])[0]
             raw_tail = (qs.get("tail") or [""])[0]
             if raw_tail == "":
                 tail = 0  # 不传 = 全量（仍受 ROLLOUT_MAX_BYTES 上限）
@@ -1086,13 +1802,7 @@ class Handler(SimpleHTTPRequestHandler):
             tail = max(0, min(tail, CLIENT_TAIL_MAX_BYTES))
             if 0 < tail < CLIENT_TAIL_MIN_BYTES:
                 tail = CLIENT_TAIL_MIN_BYTES
-            fp = None
-            if client == "zcode" and ID_RE.match(cid):
-                fp = self.rollout_path("model-io-sess_" + cid + ".jsonl")
-            elif client == "codex":
-                fp = self.codex_path(cid)
-            elif client == "qoder":
-                fp = self.qoder_path(cid)
+            fp = self.client_session_path(client, cid, rel)
             if not fp:
                 self.send_json(400, {"ok": False, "error": "客户端或文件 ID 不合法"})
                 return
@@ -1113,7 +1823,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_text(200, text)
             return
         if path == "/__flow_client_usage":
-            self.send_json(200, client_usage(self.rollout_dir, self.codex_dir, self.qoder_dir))
+            self.send_json(200, client_usage_all(type(self)))
             return
         if path == "/__flow_skills":
             self.send_json(200, scan_skills(self.skills_dir, self.skills_install))
@@ -1348,6 +2058,10 @@ def main():
     ap.add_argument("--skills-install", default="", help="技能安装目录（默认 <插件仓库>\\skills）")
     ap.add_argument("--codex", default="", help="Codex CLI 会话目录（默认 %%USERPROFILE%%\\.codex\\sessions）")
     ap.add_argument("--qoder", default="", help="Qoder CLI 数据目录（默认 %%USERPROFILE%%\\.qoder-cn）")
+    ap.add_argument("--gemini", default="", help="Gemini/Antigravity 数据目录（默认 %%USERPROFILE%%\\.gemini\\antigravity）")
+    ap.add_argument("--wb", default="", help="WorkBuddy 数据目录（默认 %%USERPROFILE%%\\.workbuddy）")
+    ap.add_argument("--qwen", default="", help="Qwen Code 数据目录（默认 %%USERPROFILE%%\\.qwen）")
+    ap.add_argument("--kimi", default="", help="Kimi 数据目录（默认 %%USERPROFILE%%\\.kimi-work）")
     ap.add_argument("--open", action="store_true", help="启动后自动用默认浏览器打开编辑器")
     a = ap.parse_args()
 
@@ -1355,11 +2069,14 @@ def main():
     if not os.path.isdir(root):
         print("目录不存在：%s" % root, file=sys.stderr)
         sys.exit(2)
-    d_usage, d_rollout, d_agents, d_skills, d_skills_install, d_codex, d_qoder = default_paths()
+    (d_usage, d_rollout, d_agents, d_skills, d_skills_install,
+     d_codex, d_qoder, d_gemini, d_wb, d_qwen, d_kimi) = default_paths()
     cli_paths = {k: v for k, v in (("usage", a.usage), ("rollout", a.rollout), ("agents", a.agents),
-                                   ("codex", a.codex), ("qoder", a.qoder)) if v}
+                                   ("codex", a.codex), ("qoder", a.qoder), ("gemini", a.gemini),
+                                   ("wb", a.wb), ("qwen", a.qwen), ("kimi", a.kimi)) if v}
     defaults = {"usage": d_usage, "rollout": d_rollout, "agents": d_agents,
-                "codex": d_codex, "qoder": d_qoder}
+                "codex": d_codex, "qoder": d_qoder, "gemini": d_gemini,
+                "wb": d_wb, "qwen": d_qwen, "kimi": d_kimi}
     saved = settings_load()
     Handler.root = root
     Handler.watch = a.watch
@@ -1391,8 +2108,11 @@ def main():
     print("  agents=%s（%s）" % (Handler.agents_dir, "存在" if os.path.isdir(Handler.agents_dir) else "缺失"))
     print("  skills=%s（%s）" % (Handler.skills_dir, "存在" if os.path.isdir(Handler.skills_dir) else "缺失，保存草稿时自动创建"))
     print("  skills-install=%s（%s）" % (Handler.skills_install, "存在" if os.path.isdir(Handler.skills_install) else "缺失，安装技能时自动创建"))
-    print("  codex=%s（%s）" % (Handler.codex_dir, "存在" if os.path.isdir(Handler.codex_dir) else "缺失"))
-    print("  qoder=%s（%s）" % (Handler.qoder_dir, "存在" if os.path.isdir(Handler.qoder_dir) else "缺失"))
+    print("  --- 已注册智能体 %d 个 ---" % len(ADAPTERS))
+    for ad in ADAPTERS:
+        d = getattr(Handler, ad["attr"], "") or ""
+        ok = bool(d and os.path.isdir(d))
+        print("  [%s] %-22s %s（%s）" % ("已连接" if ok else "未发现", ad["label"], d, "存在" if ok else "缺失"))
     print("  设置文件=%s（%s）" % (settings_file(),
           ("已保存覆盖：" + ", ".join(sorted(saved))) if saved else "无覆盖，可在编辑器 ⚙ 设置中修改"))
     print("FLOW_SERVE_URL=%s" % url)

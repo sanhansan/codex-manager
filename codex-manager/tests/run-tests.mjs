@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -25,7 +25,7 @@ const core = await import(pathToFileURL(corePath).href);
   splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta,
   parseUsageRecords, traceQuery, cleanLabel, fitText,
   extractKeywords, parseQaTurns, parseAgentRecords, qaFilter, qaLabel,
-  parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa,
+  parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa,
   suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts,
   fmtWfWhen, taskCanvasName, wfTree, isQaContinuation,
   fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries,
@@ -562,7 +562,7 @@ t("parseQoderTurns：流式去重取最长、tool_result 跳过、模型记录",
   eq(r.turns[0].tools, ["Read"]);
   eq(r.turns[0].model, "dfmodel", "回合模型取 assistant.message.model");
 });
-t("parseAnyTurns：自动识别 zcode / codex / qoder 与显式指定", () => {
+t("parseAnyTurns：自动识别 zcode / codex / qoder / wb / gemini / qwen 与显式指定", () => {
   const z = JSON.stringify({ sessionId: "s1", request: { messagesKind: "full", messages: [{ role: "user", content: "你好" }] } });
   eq(parseAnyTurns(z).session, "s1");
   const c = JSON.stringify({ type: "session_meta", payload: { id: "c1" } });
@@ -570,7 +570,61 @@ t("parseAnyTurns：自动识别 zcode / codex / qoder 与显式指定", () => {
   const q = JSON.stringify({ type: "workspace-directories", sessionId: "q1", directories: ["D:\\x"] });
   eq(parseAnyTurns(q).session, "q1");
   eq(parseAnyTurns(c, "codex").session, "c1");
+  // WorkBuddy：message + content[]
+  const wb = JSON.stringify({ type: "message", role: "user", sessionId: "w1", content: [{ type: "input_text", text: "整理目录" }] });
+  eq(parseAnyTurns(wb).session, "w1");
+  // Gemini：USER_INPUT
+  const gm = JSON.stringify({ type: "USER_INPUT", content: "<USER_REQUEST>\n查文献\n</USER_REQUEST>" });
+  const gmr = parseAnyTurns(gm);
+  eq(gmr.turns.length, 1);
+  eq(gmr.turns[0].q, "查文献");
+  // Qwen：runtime.json 元信息
+  const qw = JSON.stringify({ schema_version: 1, session_id: "q9", work_dir: "C:\\q", qwen_version: "0.24.7" });
+  const qwr = parseAnyTurns(qw);
+  eq(qwr.session, "q9");
+  eq(qwr.turns.length, 1, "Qwen 无正文 → 登记 1 个会话节点");
   eq(parseAnyTurns("flowchart TD\n a --> b").turns.length, 0, "非 JSON 回退 zcode 解析不崩");
+});
+t("parseWbTurns：message 记录按 role 组成问答，系统注入过滤，工具调用收集", () => {
+  const lines = [
+    JSON.stringify({ type: "file-history-snapshot", cwd: "C:\\x" }),
+    JSON.stringify({ type: "message", role: "user", sessionId: "ws1", timestamp: 1791379962231, content: [{ type: "input_text", text: "帮我改路径" }] }),
+    JSON.stringify({ type: "message", role: "assistant", timestamp: 1791379963000, content: [{ type: "output_text", text: "好的，先看文件。" }] }),
+    JSON.stringify({ type: "message", role: "user", timestamp: 1791379964000, content: [{ type: "input_text", text: "<task-notification>\n<task-id>x</task-id>\n</task-notification>" }] }),
+    JSON.stringify({ type: "message", role: "user", timestamp: 1791379965000, content: [{ type: "input_text", text: "还有一处" }] }),
+    JSON.stringify({ type: "message", role: "assistant", timestamp: 1791379966000, content: [{ type: "output_text", text: "已修复。" }] }),
+  ].join("\n");
+  const r = parseWbTurns(lines);
+  eq(r.session, "ws1");
+  eq(r.turns.length, 2, "task-notification 系统注入不算提问");
+  eq(r.turns[0].q, "帮我改路径");
+  eq(r.turns[0].a, "好的，先看文件。");
+  eq(r.turns[1].q, "还有一处");
+  ok(r.turns[0].ts > 0, "回合应有时间戳");
+});
+t("parseGeminiTurns：USER_INPUT 取 <USER_REQUEST> 正文，PLANNER_RESPONSE 归入回答", () => {
+  const lines = [
+    JSON.stringify({ type: "USER_INPUT", status: "DONE", created_at: "2026-10-04T04:12:21Z", content: "<USER_REQUEST>\n查一下考研择校系统\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nignore me\n</ADDITIONAL_METADATA>" }),
+    JSON.stringify({ type: "PLANNER_RESPONSE", status: "DONE", created_at: "2026-10-04T04:12:22Z", thinking: "需要检索关键词", tool_calls: [{ name: "search" }] }),
+    JSON.stringify({ type: "GENERIC", status: "DONE", created_at: "2026-10-04T04:12:28Z", content: "返回 3 篇相关文献。" }),
+    JSON.stringify({ type: "USER_INPUT", status: "DONE", created_at: "2026-10-04T04:20:00Z", content: "<USER_REQUEST>\n导出表格\n</USER_REQUEST>" }),
+  ].join("\n");
+  const r = parseGeminiTurns(lines);
+  eq(r.turns.length, 2);
+  eq(r.turns[0].q, "查一下考研择校系统", "仅取 USER_REQUEST 段，丢弃元信息");
+  ok(r.turns[0].a.indexOf("需要检索关键词") >= 0, "thinking 计入回答");
+  ok(r.turns[0].a.indexOf("返回 3 篇相关文献。") >= 0, "GENERIC content 计入回答");
+  eq(r.turns[0].tools, ["search"]);
+  eq(r.turns[1].q, "导出表格");
+});
+t("parseQwenTurns：runtime.json 无正文 → 单条会话节点，会话 id 与版本入标签", () => {
+  const r = parseQwenTurns(JSON.stringify({ schema_version: 1, session_id: "qid1", work_dir: "C:\\Users\\x\\qwen-code\\bin", started_at: 1790759665.1, qwen_version: "0.24.7" }));
+  eq(r.session, "qid1");
+  eq(r.turns.length, 1);
+  ok(r.turns[0].q.indexOf("Qwen Code 会话") >= 0);
+  ok(r.turns[0].q.indexOf("v0.24.7") >= 0);
+  ok(r.turns[0].a.indexOf("不含对话正文") >= 0, "如实标注无正文");
+  eq(parseQwenTurns("not json").turns.length, 0, "坏输入不崩");
 });
 t("parseQaTurns：无 messageOffset 的旁路窗口不清空已按偏移拼好的历史；全无偏移时退回最后窗口", () => {
   const full = JSON.stringify({ sessionId: "sess_T2", startedAt: "2026-10-07T01:00:00Z", request: { messagesKind: "full", messageOffset: 0, messageCount: 2, messages: [

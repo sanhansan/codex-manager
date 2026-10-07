@@ -188,6 +188,28 @@
   .hrow .hbar i { display:block; height:100%; background:var(--accent); opacity:.8; }
   .hrow b { width:36px; font-size:12px; text-align:left; font-family:Consolas,Menlo,monospace; }
   .hsec { margin:14px 0 4px; font-size:12.5px; color:var(--ink); }
+  /* 🔌 已连接智能体：KPI + 智能体卡片 + 对话画布行 */
+  #agBody { padding:0 14px 20px; overflow:auto; height:calc(100% - 52px); }
+  .agkpi { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 4px; }
+  .agkpi1 { border:1px solid var(--line); border-radius:2px; padding:7px 11px; background:var(--panel); min-width:88px; }
+  .agkpi1 .k { display:block; font-size:11px; color:var(--muted); }
+  .agkpi1 .v { display:block; font-size:19px; font-family:Consolas,Menlo,monospace; letter-spacing:-.02em; }
+  .agkpi1.k-ok .v { color:#15803d; }
+  .agkpi1.k-idle .v { color:#b45309; }
+  .agkpi1.k-off .v { color:#9ca3af; }
+  .agcard { border:1px solid var(--line); border-radius:2px; padding:10px 12px; background:var(--panel); margin:8px 0; }
+  .agcard.ag-conn { border-left:3px solid var(--accent); }
+  .agtop { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .agdot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .agchip { font-size:10.5px; padding:1px 6px; border-radius:2px; border:1px solid var(--line); color:var(--muted); }
+  .agchip.ag-on { color:#15803d; border-color:#86efac; }
+  .agchip.ag-idle { color:#b45309; border-color:#fcd34d; }
+  .agchip.ag-off { color:#9ca3af; }
+  .agchip.ag-tok { color:#1d4ed8; border-color:#93c5fd; }
+  .agpath { font-size:11px; color:var(--muted); font-family:Consolas,Menlo,monospace; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .agsub { font-size:11.5px; color:var(--muted); margin:8px 0 3px; letter-spacing:.04em; }
+  .agrow { display:flex; gap:8px; align-items:center; padding:3px 0; border-top:1px solid var(--line); font-size:12px; }
+  .agrow .agname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:56%; }
   .days { display:flex; gap:3px; align-items:flex-end; height:70px; margin:6px 0; }
   .days div { flex:1; background:var(--accent); opacity:.75; min-height:2px; position:relative; }
   .days div span { position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); font-size:9.5px; color:var(--muted); white-space:nowrap; }
@@ -321,6 +343,7 @@
 <nav id="side">
   <div class="brand" data-i18n="Codex 管家">Codex 管家</div>
   <button class="vbtn active" data-view="canvas" data-i18n="🖼 画布">🖼 画布</button>
+  <button class="vbtn" data-view="agents" data-i18n="🔌 已连接智能体">🔌 已连接智能体</button>
   <button class="vbtn" data-view="dist" data-i18n="🛰 分布工作区">🛰 分布工作区</button>
   <button class="vbtn" data-view="ctl" data-i18n="🧭 总控流程">🧭 总控流程</button>
   <button class="vbtn" data-view="skills" data-i18n="🧩 Agent Skills">🧩 Agent Skills</button>
@@ -418,6 +441,15 @@
   </aside>
   </div>
 </div>
+<div id="viewAgents" class="view">
+  <div class="vhead">
+    <b data-i18n="🔌 已连接智能体">🔌 已连接智能体</b>
+    <span class="hint" data-i18n="按「智能体 → 对话画布」两级分类：上面是已连接的智能体，下面是它们各自的会话（对话画布）。">按「智能体 → 对话画布」两级分类：上面是已连接的智能体，下面是它们各自的会话（对话画布）。</span>
+    <span style="flex:1"></span>
+    <button id="agRefresh" data-i18n="🔄 重新探测" title="重新扫描所有已知智能体的数据目录">🔄 重新探测</button>
+  </div>
+  <div id="agBody" class="scroll"></div>
+</div>
 <div id="viewDist" class="view">
   <div class="vhead">
     <b data-i18n="🛰 分布工作区">🛰 分布工作区</b>
@@ -495,7 +527,7 @@
     <b data-i18n="💬 问答">💬 问答</b>
     <span class="hint" data-i18n="点行展开问答与关键词；🧠 总智能体 / 🤖 子智能体，画布来源特别标注。">点行展开问答与关键词；🧠 总智能体 / 🤖 子智能体，画布来源特别标注。</span>
     <select id="qaWho" title="按来源过滤"><option value="all" data-i18n="全部来源">全部来源</option><option value="master" data-i18n="🧠 总智能体">🧠 总智能体</option><option value="sub" data-i18n="🤖 子智能体">🤖 子智能体</option></select>
-    <select id="qaClient" title="按代码客户端过滤"><option value="all" data-i18n="全部客户端">全部客户端</option><option value="zcode">ZCode</option><option value="codex">Codex CLI</option><option value="qoder">Qoder CLI</option></select>
+    <select id="qaClient" title="按代码客户端过滤"><option value="all" data-i18n="全部客户端">全部客户端</option><option value="zcode">ZCode</option><option value="codex">Codex CLI</option><option value="qoder">Qoder CLI</option><option value="gemini">Gemini (Antigravity)</option><option value="wb">WorkBuddy</option><option value="qwen">Qwen Code</option><option value="kimi">Kimi</option></select>
     <input id="qaKw" type="text" placeholder="搜索问答/关键词…" data-i18n-ph="搜索问答/关键词…" style="width:160px">
     <span style="flex:1"></span>
     <span id="qaSyncStat" class="hint" data-i18n-title="本地服务托管时自动同步最新会话与全部子智能体（每 6s），运行中的回答会持续长出来" title="本地服务托管时自动同步最新会话与全部子智能体（每 6s），运行中的回答会持续长出来"></span>
@@ -550,7 +582,7 @@
   <li data-i18n="左侧任务栏六个视图：画布 / 分布工作区 / 总控流程 / Agent Skills / 轨迹查询 / 问答；工作流列表点击即切换">左侧任务栏六个视图：画布 / 分布工作区 / 总控流程 / Agent Skills / 轨迹查询 / 问答；工作流列表点击即切换</li>
   <li data-i18n="「🧩 Agent Skills」与「📜 轨迹查询」是独立模块：选 usage.jsonl 后可看每技能调用统计，也可按关键字/类型/会话回放每次调用轨迹；Skill 工坊还能从问答/提示词或习惯候选生成 SKILL.md，导出或一键安装给智能体调用">「🧩 Agent Skills」与「📜 轨迹查询」是独立模块：选 usage.jsonl 后可看每技能调用统计，也可按关键字/类型/会话回放每次调用轨迹；Skill 工坊还能从问答/提示词或习惯候选生成 SKILL.md，导出或一键安装给智能体调用</li>
   <li data-i18n="「🛠 Skill 工坊」把习惯候选自动扩写成 SKILL.md 草稿（英中双关键词），可编辑后保存到草稿目录（~/.zcode/codex-manager/skills）或直接安装到插件 skills/；「🔄 刷新已保存列表」可载回继续编辑">「🛠 Skill 工坊」把习惯候选自动扩写成 SKILL.md 草稿（英中双关键词），可编辑后保存到草稿目录（~/.zcode/codex-manager/skills）或直接安装到插件 skills/；「🔄 刷新已保存列表」可载回继续编辑</li>
-  <li data-i18n="「💬 问答」回放三家客户端（ZCode / Codex CLI / Qoder CLI）的会话问答：HTTP 托管时自动同步最新会话 + 全部子智能体（每条带客户端色徽章），file:// 下可选 rollout 会话文件与子智能体目录；「⚡ 一键重点与提示词」自动打分提炼重点，「🖼 生成工作画布」按 🧠 总任务 / 🤖 子智能体生成画布；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体，每条可「→ 添加为画布节点」或「→ 查看 X 用量」转跳 Token 区块">「💬 问答」回放三家客户端（ZCode / Codex CLI / Qoder CLI）的会话问答：HTTP 托管时自动同步最新会话 + 全部子智能体（每条带客户端色徽章），file:// 下可选 rollout 会话文件与子智能体目录；「⚡ 一键重点与提示词」自动打分提炼重点，「🖼 生成工作画布」按 🧠 总任务 / 🤖 子智能体生成画布；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体，每条可「→ 添加为画布节点」或「→ 查看 X 用量」转跳 Token 区块</li>
+  <li data-i18n="「💬 问答」回放各已连接智能体（ZCode / Codex CLI / Qoder CLI / Gemini）的会话问答：HTTP 托管时自动同步最新会话 + 全部子智能体（每条带客户端色徽章），file:// 下可选 rollout 会话文件与子智能体目录；「⚡ 一键重点与提示词」自动打分提炼重点，「🖼 生成工作画布」按 🧠 总任务 / 🤖 子智能体生成画布；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体，每条可「→ 添加为画布节点」或「→ 查看 X 用量」转跳 Token 区块">「💬 问答」回放各已连接智能体（ZCode / Codex CLI / Qoder CLI / Gemini）的会话问答：HTTP 托管时自动同步最新会话 + 全部子智能体（每条带客户端色徽章），file:// 下可选 rollout 会话文件与子智能体目录；「⚡ 一键重点与提示词」自动打分提炼重点，「🖼 生成工作画布」按 🧠 总任务 / 🤖 子智能体生成画布；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体，每条可「→ 添加为画布节点」或「→ 查看 X 用量」转跳 Token 区块</li>
   <li data-i18n="AI 助手两条提示词通道：「优化连线」（只调结构：汇合/分支/反馈）与「优化整个流程」；校验会检查环路、类型规则（输入无入边、条件两分支等）、门规则与可达性">AI 助手两条提示词通道：「优化连线」（只调结构：汇合/分支/反馈）与「优化整个流程」；校验会检查环路、类型规则（输入无入边、条件两分支等）、门规则与可达性</li>
   <li data-i18n="超过 8 层的线性链自动蛇形折行；重复连线与自环会被拒绝">超过 8 层的线性链自动蛇形折行；重复连线与自环会被拒绝</li>
   <li data-i18n="「🔗 连接文件」后画布与本地文件双向同步：AI / 会话改文件 → 画布自动更新；画布改动 → 自动写回文件（建议 Edge / Chrome）；用 flow_serve.py 托管时打开即自动连接，零点击">「🔗 连接文件」后画布与本地文件双向同步：AI / 会话改文件 → 画布自动更新；画布改动 → 自动写回文件（建议 Edge / Chrome）；用 flow_serve.py 托管时打开即自动连接，零点击</li>
@@ -1524,13 +1556,92 @@ function parseAnyTurns(text, client){
   const s = String(text || '');
   if (client === 'codex') return parseCodexTurns(s);
   if (client === 'qoder') return parseQoderTurns(s);
+  if (client === 'wb') return parseWbTurns(s);
+  if (client === 'gemini') return parseGeminiTurns(s);
+  if (client === 'qwen') return parseQwenTurns(s);
   if (client === 'zcode') return parseQaTurns(s);
   const head = s.split(/\r?\n/).find(l => l.trim()) || '';
   let o = null; try { o = JSON.parse(head); } catch(e){}
   if (o && (o.request || o.response)) return parseQaTurns(s);
   if (o && (o.type === 'session_meta' || o.type === 'response_item' || o.type === 'turn_context')) return parseCodexTurns(s);
   if (o && (o.type === 'workspace-directories' || o.type === 'user' || o.type === 'assistant' || o.type === 'runtime-config' || o.type === 'last-prompt' || o.humanInput)) return parseQoderTurns(s);
+  // WorkBuddy：{type:'message', role, content:[{type:'output_text',text}]}
+  if (o && o.type === 'message' && (o.role === 'user' || o.role === 'assistant')) return parseWbTurns(s);
+  if (o && (o.type === 'USER_INPUT' || o.type === 'PLANNER_RESPONSE' || o.type === 'GENERIC')) return parseGeminiTurns(s);
+  if (o && (o.schema_version != null || o.session_id) && !o.type) return parseQwenTurns(s);
   return parseQaTurns(s);
+}
+// WorkBuddy（~/.workbuddy/projects/<proj>/<sess>.jsonl）：{type:'message', role, content:[{type:'input_text'|'output_text', text}], timestamp}
+function parseWbTurns(jsonlText){
+  const lines = String(jsonlText || '').split(/\r?\n/).filter(l => l.trim());
+  const turns = [];
+  let sid = '';
+  const partText = c => {
+    if (typeof c === 'string') return c;
+    if (!Array.isArray(c)) return '';
+    return c.filter(p => p && typeof p.text === 'string' && (p.type === 'input_text' || p.type === 'output_text' || p.type === 'text')).map(p => p.text).join('\n');
+  };
+  let cur = null;
+  lines.forEach(line => {
+    let o; try { o = JSON.parse(line); } catch(e){ return; }
+    if (o.sessionId && !sid) sid = String(o.sessionId);
+    if (o.type !== 'message') return;
+    const ts = o.timestamp ? Number(o.timestamp) : 0;
+    const t = partText(o.content).trim();
+    if (!t) return;
+    if (o.role === 'user'){
+      if (t.startsWith('<task-notification>') || t.startsWith('<') && t.indexOf('</') > 0 && t.length < 400) return; // 系统注入不算提问
+      cur = { q: t, a: '', tools: [], idx: turns.length, ts };
+      turns.push(cur);
+    } else if (o.role === 'assistant' && cur){
+      cur.a += (cur.a ? '\n' : '') + t;
+    }
+  });
+  finalizeQaTurns(turns);
+  return { session: sid, turns };
+}
+// Gemini / Antigravity（brain/<uuid>/.system_generated/logs/transcript.jsonl）：USER_INPUT + PLANNER_RESPONSE + GENERIC
+function parseGeminiTurns(jsonlText){
+  const lines = String(jsonlText || '').split(/\r?\n/).filter(l => l.trim());
+  const turns = [];
+  let cur = null;
+  const cleanUser = c => {
+    let t = String(c || '');
+    const m = t.match(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i);
+    if (m) t = m[1];
+    else t = t.replace(/<[^>]*>[\s\S]*?<\/[^>]*>/g, ' ');
+    return t.trim();
+  };
+  lines.forEach(line => {
+    let o; try { o = JSON.parse(line); } catch(e){ return; }
+    const ts = o.created_at ? new Date(o.created_at).getTime() : 0;
+    if (o.type === 'USER_INPUT'){
+      const t = cleanUser(o.content);
+      if (!t) return;
+      cur = { q: t, a: '', tools: [], idx: turns.length, ts };
+      turns.push(cur);
+    } else if (cur && (o.type === 'PLANNER_RESPONSE' || o.type === 'GENERIC' || o.type === 'MODEL_RESPONSE')){
+      const ans = String(o.content || o.thinking || '').trim();
+      if (ans) cur.a += (cur.a ? '\n' : '') + ans;
+      (o.tool_calls || []).forEach(tc => {
+        const nm = (tc && (tc.name || (tc.function || {}).name)) || '';
+        if (nm) cur.tools.push(nm);
+      });
+    }
+  });
+  finalizeQaTurns(turns);
+  return { session: '', turns };
+}
+// Qwen Code：chats/<uuid>.runtime.json 仅运行时会话元信息（无对话正文）→ 只登记会话节点
+function parseQwenTurns(text){
+  const s = String(text || '').trim();
+  let o = null; try { o = JSON.parse(s); } catch(e){}
+  if (!o || typeof o !== 'object') return { session: '', turns: [] };
+  const sid = String(o.session_id || '');
+  const wd = String(o.work_dir || '');
+  const st = o.started_at ? (Number(o.started_at) < 1e12 ? Number(o.started_at) * 1000 : Number(o.started_at)) : 0;
+  const q = 'Qwen Code 会话' + (wd ? '（' + wd + '）' : '') + (o.qwen_version ? ' · v' + o.qwen_version : '');
+  return { session: sid, turns: [{ q, a: '（该客户端本地仅记录运行时会话元信息，不含对话正文）', tools: [], idx: 0, ts: st }] };
 }
 // 子智能体目录（agents/sess_x/agent_y/metadata.json + output.txt）→ 子智能体聊天记录
 function parseAgentRecords(entries){
@@ -2052,6 +2163,29 @@ if (typeof document !== "undefined") var UI = function(){
   const I18N = {
     'Codex 管家': 'Codex Manager',
     '🖼 画布': '🖼 Canvas',
+    '🔌 已连接智能体': '🔌 Connected Agents',
+    '按「智能体 → 对话画布」两级分类：上面是已连接的智能体，下面是它们各自的会话（对话画布）。': 'Two-level grouping by "agent → conversation canvas": connected agents on top, their sessions (conversation canvases) below.',
+    '🔄 重新探测': '🔄 Re-scan',
+    '正在探测各智能体的数据目录…': 'Scanning each agent\'s data directories…',
+    '无法读取智能体注册表。该视图需要通过本地服务（flow_serve.py）打开；当前可能是 file:// 直开或服务未启动。': 'Cannot read the agent registry. This view needs the local service (flow_serve.py); you may be on file:// or the service is not running.',
+    '已知智能体': 'Known agents',
+    '已连接': 'Connected',
+    '无会话': 'No sessions',
+    '未安装': 'Not installed',
+    '对话画布': 'Conversation canvas',
+    '子智能体': 'Sub-agents',
+    '命令行智能体': 'CLI agents',
+    'IDE / 桌面智能体': 'IDE / desktop agents',
+    '含令牌': 'tokens',
+    '无令牌': 'no tokens',
+    '最近': 'last',
+    '（目录未配置）': '(no directory configured)',
+    '扫描失败：': 'Scan failed: ',
+    '目录存在但还没有会话记录。': 'Directory exists but has no sessions yet.',
+    '未发现该智能体的数据目录。可在 ⚙ 设置中指定路径，或确认它是否安装。': 'Agent data directory not found. Set a path in ⚙ Settings, or check whether it is installed.',
+    '（仅列出最近 14 条，完整列表见「💬 问答」）': '(showing the latest 14 only; see "💬 Q&A" for the full list)',
+    '→ 看问答': '→ View Q&A',
+    '主会话 {0} · 子智能体 {1}': '{0} sessions · {1} sub-agents',
     '🛰 分布工作区': '🛰 Workspaces',
     '🧭 总控流程': '🧭 Master Control',
     '🧩 Agent Skills': '🧩 Agent Skills',
@@ -2105,7 +2239,7 @@ if (typeof document !== "undefined") var UI = function(){
     '左侧任务栏六个视图：画布 / 分布工作区 / 总控流程 / Agent Skills / 轨迹查询 / 问答；工作流列表点击即切换': 'Six views in the left rail: Canvas / Workspaces / Master Control / Agent Skills / Trace / Q&A; click a workflow to switch.',
     '「🧩 Agent Skills」与「📜 轨迹查询」是独立模块：选 usage.jsonl 后可看每技能调用统计，也可按关键字/类型/会话回放每次调用轨迹；Skill 工坊还能从问答/提示词或习惯候选生成 SKILL.md，导出或一键安装给智能体调用': 'Agent Skills and Trace are standalone modules: pick usage.jsonl to see per-skill stats, or replay every call filtered by keyword / kind / session. The workshop can also draft a SKILL.md from Q&A prompts or habit candidates, then export or install it for agents.',
     '「🛠 Skill 工坊」把习惯候选自动扩写成 SKILL.md 草稿（英中双关键词），可编辑后保存到草稿目录（~/.zcode/codex-manager/skills）或直接安装到插件 skills/；「🔄 刷新已保存列表」可载回继续编辑': 'The Skill workshop expands habit candidates into a SKILL.md draft (bilingual keywords). Edit it, then save to the drafts dir (~/.zcode/codex-manager/skills) or install directly into the plugin skills/.',
-    '「💬 问答」回放三家客户端（ZCode / Codex CLI / Qoder CLI）的会话问答：HTTP 托管时自动同步最新会话 + 全部子智能体（每条带客户端色徽章），file:// 下可选 rollout 会话文件与子智能体目录；「⚡ 一键重点与提示词」自动打分提炼重点，「🖼 生成工作画布」按 🧠 总任务 / 🤖 子智能体生成画布；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体，每条可「→ 添加为画布节点」或「→ 查看 X 用量」转跳 Token 区块': 'Q&A replays sessions from all three clients (ZCode / Codex CLI / Qoder CLI): under HTTP hosting the latest sessions + all sub-agents auto-sync (client color badges per row); over file:// pick rollout files and subagent dirs manually. ⚡ Highlights & prompts scores the entries automatically; 🖼 Build work canvas turns 🧠 master tasks / 🤖 sub-agents into a canvas. Badges mark 🧠 master (canvas-source flagged) vs 🤖 subagent; each row can be added to the canvas or jump to the token block via "→ view X usage".',
+    '「💬 问答」回放各已连接智能体（ZCode / Codex CLI / Qoder CLI / Gemini）的会话问答：HTTP 托管时自动同步最新会话 + 全部子智能体（每条带客户端色徽章），file:// 下可选 rollout 会话文件与子智能体目录；「⚡ 一键重点与提示词」自动打分提炼重点，「🖼 生成工作画布」按 🧠 总任务 / 🤖 子智能体生成画布；徽章区分 🧠 总智能体（主会话，与画布同源的标「画布来源」）与 🤖 子智能体，每条可「→ 添加为画布节点」或「→ 查看 X 用量」转跳 Token 区块': 'Q&A replays sessions from all connected agents (ZCode / Codex CLI / Qoder CLI / Gemini): under HTTP hosting the latest sessions + all sub-agents auto-sync (client color badges per row); over file:// pick rollout files and subagent dirs manually. ⚡ Highlights & prompts scores the entries automatically; 🖼 Build work canvas turns 🧠 master tasks / 🤖 sub-agents into a canvas. Badges mark 🧠 master (canvas-source flagged) vs 🤖 subagent; each row can be added to the canvas or jump to the token block via "→ view X usage".',
     'AI 助手两条提示词通道：「优化连线」（只调结构：汇合/分支/反馈）与「优化整个流程」；校验会检查环路、类型规则（输入无入边、条件两分支等）、门规则与可达性': 'The AI assistant offers two prompt channels — optimize edges only (merge/branch/feedback) or the whole flow; validation checks cycles, kind rules, gate rules and reachability.',
     '超过 8 层的线性链自动蛇形折行；重复连线与自环会被拒绝': 'Linear chains over 8 levels wrap into serpentine bands; duplicate edges and self-loops are rejected.',
     '「🔗 连接文件」后画布与本地文件双向同步：AI / 会话改文件 → 画布自动更新；画布改动 → 自动写回文件（建议 Edge / Chrome）；用 flow_serve.py 托管时打开即自动连接，零点击': 'Connect file gives two-way sync with a local file: edits from AI / sessions update the canvas; canvas edits are written back automatically (Edge / Chrome recommended). Served by flow_serve.py it connects on open, zero clicks.',
@@ -2345,6 +2479,14 @@ if (typeof document !== "undefined") var UI = function(){
     'ZCode agents 目录（🤖 子智能体）': 'ZCode agents directory (🤖 subagents)',
     'Codex CLI 会话目录（💬 问答 / 用量）': 'Codex CLI sessions directory (💬 Q&A / usage)',
     'Qoder CLI 数据目录（💬 问答 / 用量）': 'Qoder CLI data directory (💬 Q&A / usage)',
+    'Gemini / Antigravity 数据目录（💬 问答 / 用量）': 'Gemini / Antigravity data directory (💬 Q&A / usage)',
+    'WorkBuddy 数据目录（💬 问答 / 用量）': 'WorkBuddy data directory (💬 Q&A / usage)',
+    'Qwen Code 数据目录（会话列表）': 'Qwen Code data directory (session list)',
+    'Kimi 数据目录（暂无会话数据）': 'Kimi data directory (no session data yet)',
+    '本地仅保存会话元信息，无对话正文与令牌字段': 'Stores session metadata only — no conversation body or token fields',
+    '本地不保存会话记录（目录内只有可执行文件）': 'No session records stored locally (only executables in the directory)',
+    'Qwen Code 本地仅保存会话元信息（无对话正文与令牌字段），只统计会话数量': 'Qwen Code only stores session metadata locally (no conversation body or tokens); session count only',
+    'Kimi 桌面版本地不保存会话记录（~/.kimi-work 只有可执行文件），无可读数据': 'Kimi desktop keeps no local session records (~/.kimi-work holds only executables); no readable data',
     '正在读取设置…': 'Reading settings…',
     '读取设置失败（需 flow_serve.py 托管）：': 'Failed to read settings (requires flow_serve.py hosting): ',
     '当前不是 flow_serve.py 托管（或服务版本过旧），无法修改数据来源目录；用 flow_serve.py 打开编辑器后再来设置。': 'Not hosted by flow_serve.py (or the service is outdated); cannot change data-source directories. Open the editor via flow_serve.py and try again.',
@@ -2425,6 +2567,7 @@ if (typeof document !== "undefined") var UI = function(){
     ' · 改名 ': ' · renamed ',
     ' · 跳过 ': ' · skipped ',
     '已从本地服务备份恢复 {0} 个画布（含小对话记录）': 'Restored {0} canvases from the local-server backup (chats included)',
+    '已保留 {0} 个历史会话画布（重新打开不再清空）': 'Kept {0} historical session canvases (no longer cleared on reopen)',
     '估算费用': 'Est. cost',
     '费用': 'Cost',
     '按 ⚙ 设置里的模型单价估算（美元）；未配置单价的模型不计入': 'Estimated with model prices from ⚙ Settings (USD); models without a price are excluded',
@@ -3289,7 +3432,7 @@ if (typeof document !== "undefined") var UI = function(){
   $('btnCodeToggle').addEventListener('click', () => { const c = $('code'); c.classList.toggle('hidden'); $('btnCodeToggle').textContent = c.classList.contains('hidden') ? T('展开') : T('收起'); });
 
   // ---------- ⚙ 设置：数据来源目录 + 模型单价（flow_serve.py 托管下可改，保存即生效） ----------
-  const SET_KEYS = ['usage', 'rollout', 'agents', 'codex', 'qoder'];
+  const SET_KEYS = ['usage', 'rollout', 'agents', 'codex', 'qoder', 'gemini', 'wb', 'qwen', 'kimi'];
   let lastSetView = null;
   let priceCfg = {};       // 已保存的模型单价（美元/百万 token）：{模型: {in, out, cr}}
   let priceModels = [];    // 本次设置弹窗里的模型行（键=下标 → id pp_in_0 等）
@@ -3317,6 +3460,10 @@ if (typeof document !== "undefined") var UI = function(){
     if (k === 'agents') return T('ZCode agents 目录（🤖 子智能体）');
     if (k === 'codex') return T('Codex CLI 会话目录（💬 问答 / 用量）');
     if (k === 'qoder') return T('Qoder CLI 数据目录（💬 问答 / 用量）');
+    if (k === 'gemini') return T('Gemini / Antigravity 数据目录（💬 问答 / 用量）');
+    if (k === 'wb') return T('WorkBuddy 数据目录（💬 问答 / 用量）');
+    if (k === 'qwen') return T('Qwen Code 数据目录（会话列表）');
+    if (k === 'kimi') return T('Kimi 数据目录（暂无会话数据）');
     return k;
   }
   async function openSetDlg(){
@@ -3527,7 +3674,7 @@ if (typeof document !== "undefined") var UI = function(){
     curView = name;
     document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
     clearTimeout(viewEnterTimer);
-    ['canvas','dist','ctl','skills','trace','qa'].forEach(v => {
+    ['canvas','agents','dist','ctl','skills','trace','qa'].forEach(v => {
       const el = $('view' + v.charAt(0).toUpperCase() + v.slice(1));
       if (!el) return;
       const on = v === name;
@@ -3537,6 +3684,7 @@ if (typeof document !== "undefined") var UI = function(){
     viewEnterTimer = setTimeout(() => {
       document.querySelectorAll('.view.enter').forEach(el => el.classList.remove('enter'));
     }, 480);
+    if (name === 'agents') renderAgents();
     if (name === 'dist') renderDist();
     if (name === 'ctl') renderCtl();
     if (name === 'skills') renderSkills();
@@ -3547,6 +3695,7 @@ if (typeof document !== "undefined") var UI = function(){
   document.querySelectorAll('#side .vbtn[data-view]').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
   $('btnCtl2').addEventListener('click', () => showView('ctl'));
   $('btnDist2').addEventListener('click', () => showView('dist'));
+  if ($('agRefresh')) $('agRefresh').addEventListener('click', () => renderAgents(true));
 
   // ---------- 工作流操作（分布工作区卡片 / 总控表格共用） ----------
   function wfEntry(name){ return WF.list.find(w => w.name === name); }
@@ -3624,6 +3773,109 @@ if (typeof document !== "undefined") var UI = function(){
   }
 
   // ---------- 🛰 分布工作区 ----------
+  // ---------- 🔌 已连接智能体（智能体 → 对话画布 两级分类） ----------
+  let AG_REG = null;   // /__flow_agents_registry 缓存
+  let AG_CLI = null;   // /__flow_clients 缓存（含会话明细）
+  async function fetchAgents(force){
+    if (AG_REG && !force) return;
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch('/__flow_agents_registry', { cache:'no-store' }).then(r => r.json()),
+        fetch('/__flow_clients', { cache:'no-store' }).then(r => r.json())
+      ]);
+      AG_REG = r1; AG_CLI = r2;
+    } catch (e){
+      AG_REG = { ok:false, error:String(e && e.message || e) }; AG_CLI = null;
+    }
+  }
+  function agentStateChip(st){
+    if (st === 'connected') return '<span class="agchip ag-on">' + T('已连接') + '</span>';
+    if (st === 'empty')     return '<span class="agchip ag-idle">' + T('无会话') + '</span>';
+    return '<span class="agchip ag-off">' + T('未安装') + '</span>';
+  }
+  async function renderAgents(force){
+    const box = $('agBody');
+    if (!box) return;
+    box.innerHTML = '<div class="hint" style="padding:14px">' + T('正在探测各智能体的数据目录…') + '</div>';
+    await fetchAgents(force);
+    if (!AG_REG || AG_REG.ok === false){
+      box.innerHTML = '<div class="hint" style="padding:14px">' +
+        T('无法读取智能体注册表。该视图需要通过本地服务（flow_serve.py）打开；当前可能是 file:// 直开或服务未启动。') +
+        (AG_REG && AG_REG.error ? '<br>' + escXml(AG_REG.error) : '') + '</div>';
+      return;
+    }
+    const s = AG_REG.summary || {};
+    const byId = {};
+    ((AG_CLI && AG_CLI.clients) || []).forEach(c => byId[c.id] = c);
+    let html = '<div class="agkpi">' +
+      agKpi(T('已知智能体'), s.known || 0) +
+      agKpi(T('已连接'), s.connected || 0, 'ok') +
+      agKpi(T('无会话'), s.empty || 0, 'idle') +
+      agKpi(T('未安装'), s.missing || 0, 'off') +
+      agKpi(T('对话画布'), s.sessions || 0) +
+      agKpi(T('子智能体'), s.subagents || 0) +
+      '</div>';
+    const groups = { cli: T('命令行智能体'), ide: T('IDE / 桌面智能体') };
+    const gorder = ['cli','ide'];
+    gorder.forEach(g => {
+      const list = (AG_REG.clients || []).filter(c => (c.group || 'cli') === g);
+      if (!list.length) return;
+      html += '<div class="hsec">' + escXml(groups[g] || g) + '</div>';
+      list.forEach(c => {
+        const info = byId[c.id] || {};
+        const sessions = (info.sessions || []).filter(x => !x.sub);
+        const subs = (info.sessions || []).filter(x => x.sub);
+        html += '<div class="agcard ' + (c.state === 'connected' ? 'ag-conn' : '') + '">' +
+          '<div class="agtop"><span class="agdot" style="background:' + qaClientInfo(c.id).color + '"></span>' +
+          '<b>' + escXml(c.label) + '</b>' + agentStateChip(c.state) +
+          (c.tokens ? '<span class="agchip ag-tok">' + T('含令牌') + '</span>' : '<span class="agchip ag-idle">' + T('无令牌') + '</span>') +
+          '<span style="flex:1"></span>' +
+          '<span class="hint">' + T('主会话 {0} · 子智能体 {1}', c.sessions || 0, c.subagents || 0) + '</span>' +
+          (c.lastActive ? '<span class="hint" style="margin-left:10px">' + T('最近') + ' ' + escXml(c.lastActive) + '</span>' : '') +
+          '</div>' +
+          '<div class="agpath" title="' + escXml(c.dir || '') + '">' + escXml(c.dir || T('（目录未配置）')) + '</div>' +
+          (c.note ? '<div class="hint" style="margin-top:3px">' + escXml(T(c.note)) + '</div>' : '') +
+          (c.error ? '<div class="hint" style="margin-top:3px;color:#b91c1c">' + T('扫描失败：') + escXml(c.error) + '</div>' : '');
+        if (sessions.length || subs.length){
+          html += '<div class="agsub">' + T('对话画布') + '</div>';
+          sessions.slice(0, 8).forEach(x => { html += agSessionRow(c, x); });
+          if (subs.length){
+            html += '<div class="agsub" style="margin-top:6px">' + T('子智能体') + '</div>';
+            subs.slice(0, 6).forEach(x => { html += agSessionRow(c, x); });
+          }
+          if (sessions.length + subs.length > 14){
+            html += '<div class="hint" style="margin-top:4px">' + T('（仅列出最近 14 条，完整列表见「💬 问答」）') + '</div>';
+          }
+        } else if (c.state === 'empty'){
+          html += '<div class="hint" style="margin-top:4px">' + T('目录存在但还没有会话记录。') + '</div>';
+        } else if (c.state === 'missing'){
+          html += '<div class="hint" style="margin-top:4px">' + T('未发现该智能体的数据目录。可在 ⚙ 设置中指定路径，或确认它是否安装。') + '</div>';
+        }
+        html += '</div>';
+      });
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('[data-ag-open]').forEach(b => b.addEventListener('click', () => {
+      const sel = $('qaClient');
+      if (sel){ sel.value = b.dataset.agClient || 'all'; }
+      showView('qa');
+      renderQa();
+    }));
+  }
+  function agKpi(label, val, cls){
+    return '<div class="agkpi1 ' + (cls ? 'k-' + cls : '') + '"><span class="k">' + escXml(label) + '</span><span class="v">' + val + '</span></div>';
+  }
+  function agSessionRow(c, x){
+    const name = x.task || x.mtimeText || x.id || '';
+    return '<div class="agrow">' +
+      '<span class="agname" title="' + escXml(x.id || '') + '">' +
+      (x.sub ? '🤖 ' : '🧠 ') + escXml(String(x.file || name).slice(0, 64)) + '</span>' +
+      '<span style="flex:1"></span>' +
+      (x.mtimeText ? '<span class="hint">' + escXml(x.mtimeText) + '</span>' : '') +
+      '<button class="small" data-ag-open="1" data-ag-client="' + escXml(c.id) + '">' + T('→ 看问答') + '</button>' +
+      '</div>';
+  }
+
   function renderDist(){
     const grid = $('wfGrid');
     grid.innerHTML = WF.list.map(w => {
@@ -3683,8 +3935,18 @@ if (typeof document !== "undefined") var UI = function(){
     initTokChart();
     animKpi(box);
     if (httpCaps && httpCaps.clientUsage){
-      if (!clientUsage && !clientLoading && !clientFail) loadHttpClientUsage();
+      if (!clientUsage && !clientLoading){
+        loadHttpClientUsage().then(v => { if (!v) scheduleClientRetry(); });   // 失败自动重试，不再永久锁死为「只有 ZCode」
+      }
     } else if (!tokenAgg && !tokenLoading && !tokenFail && httpCaps && httpCaps.tokens) loadHttpTokens();
+  }
+  let clientRetryTimer = null;
+  function scheduleClientRetry(){
+    if (clientRetryTimer) return;
+    clientRetryTimer = setTimeout(() => {
+      clientRetryTimer = null;
+      if (!clientUsage && curView === 'ctl') renderCtlUsage();
+    }, 4000);
   }
   // ---------- 🪙 Token 用量折线图（SVG；按日/按月；悬浮显示 token 数 + 客户端明细；点击看周期明细） ----------
   let tokSeriesCache = [], tokChartMode = 'day';
@@ -3785,6 +4047,9 @@ if (typeof document !== "undefined") var UI = function(){
   }
   function tokList(){
     if (clientUsage) return Object.entries(clientUsage);
+    // 多客户端能力可用但还未载入（或载入失败）时，不要静默退化成「只有 ZCode」——
+    // 返回空让 UI 显示加载/重试提示（避免用户以为插件只支持 ZCode）。
+    if (httpCaps && httpCaps.clientUsage) return [];
     if (tokenAgg) return [['zcode', Object.assign({ label: 'ZCode', tokens: true, available: true }, tokenAgg)]];
     return [];
   }
@@ -4386,23 +4651,25 @@ if (typeof document !== "undefined") var UI = function(){
       return null;
     } catch(e){ tokenFail = true; return null; } finally { tokenLoading = false; }
   }
+  let clientRetryAt = 0;
   async function loadHttpClientUsage(force){
     if (clientLoading) return clientUsage;
     if (clientUsage && !force) return clientUsage;
-    if (clientFail && !force) return null;
+    // 失败后可自动重试（不再永久锁死为「只有 ZCode」）；force 或距上次失败超过 8s 才重试
+    if (clientFail && !force && Date.now() < clientRetryAt) return null;
     clientLoading = true;
     try {
       const r = await fetch('__flow_client_usage?_=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       if (j && j.ok && j.clients){
-        clientUsage = j.clients; clientUsageAt = j.generated || ''; clientFail = false;
-        if (curView === 'ctl') renderCtlUsage();
+        clientUsage = j.clients; clientUsageAt = j.generated || ''; clientFail = false; clientRetryAt = 0;
+        if (curView === 'ctl') renderCtlUsage(); else if (curView === 'qa') { /* 问答视图无需重绘用量 */ }
         return clientUsage;
       }
-      clientFail = true;
+      clientFail = true; clientRetryAt = Date.now() + 8000;
       return null;
-    } catch(e){ clientFail = true; return null; } finally { clientLoading = false; }
+    } catch(e){ clientFail = true; clientRetryAt = Date.now() + 8000; return null; } finally { clientLoading = false; }
   }
   async function refreshTokens(){
     const hasMulti = httpCaps && httpCaps.clientUsage;
@@ -4664,7 +4931,7 @@ if (typeof document !== "undefined") var UI = function(){
     }
     qaByKey.set(key, it); qaItems.push(it); return true;
   }
-  const QA_CLIENTS = { zcode: { label: 'ZCode', color: '#2563eb' }, codex: { label: 'Codex CLI', color: '#0d9488' }, qoder: { label: 'Qoder CLI', color: '#7c3aed' } };
+  const QA_CLIENTS = { zcode: { label: 'ZCode', color: '#2563eb' }, codex: { label: 'Codex CLI', color: '#0d9488' }, qoder: { label: 'Qoder CLI', color: '#7c3aed' }, gemini: { label: 'Gemini (Antigravity)', color: '#ea580c' }, wb: { label: 'WorkBuddy', color: '#db2777' }, qwen: { label: 'Qwen Code', color: '#ca8a04' }, kimi: { label: 'Kimi', color: '#0e7490' } };
   function qaClientInfo(c){ return QA_CLIENTS[c] || QA_CLIENTS.zcode; }
   function qaBare(s){ return String(s || '').replace(/^sess_/, ''); }
   // 会话任务名：已建的对话画布记录的任务名优先，其次问答数据中该会话首条提问（供「按会话」表等展示）
@@ -5072,7 +5339,10 @@ if (typeof document !== "undefined") var UI = function(){
   }
 
   // ---------- 🌐 本地服务自动同步：最新会话 + 全部子智能体（每 6s 轻量轮询，仅变化时取原文） ----------
-  let qaSync = null;      // {file, size, session, agents: {path: 签名}}
+  let qaSync = null;      // {file, size, session, clients:{cid:{sid:sig}}, subs:{id:sig}, agents: {path: 签名}}
+  // 每客户端同步的会话条数上限：首次/手动载入取全量（有界），自动轮询取最新若干个（省流量）
+  const QA_SYNC_CAP_FULL = 200;   // 手动/首次载入：尽量多（覆盖历史会话，节点数显著提升）
+  const QA_SYNC_CAP_AUTO = 12;    // 自动轮询：只补最新 12 个会话
   let qaSyncTimer = null;
   let qaSyncBusy = false;
   const qaSyncStat = txt => { const el = $('qaSyncStat'); if (el) el.textContent = txt || ''; };
@@ -5095,34 +5365,61 @@ if (typeof document !== "undefined") var UI = function(){
       let added = 0, saw = false; const cl = [];
       qaSync = qaSync || { agents: {}, clients: {}, subs: {} };
       qaSync.agents = qaSync.agents || {}; qaSync.clients = qaSync.clients || {}; qaSync.subs = qaSync.subs || {};
+      // 迁移旧格式：clients[cid] 若为字符串（单会话签名）→ 转为按会话记账的对象
+      Object.keys(qaSync.clients).forEach(cid => {
+        if (typeof qaSync.clients[cid] === 'string'){ const old = qaSync.clients[cid]; qaSync.clients[cid] = {}; if (old) qaSync.clients[cid].__legacy = old; }
+        else if (!qaSync.clients[cid] || typeof qaSync.clients[cid] !== 'object') qaSync.clients[cid] = {};
+      });
       if (multi){
         const lst = await (await qaFetch('/__flow_clients')).json();
         if (!lst.ok) throw new Error(lst.error || T('会话列表读取失败'));
         const want = PAYLOAD && PAYLOAD.session;
+        // 每客户端同步的会话上限（按 mtime 由新到旧取；auto 轮询只补最新若干，首次载入多取一些）
+        const perClientCap = auto ? QA_SYNC_CAP_AUTO : QA_SYNC_CAP_FULL;
         for (const c of (lst.clients || [])){
-          const sess = c.sessions || [];
+          const sess = (c.sessions || []).filter(x => !x.sub);
           if (!c.available || !sess.length) continue;
           saw = true;
           cl.push(c.label || c.id);
+          // 单客户端出错不能中断其余客户端（如 gemini 需 rel、某会话文件损坏等）
+          try {
+          // 「主会话」仍取最新（或 PAYLOAD 指定），用于 agents 归属匹配
           const pick = (want && sess.find(s => qaBare(s.session) === qaBare(want) || String(s.name || '') === want || String(s.id || '').indexOf(qaBare(want)) >= 0 || String(s.name || '').indexOf(qaBare(want)) >= 0)) || sess[0];
-          const sig = pick.size + '@' + pick.mtime;
-          if (qaSync.clients[c.id] !== sig){
-            const url = '/__flow_client_file?client=' + encodeURIComponent(c.id) + '&id=' + encodeURIComponent(pick.id || pick.session) + '&tail=' + (4 * 1024 * 1024);
-            const txt = await (await qaFetch(url)).text();
-            added += loadQaText(txt, (c.label || c.id) + ' · ' + T('会话 ') + qaBare(pick.session).slice(0, 12), c.id, null, pick.session);
-            qaSync.clients[c.id] = sig;
-            if (c.id !== 'qoder' || !qaSync.session) qaSync.session = pick.session; // 主会话 id（agents 归属匹配用）
+          // 全量会话列表：按 mtime 降序取前 perClientCap 个（含被 want 指定的会话，若在范围内去重）
+          const ordered = sess.slice().sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+          const chosen = ordered.slice(0, perClientCap);
+          if (want && !chosen.some(s => s === pick)){
+            const pi = ordered.indexOf(pick);
+            if (pi >= 0) chosen[chosen.length - 1] = pick; // 用指定会话补位，保证被载入
           }
-          if (c.id === 'qoder'){ // Qoder 子智能体与父会话同目录：父会话最新时自动载入（区分 🤖）
-            for (const s of sess.filter(x => x.sub && x.parent === pick.session)){
+          qaSync.clients[c.id] = qaSync.clients[c.id] || {}; // 改为按会话记账：{ sid: sig }
+          const book = qaSync.clients[c.id];
+          for (const s of chosen){
+            const sig = s.size + '@' + s.mtime;
+            const key = s.id || s.session;
+            if (book[key] === sig) continue;
+            // gemini 等「目录型会话」需要 rel 指定正文相对路径（s.file）
+            const rel = s.file && s.file !== key ? '&rel=' + encodeURIComponent(s.file) : '';
+            const url = '/__flow_client_file?client=' + encodeURIComponent(c.id) + '&id=' + encodeURIComponent(key) + rel + '&tail=' + (4 * 1024 * 1024);
+            const txt = await (await qaFetch(url)).text();
+            added += loadQaText(txt, (c.label || c.id) + ' · ' + T('会话 ') + qaBare(s.session).slice(0, 12), c.id, null, s.session);
+            book[key] = sig;
+          }
+          if (c.id !== 'qoder' || !qaSync.session) qaSync.session = pick.session; // 主会话 id（agents 归属匹配用）
+          if (c.id === 'qoder'){ // Qoder 子智能体与父会话同目录：随所选父会话一并载入（区分 🤖）
+            const selectedSids = new Set(chosen.map(s => s.session));
+            for (const s of (c.sessions || []).filter(x => x.sub && selectedSids.has(x.parent))){
               const ssig = s.size + '@' + s.mtime;
               if (qaSync.subs[s.id] === ssig) continue;
               const url = '/__flow_client_file?client=qoder&id=' + encodeURIComponent(s.id) + '&tail=' + (4 * 1024 * 1024);
               const txt = await (await qaFetch(url)).text();
               const prof = String(s.name || '').replace(/\.jsonl$/, '').replace(/-[0-9a-f]{16}$/, '');
-              added += loadQaText(txt, T('子智能体 ') + prof, 'qoder', { profile: prof, parentSession: pick.session, agentPath: s.id }, s.session);
+              added += loadQaText(txt, T('子智能体 ') + prof, 'qoder', { profile: prof, parentSession: s.parent, agentPath: s.id }, s.session);
               qaSync.subs[s.id] = ssig;
             }
+          }
+          } catch(ce){ // 单客户端失败：记录并继续，不中断其它客户端
+            if (typeof console !== 'undefined') console.warn('[flow] 同步 ' + c.id + ' 失败：', (ce && ce.message) || ce);
           }
         }
       } else if (httpCaps.rollout){ // 旧服务（无 /__flow_clients）兜底：只同步 ZCode 最新会话
@@ -5173,7 +5470,7 @@ if (typeof document !== "undefined") var UI = function(){
   }
   function startQaSync(){
     if (qaSyncTimer || !httpCaps || !(httpCaps.clients || httpCaps.clientUsage || httpCaps.rollout || httpCaps.agents)) return;
-    loadHttpQa(true);
+    loadHttpQa(false);   // 首次载入：按全量上限拉取历史会话（节点数显著提升）
     qaSyncTimer = setInterval(() => { if (!document.hidden) loadHttpQa(true); }, 6000);
   }
   $('qaHttpLoad').addEventListener('click', () => loadHttpQa(false));
@@ -5187,14 +5484,35 @@ if (typeof document !== "undefined") var UI = function(){
     // 无注入数据，或注入数据与上次一致 → 用本地存档（保留用户的手工修改）
     WF = stored;
   } else {
-    // 命令新生成的工作副本（rev 变了）→ 以代码侧注入的数据为准重新播种，浏览器旧存档让位
+    // 命令新生成的工作副本（rev 变了）→ 主流程以注入数据重新播种；
+    // 但「会话/对话画布」（src.session 标记）是用户同步/导入的历史记录，必须保留——
+    // 否则每次重新打开都会因为 rev 变化而清空以前的会话记录。
     const seed = parseMermaid((PAYLOAD && PAYLOAD.mermaid) || '');
     const nm = (PAYLOAD && PAYLOAD.workflow) || '主流程';
-    WF = { list: [{ name: nm, data: { name: nm, dir: seed.dir, nodes: seed.nodes, edges: seed.edges, subs: seed.subs } }], active: nm, rev: payRev || null };
+    const kept = (stored && Array.isArray(stored.list))
+      ? stored.list.filter(w => w && w.src && w.src.session)   // 仅保留来自会话的画布
+      : [];
+    const seedNames = new Set([nm, ...kept.map(w => w.name)]);
+    // 其余本地画布（用户手工新建、非会话来源）也尽量保留：名字不与新种子冲突即可
+    const others = (stored && Array.isArray(stored.list))
+      ? stored.list.filter(w => w && !(w.src && w.src.session) && w.name !== nm && !kept.some(k => k.name === w.name))
+      : [];
+    WF = {
+      list: [
+        { name: nm, data: { name: nm, dir: seed.dir, nodes: seed.nodes, edges: seed.edges, subs: seed.subs } },
+        ...kept,
+        ...others,
+      ],
+      active: (stored && kept.concat(others).some(w => w.name === stored.active)) ? stored.active : nm,
+      rev: payRev || null,
+    };
     saveAll();
-    // 重播种会清掉本地会话画布：从 flow_serve.py 的备份（wf-backup.json）把不冲突的画布并回来
+    if (kept.length){
+      toast(tx('已保留 {0} 个历史会话画布（重新打开不再清空）', kept.length));
+    }
+    // 兜底：本地存档缺失时，再从 flow_serve.py 的备份（wf-backup.json）把不冲突的画布并回来
     if (/^https?:$/.test(location.protocol)){
-      restoreWfBackup([nm]).then(n => {
+      restoreWfBackup([...seedNames]).then(n => {
         if (!n) return;
         fillWfSel(); saveAll();
         if (curView === 'dist') renderDist();

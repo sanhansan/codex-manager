@@ -1,10 +1,10 @@
 # Codex Manager（Codex 管家）
 
-ZCode 插件 · ZCode plugin · v0.16.0
+ZCode 插件 · ZCode plugin · v0.23.0
 
 [English](#english) | [简体中文](#中文)
 
-一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图并在浏览器画布上可视化编辑。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.16.0**，由 [@sanhansan](https://github.com/sanhansan) 维护。
+一个用于管理 Codex 工作台的 ZCode 插件：自动看见其他插件的使用量、一键调出 Excel 用量表格、把每次工作会话转化为 Mermaid 流程图并在浏览器画布上可视化编辑。画图不是目的——流程图让审查与修改变得可见：对照图发现绕路与重复，改进下一次工作。当前版本 **v0.23.0**，由 [@sanhansan](https://github.com/sanhansan) 维护。
 
 ---
 
@@ -12,7 +12,7 @@ ZCode 插件 · ZCode plugin · v0.16.0
 
 ### zip 安装包使用方法
 
-1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.16.0**）；
+1. 打开 [Releases](https://github.com/sanhansan/codex-manager/releases) 页面，下载最新版的 `codex-manager-vX.Y.Z.zip`（当前 **v0.23.0**）；
 2. 解压，得到 `codex-manager/` 目录（内含 `marketplace.json` 和本插件源码 `codex-manager/`）；
 3. 打开 ZCode → **插件市场 → 添加 → 添加插件市场** → 选择解压出的 `codex-manager` 目录（含 `marketplace.json` 的那一层）；
 4. 在 **个人** 页找到 **Codex Manager** → 点击 **安装**；
@@ -27,7 +27,7 @@ ZCode 插件 · ZCode plugin · v0.16.0
 | 看见其他插件的使用量 | 自动 | 钩子把每次技能调用、MCP 调用、会话开始追加到 `%USERPROFILE%\.zcode\codex-manager\usage.jsonl` |
 | 一键调出表格 | 命令 `/codex-usage` | 聚合用量并生成带样式的 Excel（`codex-usage-<时间>.xlsx`），同时在对话中给出 Markdown 表格；可选参数：统计最近 N 天 |
 | 工作转化为流程图 | 命令 `/codex-flow` | 当前会话直接梳理成 Mermaid 流程图；参数 `recent` 或会话 ID 可复盘历史会话（读取 `%USERPROFILE%\.zcode\cli\rollout\model-io-sess_*.jsonl`），产物为 `codex-flow-<时间>.md` |
-| 可视化编辑流程图 | 命令 `/codex-flow-edit` `[文件或项目名]` | 左侧任务栏六视图（🖼 画布 / 🛰 分布工作区 / 🧭 总控流程 / 🧩 Agent Skills / 📜 轨迹查询 / 💬 问答）、中英双语界面、多工作流、节点类型与就地编辑、画布「＋框架」一键插骨架、八类逻辑门、三页签双向同步、**HTTP 零点击双向文件同步且断线 4 秒自动重连**（flow_serve.py）、AI 校验与提案；🧩 Agent Skills 含 **🛠 Skill 工坊**（从习惯候选或问答/提示词生成 SKILL.md 草稿 → 编辑 → 导出 → 保存/安装，装进插件的技能可被智能体用 Skill 工具直接调用）；📜 轨迹查询按关键字/类型/会话回放；💬 问答**多客户端自动同步**（ZCode / Codex CLI / Qoder CLI 最新会话+全部子智能体，6s 轮询，客户端色徽章）、关键词总览条点击过滤、提示词总结可复制/导出、**一键重点与提示词**、**一键生成工作画布**（🧠 总任务链 + 🤖 虚线挂载）；🧭 总控流程含使用量与 **多客户端 Token 看板**（按日/按月切换、悬停看各客户端分解、点数据点出周期明细并转跳问答、客户端模型用量、按插件归属与按会话明细）；导出后可用 `/codex-flow-save` 回写框架 |
+| 可视化编辑流程图 | 命令 `/codex-flow-edit` `[文件或项目名]` | 左侧任务栏七视图（🖼 画布 / 🔌 已连接智能体 / 🛰 分布工作区 / 🧭 总控流程 / 🧩 Agent Skills / 📜 轨迹查询 / 💬 问答）、中英双语界面、多工作流、节点类型与就地编辑、画布「＋框架」一键插骨架、八类逻辑门、三页签双向同步、**HTTP 零点击双向文件同步且断线 4 秒自动重连**（flow_serve.py）、AI 校验与提案；🧩 Agent Skills 含 **🛠 Skill 工坊**（从习惯候选或问答/提示词生成 SKILL.md 草稿 → 编辑 → 导出 → 保存/安装，装进插件的技能可被智能体用 Skill 工具直接调用）；📜 轨迹查询按关键字/类型/会话回放；🔌 已连接智能体按「智能体 → 对话画布」分类呈现 7 家连接状态；💬 问答**多客户端自动同步**（**全部会话**+全部子智能体，覆盖 ZCode / Codex CLI / Qoder CLI / Gemini / WorkBuddy / Qwen / Kimi，6s 轮询，客户端色徽章）、关键词总览条点击过滤、提示词总结可复制/导出、**一键重点与提示词**、**一键生成工作画布**（🧠 总任务链 + 🤖 虚线挂载）；🧭 总控流程含使用量与 **多客户端 Token 看板**（ZCode / Codex CLI / WorkBuddy 有令牌明细）（按日/按月切换、悬停看各客户端分解、点数据点出周期明细并转跳问答、客户端模型用量、按插件归属与按会话明细）；导出后可用 `/codex-flow-save` 回写框架 |
 | 流程提问审查 | `/codex-review` `[项目名]` | 7 类审查问题自问自答，输出【可省/可优化/保留/习惯】推荐，每条附事件依据 |
 | 项目结束总结 | `/codex-optimize` `[项目名]` | 复盘报告 + 吸收踩坑教训的优化提示词模板 |
 | 习惯固化成 skill | `/codex-habit` `[主题] [install]` | 从用量与审查数据提炼个人习惯，自主编写 SKILL.md，可装进插件 |
@@ -50,11 +50,11 @@ ZCode 插件 · ZCode plugin · v0.16.0
 
 ## English
 
-A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart you can visually edit on a canvas. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.16.0**, maintained by [@sanhansan](https://github.com/sanhansan).
+A ZCode plugin for managing your Codex workbench: see other plugins' usage automatically, bring up an Excel usage report with one command, and turn every work session into a Mermaid flowchart you can visually edit on a canvas. The diagram is not the goal — it makes review possible: spot detours and repeats against it, then improve the next run. Current version **v0.23.0**, maintained by [@sanhansan](https://github.com/sanhansan).
 
 ### How to use the zip package
 
-1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.16.0**);
+1. Open the [Releases](https://github.com/sanhansan/codex-manager/releases) page and download the latest `codex-manager-vX.Y.Z.zip` (currently **v0.23.0**);
 2. Unzip it — you get a `codex-manager/` folder containing `marketplace.json` and this plugin's source (`codex-manager/`);
 3. Open ZCode → **Plugin Marketplace → Add → Add Plugin Marketplace** → select the extracted `codex-manager` folder (the one containing `marketplace.json`);
 4. Under **Personal**, find **Codex Manager** → click **Install**;
@@ -69,7 +69,7 @@ A ZCode plugin for managing your Codex workbench: see other plugins' usage autom
 | See other plugins' usage | automatic | Hooks append every skill call, MCP call and session start to `%USERPROFILE%\.zcode\codex-manager\usage.jsonl` |
 | One-click spreadsheet | `/codex-usage` | Prints a Markdown breakdown in chat and generates a styled Excel (`codex-usage-<timestamp>.xlsx`); optional argument = last N days |
 | Session flowchart | `/codex-flow` | Outlines the current session as a Mermaid diagram; `recent` / a session-ID fragment replays past sessions (from `%USERPROFILE%\.zcode\cli\rollout\model-io-sess_*.jsonl`) into `codex-flow-<timestamp>.md` |
-| Visual flowchart editor | `/codex-flow-edit` `[file or project]` | Left taskbar with six views (🖼 canvas / 🛰 distributed workspaces / 🧭 master control / 🧩 Agent Skills / 📜 trace query / 💬 Q&A), bilingual UI, multi-workflow, node kinds & in-place editing, canvas "＋skeleton", 8 logic gates, three synced tabs, **zero-click two-way file sync over HTTP with 4-second auto-reconnect** (flow_serve.py), AI validation & proposals; 🧩 Agent Skills ships a **🛠 skill workshop** (draft a SKILL.md from habits or from the loaded Q&A/prompts → edit → export → save/install; installed skills are callable by agents via the Skill tool); 📜 trace query replays every call by keyword/kind/session; 💬 Q&A **multi-client auto-sync** (latest sessions + all sub-agents across ZCode / Codex CLI / Qoder CLI, 6s polling, client color badges) with a click-to-filter keyword bar, a copyable/exportable prompt summary, **one-click highlights & prompts** and **one-click work canvas** (🧠 task chain + 🤖 dashed attachments); 🧭 master control carries usage & a **multi-client token board** (day/month toggle, per-client hover breakdown, click-a-point period details with jump-to-Q&A, per-client model usage, per-plugin attribution, per-session drill-down); export flows back via `/codex-flow-save` |
+| Visual flowchart editor | `/codex-flow-edit` `[file or project]` | Left taskbar with seven views (🖼 canvas / 🔌 connected agents / 🛰 distributed workspaces / 🧭 master control / 🧩 Agent Skills / 📜 trace query / 💬 Q&A), bilingual UI, multi-workflow, node kinds & in-place editing, canvas "＋skeleton", 8 logic gates, three synced tabs, **zero-click two-way file sync over HTTP with 4-second auto-reconnect** (flow_serve.py), AI validation & proposals; 🧩 Agent Skills ships a **🛠 skill workshop** (draft a SKILL.md from habits or from the loaded Q&A/prompts → edit → export → save/install; installed skills are callable by agents via the Skill tool); 📜 trace query replays every call by keyword/kind/session; 🔌 Connected agents view groups 7 clients as 「agent → conversation canvases」; 💬 Q&A **multi-client auto-sync** (**all sessions** + all sub-agents across ZCode / Codex CLI / Qoder CLI / Gemini / WorkBuddy / Qwen / Kimi, 6s polling, client color badges) with a click-to-filter keyword bar, a copyable/exportable prompt summary, **one-click highlights & prompts** and **one-click work canvas** (🧠 task chain + 🤖 dashed attachments); 🧭 master control carries usage & a **multi-client token board** (token detail on ZCode / Codex CLI / WorkBuddy) (day/month toggle, per-client hover breakdown, click-a-point period details with jump-to-Q&A, per-client model usage, per-plugin attribution, per-session drill-down); export flows back via `/codex-flow-save` |
 | Question-driven process review | `/codex-review` `[project]` | 7 classes of review questions produce typed recommendations (omit/optimize/keep/habit), each with event evidence |
 | End-of-project retrospective | `/codex-optimize` `[project]` | Retrospective report + prompt templates that absorb the project's pitfalls |
 | Habits into skills | `/codex-habit` `[theme] [install]` | Distills habits from usage/review data, autonomously writes SKILL.md, installable into the plugin |
@@ -92,6 +92,13 @@ The usage log holds six metadata fields only (timestamp, type, plugin name, skil
 
 ## 版本历史 / Changelog
 
+- **0.23.0**：修复三处反馈问题——①**Token 使用量此前只显示 ZCode**：多客户端能力可用但未载入时 `tokList()` 不再静默退化为「只有 ZCode」，改为显示加载/重试态，且 `loadHttpClientUsage` 失败后 **8 秒自动重试**（一次瞬时失败不再永久锁死）；②**重新打开会清空历史会话记录**：rev 变化重播种时**保留所有会话/对话画布（`src.session`）与用户手工画布**，不再因工作副本重生成而丢失；③**画布同步节点过少**：每个客户端由「只取最新 1 个会话」改为同步**全部会话**（手动/首载上限 200、6 秒轮询补最新 12），并新增 **WorkBuddy / Gemini / Qwen 三种会话格式解析器**（WorkBuddy `message`+`content[]`、Gemini `USER_INPUT`/`PLANNER_RESPONSE`/`GENERIC`、Qwen 运行时元信息登记为单节点）；同期修复 gemini 未传 `rel` 时自动定位 `transcript.jsonl`、**单客户端异常不再中断其余客户端同步**。本机实测：问答节点 68→**152**，载入会话 7→**62**（58 主会话 + 4 子智能体）。回归测试 74 项、i18n 585 用键 0 缺失。
+- **0.22.0**：新增 **WorkBuddy / Qwen Code / Kimi** 三个适配器，注册表扩至 **7 家**——WorkBuddy 接 `~/.workbuddy/projects/<项目>/<会话>.jsonl`（完整对话 + `providerData.usage` 令牌明细 + 模型名，本机 23 会话 / 5341 万 token / 6 个模型）；Qwen Code 接 `~/.qwen/projects/<项目>/chats/<uuid>.runtime.json`（仅会话元信息）；Kimi 接 `~/.kimi-work`（仅可执行文件，如实标注无会话数据）；⚙ 设置扩至 **9 个数据源目录**；「🔌 已连接智能体」视图按 CLI / IDE / 桌面三组呈现 7 家连接状态。
+- **0.21.0**：**多智能体适配器框架**——客户端不再硬编码，改为「适配器注册表」自动接入（`ADAPTERS` + `_adapter()`），新增 **「🔌 已连接智能体」分类视图**（按「智能体 → 对话画布」两级分类：连接状态徽章、令牌能力、数据目录、最近活跃；下层列出各自主会话与子智能体，可一键转跳问答并按该客户端过滤）；新增 `GET /__flow_agents_registry` 端点；接入 **Gemini / Antigravity** 目录树式会话（`brain/<uuid>/`，正文在 `.system_generated/logs/transcript.jsonl`，无令牌字段则如实按响应步数统计）；适配器扫描失败不再静默吞掉，而是如实报错。
+- **0.20.0**：编辑器「科技朴素」视觉重写（中性灰阶、统一 2px 方角、去阴影、24px 工程细线网格、等宽数字、亮暗双主题）与克制的工程感动效（120–220ms；系统「减弱动态效果」时全量降级）；回归测试 71 项。
+- **0.19.0**：工作流整树一键导出 / 导入（合并语义、兼容单画布 JSON）与**本地服务自动备份**（改动防抖 2.5 秒回传 `wf-backup.json`，rev 重播种或存档丢失后自动并回不冲突的画布）；画布 🤖 子智能体节点查看输出全文（含 Qoder）；小对话与节点耗时标注（距下一次提问）；**Token 费用估算**（⚙ 设置填模型单价，KPI / 客户端模型表 / 周期明细卡 / 折线图悬停四处显示）。
+- **0.18.0**：**对话画布 + 三层工作流树**（主流程 → 对话画布 → 小对话，点击跳转定位）；导入会话生成独立对话画布；文件同步固定归属主流程。
+- **0.17.0**：会话一键导入为独立对话画布（追加 🧠 任务链 + 🤖 虚线子智能体，可撤销，按需拉取原文）；⚙ 设置弹窗（`GET/POST /__flow_settings`，5 个数据源目录，仅绝对路径，CLI 参数优先并锁定，原子落盘即时生效）；空问答条目导入时跳过。
 - **0.16.0**：编辑器 v7——**多客户端（ZCode / Codex CLI / Qoder CLI）**：`flow_serve.py` 新增 `/__flow_clients`（三家会话列表）、`/__flow_client_file`（按客户端读原文，tail 钳制）、`/__flow_client_usage`（三家用量聚合，口径统一「输入 + 缓存读 + 输出 = 合计」，Qoder 无令牌数如实标注）；🪙 Token 升级为多客户端看板（客户端筛选 chips、按日/按月切换、悬停看各客户端分解、点数据点出周期明细并可转跳问答、客户端模型用量）；💬 问答自动同步扩至三家（客户端色徽章），新增 **⚡ 一键重点与提示词**（自动打分，无需标注）与 **🖼 生成工作画布**（🧠 任务链 + 🤖 虚线挂载，可撤销）；画布同步自愈——断线提示 + **4 秒自动重连**，服务恢复自动续传；修复 `parseQaTurns` 只取最后窗口导致 tail/delta 分片会话解析为 0 条的 bug（改为按偏移合并全部窗口）；回归测试 56 项、i18n 451 用键 0 缺失。
 - **0.15.0**：编辑器 v6——💬 问答自动同步（最新会话 + 全部子智能体，6s 轻量轮询、去重原地更新）、关键词总览条（🧠 任务 / 🤖 子智能体，点击即过滤）、中英双语提示词总结（复制 / 导出 .md）、「🧩 技能总结」更名 **「🧩 Agent Skills」** 并支持从问答/提示词生成 SKILL.md 草稿、⬇ 导出 SKILL.md、一键安装（智能体可用 Skill 工具调用）、画布「＋框架」一键插骨架、Token 每日折线图（悬浮显示当日用量）；回归测试 48 项、i18n 412 用键 0 缺失。
 - **0.14.0**：编辑器 v5——中英双语界面（🌐 一键切换，偏好记忆）、🛠 Skill 工坊（习惯候选生成技能草稿 → 编辑 → 保存草稿 / 安装进插件）、节点就地编辑（双击节点 / F2 直接改标签）、前端页面优化。
