@@ -14,17 +14,19 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseAgentRecords, qaFilter };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
   parseMermaid, toMermaid, graphToJSON, jsonToGraph,
   graphToMarkdown, markdownToGraph,
-  guessKind, aggregateUsage, skillSummary, habitCandidates,
+  guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates,
   ctlLayout, autoLayout, findCycle, validateGraph, newNodeId,
   splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta,
   parseUsageRecords, traceQuery, cleanLabel, fitText,
-  extractKeywords, parseQaTurns, parseAgentRecords, qaFilter,
+  extractKeywords, parseQaTurns, parseAgentRecords, qaFilter, qaLabel,
+  parseCodexTurns, parseQoderTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa,
+  suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts,
 } = core;
 
 let pass = 0, fail = 0;
@@ -147,6 +149,24 @@ t("skillSummary：排序、占比与结论文案", () => {
   ok(s.text.includes("「x」"), "结论应点名最常用技能");
 });
 
+t("pluginUsageRows：按插件聚合，含技能/MCP 拆分与主要工具", () => {
+  const agg = aggregateUsage([
+    JSON.stringify({ ts: "2026-10-06T09:00:00Z", kind: "skill", plugin: "a", name: "x", session: "s" }),
+    JSON.stringify({ ts: "2026-10-06T10:00:00Z", kind: "skill", plugin: "a", name: "x", session: "s" }),
+    JSON.stringify({ ts: "2026-10-06T11:00:00Z", kind: "mcp", plugin: "a", name: "m1", session: "s" }),
+    JSON.stringify({ ts: "2026-10-06T12:00:00Z", kind: "mcp", plugin: "b", name: "y", session: "s" }),
+  ].join("\n"));
+  const rows = pluginUsageRows(agg);
+  eq(rows.length, 2);
+  eq(rows[0].plugin, "a");
+  eq(rows[0].count, 3);
+  eq(rows[0].skill, 2);
+  eq(rows[0].mcp, 1);
+  eq(rows[0].pct, 75);
+  ok(rows[0].names.includes("x×2"), "主要工具应带次数");
+  ok(rows[1].last > rows[0].last, "b 的最后一次（12:00Z）应晚于 a 的最后一次（11:00Z）");
+});
+
 t("habitCandidates：产出 ≤5 条且带证据", () => {
   const agg = aggregateUsage([
     JSON.stringify({ ts: "2026-10-06T09:00:00Z", kind: "skill", plugin: "a", name: "x", session: "s", cwd: "C:\\one" }),
@@ -157,6 +177,33 @@ t("habitCandidates：产出 ≤5 条且带证据", () => {
   c.forEach(x => { ok(x.title && x.evidence && x.suggestion, "每条候选需 title/evidence/suggestion"); });
 });
 
+// ---------- Skill 工坊（习惯候选 → SKILL.md 草稿） ----------
+const draftAgg = aggregateUsage([
+  JSON.stringify({ ts: "2026-10-06T09:00:00Z", kind: "mcp", plugin: "browser-use", name: "control-browser", session: "s", cwd: "C:\\one" }),
+  JSON.stringify({ ts: "2026-10-06T09:10:00Z", kind: "mcp", plugin: "browser-use", name: "control-browser", session: "s", cwd: "C:\\one" }),
+  JSON.stringify({ ts: "2026-10-06T10:00:00Z", kind: "skill", plugin: "codex-manager", name: "codex-manager", session: "s2", cwd: "C:\\two" }),
+].join("\n"));
+
+t("suggestSlug：从高频工具名生成 slug，无 ASCII 名时退化到日期", () => {
+  eq(suggestSlug(draftAgg, "2026-10-07"), "habit-control-browser");
+  const zhAgg = aggregateUsage([JSON.stringify({ kind: "mcp", plugin: "p", name: "中文工具", session: "s" })].join("\n"));
+  eq(suggestSlug(zhAgg, "2026-10-07"), "habit-20261007");
+});
+
+t("skillDraft：中文草稿含双关键词 frontmatter、章节与数据依据", () => {
+  const md = skillDraft("habit-x", draftAgg, habitCandidates(draftAgg), "zh", "2026-10-07");
+  ok(md.startsWith("---\nname: habit-x\n"), "应以 frontmatter 开头：" + md.slice(0, 40));
+  ok(md.includes("description:") && md.includes("Use when the user repeatedly"), "description 应英中双关键词");
+  ["## 何时使用", "## 推荐步骤", "## 验收点", "## 数据依据（usage.jsonl 汇总）"].forEach(sec => ok(md.includes(sec), "缺少章节 " + sec));
+  ok(md.includes("2026-10-07") && md.includes("总记录 3 条"), "应含生成日期与记录数");
+  ok(md.includes("browser-use · control-browser ×2"), "应含高频清单：" + md.split("\n").slice(-4).join(" | "));
+});
+
+t("skillDraft：英文模式输出英文正文，仍是双关键词 description", () => {
+  const md = skillDraft("habit-x", draftAgg, habitCandidates(draftAgg, "en"), "en", "2026-10-07");
+  ["## When to use", "## Suggested steps", "## Acceptance", "## Evidence (usage.jsonl)"].forEach(sec => ok(md.includes(sec), "缺少章节 " + sec));
+  ok(md.includes("当用户反复需要"), "英文草稿的 description 也应含中文关键词");
+});
 // ---------- 总控布局 ----------
 t("ctlLayout：按引用分层，子流程在调用者右侧", () => {
   const list = [
@@ -346,6 +393,25 @@ t("parseQaTurns：坏行跳过、空输入返回空", () => {
   eq(parseQaTurns("not json\n").turns.length, 0);
   eq(parseQaTurns("").session, "");
 });
+t("parseQaTurns：只有 tail/delta 分片窗口时，并集仍能找到更早的提问", () => {
+  const w1 = JSON.stringify({
+    sessionId: "sess_T", querySource: "main_turn", startedAt: "2026-10-07T02:00:00Z",
+    request: { messagesKind: "tail", messageOffset: 3, messageCount: 5, messages: [
+      { role: "user", content: "继续" },
+      { role: "assistant", content: [{ type: "text", text: "收到，继续处理。" }] },
+    ] }
+  });
+  const w2 = JSON.stringify({
+    sessionId: "sess_T", querySource: "main_turn", startedAt: "2026-10-07T02:01:00Z",
+    request: { messagesKind: "tail", messageOffset: 5, messageCount: 6, messages: [
+      { role: "assistant", content: [{ type: "text", text: "补充说明。" }] },
+    ] }
+  });
+  const r = parseQaTurns(w2 + "\n" + w1); // 文件顺序不保证窗口递增，并集应不受影响
+  eq(r.turns.length, 1, "tail 分片窗口也应解析出提问");
+  eq(r.turns[0].q, "继续");
+  ok(r.turns[0].a.includes("继续处理"), "回答应来自同会话窗口");
+});
 t("parseAgentRecords：子智能体 metadata+output 映射、坏 JSON 跳过", () => {
   const meta = JSON.stringify({
     agentId: "agent_1", profileId: "general-purpose", description: "质量审查员",
@@ -377,6 +443,191 @@ t("qaFilter：来源过滤与关键字命中关键词表", () => {
   eq(qaFilter(items, { who: "sub" })[0].profile, "general-purpose");
   eq(qaFilter(items, { kw: "审查" }).length, 1, "关键字应命中关键词表与描述");
   eq(qaFilter(items, {})[0].ts, 200, "默认时间倒序");
+});
+t("qaLabel：总智能体标签取具体任务，清掉 markdown 链接", () => {
+  eq(qaLabel({ who: "master", q: "[@Codex 管家](plugin://codex-manager@x) 添加展开看问答" }), "@Codex 管家 添加展开看问答");
+});
+t("qaLabel：代码行跳过，取第一个任务行", () => {
+  eq(qaLabel({ who: "master", q: "const hits = ALL_TOOLS.filter(f => f.json)\n修复这个统计 bug" }), "修复这个统计 bug");
+});
+t("qaLabel：子智能体优先用任务描述而不是完整 prompt", () => {
+  eq(qaLabel({ who: "sub", description: "质量审查员审查调试流程", q: "你是质量审查员，任务：审查一次 AI 插件调试会话…" }), "质量审查员审查调试流程");
+  eq(qaLabel({ who: "sub", description: "", q: "你是效率审查员，任务：找出可省掉的环节" }), "你是效率审查员，任务：找出可省掉的环节");
+});
+t("qaLabel：图片占位与代码围栏被清除", () => {
+  const r = qaLabel({ who: "master", q: "```js\nvar a = 1\n```\n优化线条 [Image: source: C:\\cli\\image-cache\\i.png] 支持拖动" });
+  ok(r.indexOf("[Image") < 0, "图片占位应清除：" + r);
+  ok(r.indexOf("var") < 0, "代码围栏应清除：" + r);
+  eq(r, "优化线条 支持拖动");
+});
+
+// ---------- 关键词聚合 / 提示词总结 / 从提示词生成技能草稿 ----------
+const qaFixtures = [
+  { who: "master", ts: 3000, q: "把会话转成流程图 | 带竖线", a: "好的", kw: ["流程图", "转换", "会话"], tools: ["flow_serve", "node_repl"], sessionId: "sess_A" },
+  { who: "master", ts: 2000, q: "修复流程图导出的 bug", a: "已修", kw: ["流程图", "导出", "bug"], tools: ["node_repl"], sessionId: "sess_A" },
+  { who: "sub", ts: 2500, q: "你是质量审查员，审查流程图模块", a: "发现问题 3 处", kw: ["审查", "质量"], description: "质量审查员", profile: "general-purpose", tokens: 20864, parentSession: "sess_A" },
+  { who: "sub", ts: 1500, q: "你是效率审查员", a: "可省 2 步", kw: ["审查", "效率"], description: "效率审查员", profile: "Explore", tokens: 5120, parentSession: "sess_A" },
+];
+t("keywordDigest：总/子分区、按次数排序、取前 n", () => {
+  const d = keywordDigest(qaFixtures, 12);
+  eq(d.master[0], { kw: "流程图", count: 2 });
+  eq(d.sub[0], { kw: "审查", count: 2 });
+  ok(!d.master.some(x => x.kw === "审查"), "子智能体关键词不应混入总表");
+  eq(keywordDigest(qaFixtures, 1).master.length, 1);
+  eq(keywordDigest([], 5).sub.length, 0);
+});
+t("promptSummary：中文 Markdown 含分区/统计/转义竖线", () => {
+  const md = promptSummary(qaFixtures, "zh", 1759766400000);
+  ok(md.includes("# 提示词总结"), "应含中文标题");
+  ok(md.includes("## 任务关键词（总智能体提问）"), "应含总智能体关键词区");
+  ok(md.includes("## 子智能体关键词"), "应含子智能体关键词区");
+  ok(md.includes("问答条目：4（🧠 总智能体 2 / 🤖 子智能体 2）"), "应含总/子计数");
+  ok(md.includes("| 时间 | 任务 | 关键词 | 工具 |"), "应含总智能体表格");
+  ok(md.includes("| 时间 | 角色 | 任务 | 关键词 | Tokens |"), "应含子智能体表格");
+  ok(md.includes("20864"), "应含子智能体 tokens");
+  ok(md.includes("sess_A"), "应含覆盖会话");
+  ok(md.includes("把会话转成流程图 / 带竖线"), "正文竖线应替换为 / 避免破坏表格");
+  ok(!md.includes("流程图 | 带竖线"), "不应残留原始竖线");
+});
+t("promptSummary：英文版与语言参数、空数据不崩", () => {
+  const en = promptSummary(qaFixtures, "en", 1759766400000);
+  ok(en.includes("# Prompt Summary"), "应含英文标题");
+  ok(en.includes("## Task keywords (master-agent prompts)"), "应含英文关键词区");
+  ok(!en.includes("提示词总结"), "英文版不应含中文标题");
+  const empty = promptSummary([], "zh", 1759766400000);
+  ok(empty.includes("（无）"), "空数据应显示（无）");
+});
+t("skillDraftFromPrompts：frontmatter 合法、主题取高频词", () => {
+  const md = skillDraftFromPrompts("flow-review", qaFixtures, "zh", "2026-10-07");
+  ok(md.startsWith("---\nname: flow-review\n"), "应以 frontmatter 开头且 name=slug");
+  ok(md.includes("description: "), "应含 description");
+  ok(md.includes("2026-10-07"), "应含生成日期");
+  ok(md.includes("## 何时使用"), "应含中文区块");
+  ok(md.includes("## 统计"), "应含统计区块");
+  ok(md.includes("提问数：2（子智能体记录：2）"), "应含提问统计");
+  ok(md.includes("flow_serve"), "应含惯用工具");
+  ok(md.includes("把会话转成流程图 | 带竖线"), "近期任务应保留原始任务文本");
+  ok(!/^\s*\|/m.test(md), "技能正文不应含表格行");
+});
+t("skillDraftFromPrompts：英文版", () => {
+  const md = skillDraftFromPrompts("flow-review", qaFixtures, "en", "2026-10-07");
+  ok(md.includes("## When to use"), "应含英文区块");
+  ok(md.includes("## Stats"), "应含英文统计");
+  ok(/^---\nname: flow-review\ndescription: /.test(md), "英文 frontmatter 同样合法");
+});
+
+// ---------- 多客户端解析（Codex / Qoder）/ 按月聚合 / 一键重点 / 生成画布 ----------
+t("parseCodexTurns：过滤系统注入与 developer、工具收集、模型与 cwd", () => {
+  const lines = [
+    JSON.stringify({ timestamp: "2026-10-01T13:02:38Z", type: "session_meta", payload: { id: "sess_C1", cwd: "C:\\proj" } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:39Z", type: "turn_context", payload: { model: "gpt-6-luna", cwd: "C:\\proj" } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:39Z", type: "response_item", payload: { type: "message", role: "developer", content: [{ type: "input_text", text: "系统指导" }] } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:40Z", type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "<environment_context>注入</environment_context>" }] } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:41Z", type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "帮我检查统计" }] } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:42Z", type: "response_item", payload: { type: "function_call", namespace: "mcp__repl", name: "js", arguments: "{}" } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:43Z", type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "检查完成，无问题。" }] } }),
+    JSON.stringify({ timestamp: "2026-10-01T13:02:44Z", type: "response_item", payload: { type: "function_call_output", call_id: "x", output: "ok" } }),
+  ].join("\n");
+  const r = parseCodexTurns(lines);
+  eq(r.session, "sess_C1");
+  eq(r.cwd, "C:\\proj");
+  eq(r.model, "gpt-6-luna");
+  eq(r.turns.length, 1, "developer 与 <环境> 注入不算提问，_output 不算工具");
+  eq(r.turns[0].q, "帮我检查统计");
+  ok(r.turns[0].a.includes("检查完成"));
+  eq(r.turns[0].tools, ["mcp__repl__js"]);
+  ok(r.turns[0].kw.length > 0, "回合应有关键词");
+  ok(r.turns[0].ts > 0, "回合应有时间戳");
+});
+t("parseQoderTurns：流式去重取最长、tool_result 跳过、模型记录", () => {
+  const lines = [
+    JSON.stringify({ type: "workspace-directories", sessionId: "qs1", directories: ["C:\\lun wen"] }),
+    JSON.stringify({ type: "runtime-config", model: "auto", timestamp: 1 }),
+    JSON.stringify({ type: "user", timestamp: "2026-10-07T01:00:00Z", humanInput: { text: "列出文件" }, message: { role: "user", content: [{ type: "text", text: "列出文件" }] } }),
+    JSON.stringify({ type: "assistant", timestamp: "2026-10-07T01:00:01Z", message: { id: "cm1", role: "assistant", model: "dfmodel", content: [{ type: "text", text: "目录：" }] } }),
+    JSON.stringify({ type: "assistant", timestamp: "2026-10-07T01:00:02Z", message: { id: "cm1", role: "assistant", model: "dfmodel", content: [{ type: "text", text: "目录：a.md b.md" }, { type: "tool_use", name: "Read", input: {} }] } }),
+    JSON.stringify({ type: "user", timestamp: "2026-10-07T01:00:03Z", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "c1", content: "file body" }] } }),
+    JSON.stringify({ type: "assistant", timestamp: "2026-10-07T01:00:04Z", message: { id: "cm2", role: "assistant", model: "dfmodel", content: [{ type: "text", text: "共 2 个文件。" }] } }),
+  ].join("\n");
+  const r = parseQoderTurns(lines);
+  eq(r.session, "qs1");
+  eq(r.cwd, "C:\\lun wen");
+  eq(r.model, "auto", "会话默认模型取 runtime-config");
+  eq(r.turns.length, 1, "tool_result 行不算新提问");
+  eq(r.turns[0].q, "列出文件");
+  eq(r.turns[0].a, "目录：a.md b.md\n共 2 个文件。", "流式行取最长、多消息按序拼接");
+  eq(r.turns[0].tools, ["Read"]);
+  eq(r.turns[0].model, "dfmodel", "回合模型取 assistant.message.model");
+});
+t("parseAnyTurns：自动识别 zcode / codex / qoder 与显式指定", () => {
+  const z = JSON.stringify({ sessionId: "s1", request: { messagesKind: "full", messages: [{ role: "user", content: "你好" }] } });
+  eq(parseAnyTurns(z).session, "s1");
+  const c = JSON.stringify({ type: "session_meta", payload: { id: "c1" } });
+  eq(parseAnyTurns(c).session, "c1");
+  const q = JSON.stringify({ type: "workspace-directories", sessionId: "q1", directories: ["D:\\x"] });
+  eq(parseAnyTurns(q).session, "q1");
+  eq(parseAnyTurns(c, "codex").session, "c1");
+  eq(parseAnyTurns("flowchart TD\n a --> b").turns.length, 0, "非 JSON 回退 zcode 解析不崩");
+});
+t("parseQaTurns：无 messageOffset 的旁路窗口不清空已按偏移拼好的历史；全无偏移时退回最后窗口", () => {
+  const full = JSON.stringify({ sessionId: "sess_T2", startedAt: "2026-10-07T01:00:00Z", request: { messagesKind: "full", messageOffset: 0, messageCount: 2, messages: [
+    { role: "user", content: "开始任务" },
+    { role: "assistant", content: [{ type: "text", text: "收到" }] }] } });
+  const side = JSON.stringify({ sessionId: "sess_T2", startedAt: "2026-10-07T01:05:00Z", request: { messagesKind: "delta", messages: [
+    { role: "user", content: "旁路窗口不应覆盖" }] } });
+  const r = parseQaTurns(full + "\n" + side);
+  eq(r.turns.length, 1, "无偏移窗口不得覆盖有偏移的历史");
+  eq(r.turns[0].q, "开始任务");
+  ok(r.turns[0].a.includes("收到"));
+  const r2 = parseQaTurns(JSON.stringify({ sessionId: "s", request: { messages: [{ role: "user", content: "甲" }] } }) + "\n" +
+                          JSON.stringify({ sessionId: "s", request: { messages: [{ role: "user", content: "乙" }] } }));
+  eq(r2.turns.length, 1, "全无偏移时退回最后一条窗口（旧行为保留）");
+  eq(r2.turns[0].q, "乙");
+});
+t("keyPoints：可执行动词与近期优先，得分可解释", () => {
+  const items = [
+    { who: "master", ts: 1, q: "修复导出的 bug", a: "", kw: ["导出", "bug"], tools: [] },
+    { who: "master", ts: 2, q: "随便聊聊", a: "", kw: ["闲聊"], tools: [] },
+  ];
+  const kp = keyPoints(items, 2);
+  eq(kp[0].it.q, "修复导出的 bug");
+  ok(kp[0].score > kp[1].score, "动词命中应更高分");
+  ok(kp[0].reasons.indexOf("verb") >= 0, "应标注可执行任务原因");
+  eq(keyPoints([], 5).length, 0);
+});
+t("highlightSummary：自动重点+可复用提示词+模板，双语与空数据", () => {
+  const md = highlightSummary(qaFixtures, "zh", 1759766400000);
+  ok(md.includes("# 重点与可复用提示词"), "应含中文标题");
+  ok(md.includes("## ⭐ 重点（自动打分，无需人工标注）"), "应含重点区");
+  ok(md.includes("## ♻ 可复用提示词"), "应含提示词区");
+  ok(md.includes("## 🧩 模板提示词"), "应含模板区");
+  ok(md.includes("修复流程图导出的 bug"), "高分任务应进入可复用提示词");
+  const en = highlightSummary(qaFixtures, "en", 1759766400000);
+  ok(en.includes("## ⭐ Highlights"), "英文重点区");
+  ok(!en.includes("## ⭐ 重点"), "英文模式不应含中文区块");
+  ok(highlightSummary([], "zh").includes("（无）"), "空数据不崩");
+});
+t("flowFromQa：🧠 链 + 🤖 虚线挂载、时间正序、上限与空数据", () => {
+  const r = flowFromQa(qaFixtures, { maxNodes: 36 });
+  ok(r.code.startsWith("flowchart TD"), "应输出 mermaid");
+  eq(r.masters, 2);
+  eq(r.subs, 2);
+  ok(r.code.includes('m1["🧠'), "总任务带 🧠 前缀");
+  ok(r.code.includes('s1["🤖'), "子任务带 🤖 前缀");
+  ok(r.code.indexOf("m1") < r.code.indexOf("m2"), "节点编号按时间正序");
+  ok(r.code.includes("m1 --> m2"), "总任务应串成链");
+  ok(r.code.includes("-.->"), "子任务应虚线挂载");
+  const small = flowFromQa(qaFixtures, { maxNodes: 2 });
+  eq(small.masters + small.subs, 2, "maxNodes 应限制总量");
+  eq(flowFromQa([], {}).code, "", "空数据返回空串");
+});
+t("flowTemplate：英文参数输出英文标签，缺省中文不变", () => {
+  const zh = flowTemplate("测试");
+  ok(zh.nodes.some(n => /输入/.test(n.label)), "缺省应输出中文标签");
+  const en = flowTemplate("Test", true);
+  ok(en.nodes.some(n => n.label === "Input"), "en=true 应输出英文标签");
+  ok(en.nodes.some(n => n.label === "Merge"), "英文骨架应含 Merge");
+  eq(en.name, "Test");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
