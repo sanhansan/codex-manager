@@ -1453,6 +1453,17 @@ def wf_state_file():
     return os.path.join(os.path.expanduser("~"), ".zcode", "codex-manager", "wf-backup.json")
 
 
+def wf_state_list_len():
+    """现有备份里的画布数量（文件不存在 / 解析失败 → 0，此时不启用防覆盖闸门）。"""
+    try:
+        with open(wf_state_file(), encoding="utf-8") as f:
+            obj = json.load(f)
+        lst = obj.get("list") if isinstance(obj, dict) else None
+        return len(lst) if isinstance(lst, list) else 0
+    except Exception:
+        return 0
+
+
 class Handler(SimpleHTTPRequestHandler):
     watch = "flow-source.mmd"
     root = "."
@@ -2156,10 +2167,17 @@ class Handler(SimpleHTTPRequestHandler):
                              "bytes": os.path.getsize(fp)})
 
     def post_wf_state(self):
-        """写工作流树备份（编辑器防抖回传整树）：须为含 list 数组的对象且 8MB 以内，原子写。"""
+        """写工作流树备份（编辑器防抖回传整树）：须为含 list 数组的对象且 8MB 以内，原子写。
+
+        v0.27.8 防「备份被残缺树覆盖」：老版本编辑器（或刚打开的页面还没把服务端备份合并完）
+        可能回传一个只剩几个画布的树。若新树比现有备份**少得离谱**（少掉 > max(2, 35%)）且没有
+        force 标记，就拒绝写入并返回 409 + 两边数量，让编辑器提示用户，而不是静默删掉用户数据。
+        用户在界面上真的删了画布时，编辑器会带 force=true 放行。
+        """
         try:
             body = self.read_body()
             tree = body.get("tree")
+            force = bool(body.get("force"))
             if not isinstance(tree, dict) or not isinstance(tree.get("list"), list):
                 raise ValueError("缺少 tree.list 字段")
             if len(tree["list"]) > WF_STATE_MAX_CANVASES:
@@ -2170,6 +2188,18 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_json(400, {"ok": False, "error": "请求体解析失败：%s" % e})
             return
+        if not force:
+            cur = wf_state_list_len()
+            new = len(tree["list"])
+            floor = cur - max(2, int(cur * 0.35))
+            if cur >= 3 and new < floor:
+                self.send_json(409, {
+                    "ok": False,
+                    "error": "服务端备份里有 %d 个画布，本次只回传 %d 个；为防误删已拒绝覆盖"
+                             "（确实要删请带 force=true）" % (cur, new),
+                    "existing": cur, "incoming": new,
+                })
+                return
         fp = wf_state_file()
         try:
             os.makedirs(os.path.dirname(fp), exist_ok=True)

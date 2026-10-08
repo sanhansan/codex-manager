@@ -173,6 +173,36 @@ try {
   try { await page.evaluate(async rel => { await fetch("__flow_write_path", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: rel, text: "" }) }); }, SCRATCH); } catch(e){}
 }
 
+// ========== v0.27.8 服务端「缩水保护」：画布数量骤降必须被拒（除非带 force） ==========
+try {
+  const g409 = await page.evaluate(async () => {
+    const cur = await (await fetch("__flow_wf_state?_=" + Date.now(), { cache: "no-store" })).json();
+    const tree = cur && cur.tree;
+    if (!tree || !Array.isArray(tree.list)) return { skip: true };
+    const n = tree.list.length;
+    const tiny = Object.assign({}, tree, { list: tree.list.slice(0, 1) });
+    const post = async (t, force) => {
+      const body = force === undefined ? { tree: t } : { tree: t, force: force };
+      const r = await fetch("__flow_wf_state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      return { status: r.status, body: await r.json().catch(() => null) };
+    };
+    const bad = await post(tiny);                       // 65 → 1，必须被拒
+    const bad2 = await post(tiny, false);               // 显式 force:false 同样拒绝
+    const good = await post(tree, true);                // 原样回传 + force → 放行
+    const after = await (await fetch("__flow_wf_state?_=" + Date.now(), { cache: "no-store" })).json();
+    return { n: n, skip: false, bad: bad.status, bad2: bad2.status, good: good.status,
+      msg: (bad.body && bad.body.error) || "", after: ((after.tree || {}).list || []).length };
+  });
+  if (g409.skip) ok(false, "缩水保护：拿不到服务端工作副本，无法校验");
+  else {
+    ok(g409.bad === 409, "画布数量骤降被服务端拒绝（HTTP " + g409.bad + "，现有 " + g409.n + " 个）");
+    ok(g409.bad2 === 409, "force:false 同样被拒绝（HTTP " + g409.bad2 + "）");
+    ok(g409.good === 200, "原样回传并带 force=true 时正常写入（HTTP " + g409.good + "）");
+    ok(g409.after === g409.n, "被拒绝后工作副本没被改动（仍为 " + g409.after + " 个画布）");
+    ok(/拒绝覆盖|防误删/.test(g409.msg), "拒绝时返回可读的中文原因（" + String(g409.msg).slice(0, 30) + "…）");
+  }
+} catch(e){ ok(false, "缩水保护校验抛异常：" + ((e && e.message) || e)); }
+
 const fp = join(OUT, "live-verify.png");
 await page.waitForTimeout(600);
 await page.screenshot({ path: fp });

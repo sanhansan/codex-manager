@@ -63,6 +63,8 @@ const browser = await chromium.launch({ executablePath: chrome, headless: true }
 const page = await browser.newPage();
 const errs = [];
 page.on("pageerror", e => errs.push(String(e && e.message || e)));
+// v0.27.8：批量导入弹确认框，测试里统一接受（否则 Playwright 默认 dismiss 会让导入直接中断）
+page.on("dialog", d => d.accept());
 await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load" });
 await page.waitForFunction(() => window.__flow && window.__flow.g(), null, { timeout: 15000 });
 
@@ -691,6 +693,135 @@ const cleaned = await page.evaluate(async () => {
 ok(!cleaned.hasXWhenFilled, "非空项目不显示「✕ 删除项目」（不会误删带走卡片）");
 ok(cleaned.xAfterEmpty, "项目空了才出现「✕ 删除项目」");
 ok(cleaned.keys.indexOf("测验项目") < 0, "「✕ 删除项目」可删掉空项目（剩余：" + cleaned.keys.join(",") + "）");
+
+// ========== v0.27.8 各处都能「导入神经网络」：分布工作区 / 项目组 / 总控表 / 问答 ==========
+await page.evaluate(() => { window.__flow.showView("dist"); });
+await page.waitForTimeout(400);
+const nnEntries = await page.evaluate(() => ({
+  cardBtn: document.querySelectorAll("#wfGrid .wfcard [data-nnon]").length,
+  cardBtnTxt: (document.querySelector("#wfGrid .wfcard [data-nnon]") || {}).textContent || "",
+  projBtn: document.querySelectorAll("#wfGrid .pfgroup [data-nnproj]").length,
+  chip: document.querySelectorAll("#wfGrid .wfcard .nnbtn").length,
+}));
+ok(nnEntries.cardBtn >= 3, "分布工作区每张卡片新增「🧠 加入/已在神经网络」按钮（实际 " + nnEntries.cardBtn + "）");
+ok(/🧠/.test(nnEntries.cardBtnTxt), "按钮文案带 🧠：" + nnEntries.cardBtnTxt.trim());
+ok(nnEntries.projBtn >= 1, "分布工作区每个项目框新增「🧠 本项目加入」按钮（实际 " + nnEntries.projBtn + "）");
+ok(nnEntries.chip >= 3, "卡片头部的 🧠 开关仍在（两种入口并存）");
+
+// —— 卡片按钮：移出后再点「加入神经网络」应加回来 ——
+const cardAdd = await page.evaluate(async () => {
+  const F = window.__flow;
+  const w = F.wf().list.find(x => x.src && x.src.session);
+  F.toggleNnCard(w.name);                       // 先移出
+  await new Promise(r => setTimeout(r, 250));
+  const off = w.nnOn === false;
+  F.showView("dist"); await new Promise(r => setTimeout(r, 250));
+  const btn = [...document.querySelectorAll("#wfGrid .wfcard [data-nnon]")].find(b => b.getAttribute("data-nnon") === w.name);
+  const label = btn ? btn.textContent.trim() : "";
+  if (btn) btn.click();                          // 点「加入神经网络」
+  await new Promise(r => setTimeout(r, 350));
+  return { off: off, label: label, back: w.nnOn !== false };
+});
+ok(cardAdd.off, "先移出神经网络（nnOn=false）");
+ok(/加入神经网络/.test(cardAdd.label), "移出后按钮文案变成「🧠 加入神经网络」：" + cardAdd.label);
+ok(cardAdd.back, "点「🧠 加入神经网络」把它加回来了");
+
+// —— 项目组按钮：一键把本项目所有画布加入神经网络 ——
+const projAdd = await page.evaluate(async () => {
+  const F = window.__flow;
+  const convs = F.wf().list.filter(x => x.src && x.src.session);
+  convs.forEach(w => { w.nnOn = false; });       // 先把所有会话画布移出
+  F.showView("dist"); F.renderDist(); await new Promise(r => setTimeout(r, 300));
+  const btn = document.querySelector("#wfGrid .pfgroup [data-nnproj]");
+  const proj = btn ? btn.getAttribute("data-nnproj") : null;
+  if (btn) btn.click();
+  await new Promise(r => setTimeout(r, 400));
+  const inProj = convs.filter(w => {
+    const key = w.proj || (w.src && w.src.project) || "";
+    return key === proj;
+  });
+  return { proj: proj, total: convs.length, inProj: inProj.length,
+    onInProj: inProj.filter(w => w.nnOn !== false).length };
+});
+ok(projAdd.proj && projAdd.inProj >= 1, "点到项目组按钮（项目 " + projAdd.proj + "，含 " + projAdd.inProj + " 张画布）");
+ok(projAdd.onInProj === projAdd.inProj, "「🧠 本项目加入」把该项目下的画布全部加入神经网络（" + projAdd.onInProj + "/" + projAdd.inProj + "）");
+
+// —— 总控流程表里也能加 ——
+const ctlAdd = await page.evaluate(async () => {
+  const F = window.__flow;
+  F.showView("ctl"); await new Promise(r => setTimeout(r, 350));
+  const btns = document.querySelectorAll("#ctlTable tbody [data-nnon]");
+  const n0 = F.wf().list.filter(w => w.src && w.src.session).length;
+  F.wf().list.forEach(w => { if (w.src && w.src.session) w.nnOn = false; });
+  const first = btns[0];
+  const name = first ? first.getAttribute("data-nnon") : null;
+  if (first) first.click();
+  await new Promise(r => setTimeout(r, 300));
+  const w = F.wf().list.find(x => x.name === name);
+  return { n: btns.length, sessions: n0, name: name, on: w ? w.nnOn !== false : null };
+});
+ok(ctlAdd.n >= ctlAdd.sessions && ctlAdd.n >= 3, "总控流程表每行新增 🧠 按钮（实际 " + ctlAdd.n + " 个）");
+ok(ctlAdd.on === true, "总控表点 🧠 把该画布加入神经网络（" + ctlAdd.name + "）");
+
+// —— 问答视图：一键导入神经网络（会话 → 对话画布 → 神经网络） ——
+const qaImport = await page.evaluate(async () => {
+  const F = window.__flow;
+  const stamp = Date.now();
+  const s1 = "sess_nntest_a" + stamp, s2 = "sess_nntest_b" + stamp;
+  F.qaItems().push({ who: "master", client: "zcode", sessionId: s1, q: "实现登录接口", a: "LoginController 完成 /api/login", tools: [], ts: stamp - 2000, kw: ["登录"] });
+  F.qaItems().push({ who: "master", client: "qoder", sessionId: s2, q: "设计统计图表", a: "ECharts 雷达图对接完成", tools: [], ts: stamp - 1000, kw: ["图表"] });
+  F.showView("qa");
+  F.renderQa();
+  await new Promise(r => setTimeout(r, 250));
+  const btn = document.getElementById("qaNnBtn");
+  const has = !!btn;
+  const before = F.wf().list.length;
+  btn.click();
+  await new Promise(r => setTimeout(r, 2200));
+  const made = F.wf().list.filter(w => w.src && String(w.src.session).indexOf("nntest") >= 0);
+  return {
+    has: has, before: before, after: F.wf().list.length, made: made.length,
+    names: made.map(w => w.name), allOn: made.every(w => w.nnOn !== false),
+    view: document.getElementById("viewNn").classList.contains("show"),
+    nnSess: F.nnTextState() ? F.nnTextState().stat.sess : 0,
+  };
+});
+ok(qaImport.has, "问答视图新增「🧠 导入神经网络」按钮");
+ok(qaImport.made >= 2, "点一下从问答生成了会话画布（新增 " + qaImport.made + " 个）");
+ok(qaImport.allOn, "生成的画布全部处于「已加入神经网络」状态");
+ok(qaImport.view, "导入后自动切到神经网络视图");
+ok(qaImport.nnSess >= 2, "神经网络里能看到这些会话（会话数 " + qaImport.nnSess + "）");
+
+// —— 保护手工编辑：重新导入不得把用户改过的画布刷回模板版本 ——
+const protect = await page.evaluate(async () => {
+  const F = window.__flow;
+  const stamp = Date.now();
+  const sid = "sess_protect_" + stamp;
+  F.qaItems().push({ who: "master", client: "zcode", sessionId: sid, q: "写单元测试", a: "run-tests.mjs 通过", tools: [], ts: stamp - 3000, kw: ["测试"] });
+  F.qaItems().push({ who: "master", client: "zcode", sessionId: sid, q: "修一个 bug", a: "已修", tools: [], ts: stamp - 2000, kw: ["bug"] });
+  await F.importSessionToCanvas("zcode", sid);
+  await new Promise(r => setTimeout(r, 400));
+  const w = F.wf().list.find(x => x.src && x.src.session && String(x.src.session).indexOf(sid) >= 0);
+  if (!w) return { made: false };
+  const impN = (w.data.nodes || []).length;
+  const recorded = w.src.importedNodes;
+  // 模拟用户手工加节点
+  const extra = JSON.parse(JSON.stringify(w.data.nodes[0]));
+  extra.id = "hand1"; extra.label = "🖐 手工加的节点";
+  w.data.nodes.push(extra);
+  const curN = w.data.nodes.length;
+  await F.importSessionToCanvas("zcode", sid);   // 再次导入（模板只有 impN 个）
+  await new Promise(r => setTimeout(r, 400));
+  return {
+    made: true, impN: impN, recorded: recorded, curN: curN,
+    afterN: (w.data.nodes || []).length,
+    kept: w.data.nodes.some(n => n.id === "hand1"),
+  };
+});
+ok(protect.made, "保护用例：会话成功生成对话画布");
+ok(protect.recorded === protect.impN, "新建画布时记录导入节点数 importedNodes（" + protect.recorded + "）");
+ok(protect.kept === true && protect.afterN === protect.curN,
+   "重新导入不会覆盖手工编辑过的画布（编辑后 " + protect.curN + " 节点，导入后仍为 " + protect.afterN + "，手工节点仍在）");
 
 // ---------- 收尾：汇总 + 释放浏览器（缺这段会让进程挂在打开的浏览器上不退出） ----------
 if (errs.length) console.log("\n页面错误：\n  " + errs.slice(0, 8).join("\n  "));

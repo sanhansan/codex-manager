@@ -44,6 +44,30 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
 - **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
 
+**v0.27.8 关键行为**（跳转高亮持久化 + 分布工作区/项目/总控表/问答一键导入神经网络 + 备份防误删；用户诉求原文「胶囊点击后跳转的要有高亮，分布工作区，问答等可导入神经网络」）：
+
+- **持久跳转高亮**：新增模块级 `let jumpHl = null`；`jumpToNode(id)` 在 `setSel` **之前** `jumpHl = id`；
+  渲染时 `jumpOn = jumpHl === n.id` → 卡片 `cls` 追加 ` nd-jump`、整组 `<g data-node>` 加 `nd-jump-g`，
+  并按形状发一个 `<rect>/<circle class="nd-halo">` 呼吸光晕（CSS `@keyframes nd-breathe`，1.6s）。
+  清除点只有三处：`pointerdown`（含空白点击，`hadJump` 为真时补一次 `render()`）、`Escape`、`switchWorkflow`。
+- **一键进神经网络四个入口**：分布工作区卡片 `[data-nnon]`（文案 🧠 加入神经网络 / 🧠 已在神经网络，与卡片头 🧠 并存）、
+  项目框 `[data-nnproj]` → `nnAddProject(projKey)` 整批加、总控表每行 `[data-nnon]`、问答视图 `#qaNnBtn` →
+  `importQaSessionsToNn()`（遍历 `lastQaItems/qaItems` 的会话，逐个 `importSessionToCanvas`，
+  再把 `nnOn === false` 的重新加回，`showView('nn')`，LIMIT 60）。
+- **⚠️ `importQaSessionsToNn` 超过 3 个会话会 `confirm()`**：批量动作会一次性新建几十个画布。
+  e2e 里必须 `page.on("dialog", d => d.accept())`，否则 Playwright 默认 dismiss、导入直接中断。
+- **⚠️ 会话导入绝不能无条件覆盖已有画布**：`storeConversationCanvas` 现在的规则是
+  「`src.importedNodes` 与当前节点数不一致（手工改过）**或** 本地节点数 > 新模板节点数」→ **只刷元信息、保留本地 data** 并 toast。
+  新建画布时务必写 `src.importedNodes = tpl.nodes.length`，否则这条保护永远不生效。
+- **服务端缩水保护**：`flow_serve.py` 的 `post_wf_state()` 在 `not force` 且 `new < cur - max(2, cur*0.35)` 时返回 **409**
+  （带 `existing` / `incoming`）；只有 `deleteWf` 会置 `wfAllowShrink = true` 并带 `force: true`。
+  客户端收到 409 只提示，不要重试覆盖。
+- **⚠️ 本地服务别用 `python flow_serve.py | head -N` 启动**：`head` 读满 N 行就退出，
+  Python 写日志时收到 BrokenPipe 直接死掉 —— 页面还能打开，但之后所有 `fetch` 全 `Failed to fetch`（verify-live 会整片红）。
+  启动请用 `> 日志文件 2>&1` 后台运行。
+- **测试**：单测 **121/121**、`e2e-nn` **124/124**、`e2e-canvas-nodes` **54/54**、`verify-live` **26/26**、
+  i18n missing 0、守卫 4/4 + 4/4。
+
 **v0.27.7 关键行为**（画布 UI 优化：连线去重叠 + 输入输出胶囊可点击跳转；用户诉求原文「画布ui优化，连线不要有重叠，方框上下的由谁指向的加一个点击跳转，跳转那个高亮显示，为了理清工作流程」）：
 
 - **连线去重叠 `planLanes`（`__CORE` 纯函数，可单测）**：输入 `[{i, dir, ch, lo, hi}]`

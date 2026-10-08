@@ -326,6 +326,11 @@ const jump = await page.evaluate(async () => {
     sel: F.sel(), moved: (F.view().x !== before.x || F.view().y !== before.y),
     centeredX: Math.abs(cx - r.width / 2) < 24, centeredY: Math.abs(cy - r.height * 0.42) < 24,
     flashed: el ? el.classList.contains("nd-flash") : false,
+    // v0.27.8：跳转后要有**持久高亮**（光晕 + 强调描边），而不是只闪一下
+    hlState: F.jumpHighlight(),
+    hasHalo: el ? !!el.querySelector(".nd-halo") : false,
+    haloClass: el ? el.getAttribute("class") : "",
+    bodyJump: el ? !!el.querySelector(".nd-jump") : false,
   };
 });
 ok(jump.n >= 3, "每个节点都有可点击的输入/输出胶囊（实际 " + jump.n + " 个）");
@@ -334,6 +339,21 @@ ok(jump.jumpId === "C", "点「指向 C」的胶囊拿到正确的跳转目标")
 ok(jump.sel && jump.sel.type === "node" && jump.sel.id === "C", "跳转后选中了目标节点（属性面板同步）");
 ok(jump.moved && jump.centeredX && jump.centeredY, "跳转把目标节点移到视口中央（偏移已校正）");
 ok(jump.flashed, "跳转后目标节点高亮闪烁（nd-flash）");
+ok(jump.hlState === "C" && jump.hasHalo, "跳转后目标节点带持久光晕（.nd-halo，不只闪一下）");
+ok(/nd-jump-g/.test(jump.haloClass) && jump.bodyJump, "跳转目标整组带 nd-jump-g、卡片本体带 nd-jump 强调描边");
+
+// —— 用户自己动手后，跳转高亮应清除 ——
+const hlCleared = await page.evaluate(async () => {
+  const F = window.__flow;
+  const svg = document.getElementById("cv");
+  // 点空白处（模拟用户自己操作）
+  svg.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: 1000, clientY: 500, pointerId: 7 }));
+  svg.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: 1000, clientY: 500, pointerId: 7 }));
+  await new Promise(r => setTimeout(r, 250));
+  const el = document.querySelector('#cv [data-node="C"]');
+  return { hl: F.jumpHighlight(), hasHalo: el ? !!el.querySelector(".nd-halo") : false };
+});
+ok(hlCleared.hl === null && !hlCleared.hasHalo, "用户自己点一下就清除跳转高亮（不会一直挂着）");
 
 // ---------- 6) 神经网络新增：层级显隐 / 角色分布 / 导出按钮 ----------
 const nnNew = await page.evaluate(async () => {

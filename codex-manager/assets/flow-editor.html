@@ -188,6 +188,8 @@
   .wfcard h5 .nnbtn.on { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); background:color-mix(in srgb, var(--accent) 8%, transparent); }
   .wfcard h5 .nnbtn.off { opacity:.75; }
   .wfcard h5 .nnbtn:hover { border-color:var(--accent); color:var(--accent); }
+  /* v0.27.8 卡片操作区的「🧠 加入/已在神经网络」按钮 */
+  .wfcard .ops button.nn-on { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 40%, var(--line)); }
   .pfhead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:7px; border-bottom:1px dashed var(--line); }
   .pfhead .pfname { font-weight:700; font-size:13.5px; }
   .pfhead .pfstat { color:var(--muted); font-size:11.5px; }
@@ -290,6 +292,11 @@
 #cv .io-tag-g:hover .io-bg { stroke:var(--accent); fill:color-mix(in srgb, var(--accent) 12%, var(--panel)); }
 #cv .io-tag-g:hover .io-tag { fill:var(--accent); }
 #cv.io-compact .io-tag-g { display:none; }   /* 缩得太小（z<0.55）时隐藏，避免一片噪声 */
+/* v0.27.8 跳转高亮：跳过去的那个节点套一圈强调色光晕 + 描边，一直亮到用户自己动手 */
+#cv .nd-halo { fill:none; stroke:var(--accent); stroke-width:2.4; opacity:.9; animation:ndhalo 1.8s ease-in-out infinite; }
+@keyframes ndhalo { 0%,100% { opacity:.95; } 50% { opacity:.35; } }
+#cv .nd-jump { stroke:var(--accent) !important; stroke-width:2.6 !important; }
+#cv g[data-node].nd-jump-g { filter:drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent)); }
   #cv .port:hover { stroke:var(--accent); }
   #cv .eg { fill:none; stroke:var(--node-wire); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   #cv .eg-sel { stroke:var(--accent); stroke-width:3; }
@@ -803,6 +810,7 @@
       <span class="hint" data-i18n="汇总已载入的总/子智能体任务与关键词，可复制或导出 Markdown（双语随界面语言）">汇总已载入的总/子智能体任务与关键词，可复制或导出 Markdown（双语随界面语言）</span></p>
     <p style="margin:4px 0 8px"><button id="qaKeyBtn" data-i18n="⚡ 一键重点与提示词">⚡ 一键重点与提示词</button>
       <button id="qaCanvasBtn" data-i18n="🖼 生成工作画布">🖼 生成工作画布</button>
+      <button id="qaNnBtn" data-i18n="🧠 导入神经网络" data-i18n-title="把当前问答视图里（按上面的过滤条件）出现的每个会话，逐个生成/更新对话画布并加入「🧠 智能体总结神经网络」，随后自动切到神经网络视图" title="把当前问答视图里（按上面的过滤条件）出现的每个会话，逐个生成/更新对话画布并加入「🧠 智能体总结神经网络」，随后自动切到神经网络视图">🧠 导入神经网络</button>
       <span class="hint" data-i18n="自动打分提取重点并汇总可复用提示词（无需人工标注）；生成画布用 🧠/🤖 区分总/子智能体，可直接编辑。">自动打分提取重点并汇总可复用提示词（无需人工标注）；生成画布用 🧠/🤖 区分总/子智能体，可直接编辑。</span></p>
     <div id="qaKeyWrap" style="display:none">
       <div id="qaKeyHits"></div>
@@ -3069,6 +3077,8 @@ if (typeof document !== "undefined") var UI = function(){
   let view = { x:0, y:0, z:1 };
   let mode = null;
   let codeEditing = false;
+  // v0.27.8：点输入/输出胶囊跳过去之后，目标节点**持久高亮**（一直亮到用户自己动手为止）
+  let jumpHl = null;
 
   // ---------- 中英文切换（i18n；键 = 中文原文，缺省回退中文） ----------
   let LANG = 'zh';
@@ -3421,6 +3431,25 @@ if (typeof document !== "undefined") var UI = function(){
     '已新建项目：{0}（把卡片拖进去即可）': 'Project created: {0} (drag cards into it)',
     '已删除空项目：{0}': 'Empty project deleted: {0}',
     '已移动到「{0}」': 'Moved to "{0}"',
+    // ---- v0.27.8 跳转持久高亮 + 各处可导入神经网络 ----
+    '🧠 导入神经网络': '🧠 Import to neural net',
+    '把当前问答视图里（按上面的过滤条件）出现的每个会话，逐个生成/更新对话画布并加入「🧠 智能体总结神经网络」，随后自动切到神经网络视图': 'For every session visible in the Q&A view (per the filters above), generate/update its conversation canvas and add it to the neural-network view, then switch there automatically',
+    '🧠 加入神经网络': '🧠 Add to neural net',
+    '🧠 已在神经网络': '🧠 In neural net',
+    '加入「🧠 智能体总结神经网络」视图': 'Add to the "🧠 agent summary neural network" view',
+    '本项目加入': 'Add project',
+    '把这个项目下的画布一键全部加入神经网络': 'Add every canvas in this project to the neural network in one click',
+    '已把本项目 {0} 个画布加入神经网络': 'Added {0} canvas(es) from this project to the neural network',
+    '本项目的画布都已在神经网络里': 'Every canvas in this project is already in the neural network',
+    '先载入问答数据再导入神经网络': 'Load Q&A data before importing to the neural network',
+    '这些问答没有关联会话，无法导入神经网络': 'These Q&A records have no session attached, so they cannot be imported',
+    '正在导入 {0} 个会话到神经网络…': 'Importing {0} session(s) to the neural network…',
+    '已导入神经网络：{0} 个会话画布': 'Imported to the neural network: {0} session canvas(es)',
+    '（{0} 个移出的重新加入）': ' ({0} previously removed were re-added)',
+    '，仅前 {0} 个会话': ', first {0} sessions only',
+    // v0.27.8 服务端防误删闸门（备份被残缺树覆盖时提示）
+    '服务端备份有 {0} 个画布，本次只 {1} 个：已拒绝覆盖（防误删）': 'The server backup holds {0} canvas(es) but this push has only {1}: overwrite refused (guarding against accidental data loss)',
+    '服务端备份的画布更多（{0} 个），已阻止本次回传把它覆盖成 {1} 个。若确实想删，请再删一次（或刷新页面把备份载进来）': 'The server backup has more canvases ({0}); this push was blocked from overwriting it with {1}. If you really meant to delete, delete once more (or reload the page to pull the backup in)',
     // ---- v0.27.7 画布 UI：连线去重叠 + 输入输出胶囊可跳转 ----
     '已跳到「{0}」（{1} 个输入 · {2} 个输出）': 'Jumped to "{0}" ({1} in · {2} out)',
     // ---- v0.27.6 画布：逻辑门快捷添加 + 具体输入输出 ----
@@ -3532,6 +3561,8 @@ if (typeof document !== "undefined") var UI = function(){
     '{0} 对话': '{0} conversation(s)',
     '已更新对话画布「{0}」（🧠 {1} · 🤖 {2}）': 'Updated conversation canvas “{0}” (🧠 {1} · 🤖 {2})',
     '已新建对话画布「{0}」（挂在「{1}」下，展开左侧列表可点击跳转）': 'Created conversation canvas “{0}” (nested under “{1}”; expand the left list to jump)',
+    '「{0}」本地已有 {1} 个节点（重新导入只有 {2} 个），已保留你手工编辑的版本，未覆盖': '“{0}” already has {1} node(s) locally (re-import only yields {2}); your hand-edited version was kept, not overwritten',
+    '确认把 {0} 个会话导入神经网络？会新建对话画布（已有画布若被手工编辑过不会被覆盖）。': 'Import {0} session(s) into the neural net? New conversation canvases will be created (canvases you hand-edited will not be overwritten).',
     '该提问的节点在此画布中不存在（画布可能已被修改）': 'This turn\u2019s node no longer exists on this canvas (it may have been modified)',
     '对话画布': 'Conversation canvas',
     '{0} 小对话': '{0} turn(s)',
@@ -3753,6 +3784,8 @@ if (typeof document !== "undefined") var UI = function(){
   function saveAll(){ try { localStorage.setItem(WF_KEY, JSON.stringify(WF)); } catch(e){} scheduleWfBackup(); }
   // ---------- 工作流树服务端自动备份（flow_serve.py /__flow_wf_state；rev 重播种后自动恢复） ----------
   let wfBackupTimer = null, wfBackupBusy = false, wfBackupAt = '';
+  // v0.27.8：服务端「防误删闸门」配套 —— 只有用户主动删过画布，才允许备份变小
+  let wfAllowShrink = false, wfShrinkWarned = false;
   // v0.27.6 防覆盖竞态：服务端备份要等「恢复尝试」结束之后才允许写。
   //   此前直接打开编辑器（无注入工作副本）时会先播种一个空/单画布树，
   //   若此时 restoreWfBackup 还没把服务端备份合并回来，一次 markDirty 就会把
@@ -3771,10 +3804,23 @@ if (typeof document !== "undefined") var UI = function(){
     if (wfBackupBusy){ scheduleWfBackup(); return; }
     wfBackupBusy = true;
     try {
-      const r = await fetch('__flow_wf_state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tree: wfTreeObj() }) });
+      const r = await fetch('__flow_wf_state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tree: wfTreeObj(), force: wfAllowShrink }) });
       const j = await r.json().catch(() => null);
+      if (r.status === 409){
+        // 服务端备份里的画布明显更多：防误删闸门生效（常见于老页面，或刚打开还没把备份合并完的页面）
+        // 不覆盖、不报错，只在状态栏提示，避免用户以为"同步坏了"
+        syncStatus('⚠ ' + tx('服务端备份有 {0} 个画布，本次只 {1} 个：已拒绝覆盖（防误删）',
+          (j && j.existing) || '?', (j && j.incoming) || '?'));
+        if (!wfShrinkWarned){
+          wfShrinkWarned = true;
+          toast(tx('服务端备份的画布更多（{0} 个），已阻止本次回传把它覆盖成 {1} 个。若确实想删，请再删一次（或刷新页面把备份载进来）',
+            (j && j.existing) || '?', (j && j.incoming) || '?'));
+        }
+        return;
+      }
       if (!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
       wfBackupAt = new Date().toLocaleTimeString();
+      wfAllowShrink = false; wfShrinkWarned = false;   // 写成功：复位
     } catch(e){ wfBackupAt = ''; }
     finally { wfBackupBusy = false; }
   }
@@ -3975,9 +4021,10 @@ if (typeof document !== "undefined") var UI = function(){
     animateViewTo(r.width / 2 - (n.x + n.w / 2) * view.z,
                   r.height * 0.42 - (n.y + n.h / 2) * view.z, null, ms == null ? 220 : ms);
   }
-  // 点胶囊：选中该节点（属性面板随之切换）+ 居中 + 闪一下；toast 回显方便连续跳
+  // 点胶囊：选中该节点（属性面板随之切换）+ 居中 + **持久高亮**（jumpHl，直到用户自己动手）+ 闪一下
   function jumpToNode(id){
     const n = nodeById(id); if (!n) return;
+    jumpHl = id;                                    // 先置位：setSel 会立刻重绘，光晕随之上屏
     setSel({ type:'node', id:id });
     centerOnNode(id);
     flashNodes([id]);
@@ -4029,6 +4076,7 @@ if (typeof document !== "undefined") var UI = function(){
     if (!g.errors) g.errors = [];
     $('dirSel').value = g.dir;
     hist.past.length = 0; hist.future.length = 0;
+    jumpHl = null;   // v0.27.8：换画布不再保留上一个画布的跳转高亮
     fillWfSel(); setSel(null); refresh(true); updateSrcInfo(); refreshSyncHint(); saveAll();
     renderCrumb();
     // v0.24.0 切换动效：画布轻微上浮淡入（同画布重入不重播）
@@ -4299,7 +4347,8 @@ if (typeof document !== "undefined") var UI = function(){
       const selOn = sel && sel.type==='node' && sel.id===n.id;
       const shapeCls = n.shape==='diamond' ? 'nd-diam' : n.shape==='round' ? 'nd-round' : 'nd-rect';
       const subCls = n.subflow ? ' nd-sub' : '';
-      const cls = 'nd '+shapeCls+subCls+(selOn?' nd-sel':'');
+      const jumpOn = jumpHl === n.id;   // v0.27.8：跳转高亮（持久，直到用户自己动手）
+      const cls = 'nd '+shapeCls+subCls+(selOn?' nd-sel':'')+(jumpOn?' nd-jump':'');
       const R = 8;                            // 卡片圆角（图3 的圆角方卡）
       const isLink = isLinkKind(n.kind);
       let body = '';
@@ -4308,7 +4357,7 @@ if (typeof document !== "undefined") var UI = function(){
         const cx = n.x + n.w/2, cy = n.y + n.h/2;
         const col = KIND_COLOR[n.kind] || '#0ea5e9';
         const glyph = n.kind === 'link-in' ? '◁' : '▷';
-        body = '<circle class="nd nd-link'+subCls+(selOn?' nd-sel':'')+'" cx="'+cx+'" cy="'+cy+'" r="'+Math.max(8, n.w/2 - 1)+'"' +
+        body = '<circle class="nd nd-link'+subCls+(selOn?' nd-sel':'')+(jumpOn?' nd-jump':'')+'" cx="'+cx+'" cy="'+cy+'" r="'+Math.max(8, n.w/2 - 1)+'"' +
             ' fill="'+col+'" fill-opacity="0.12" stroke="'+col+'"/>' +
           '<text class="nd-linkg" x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" fill="'+col+'">'+glyph+'</text>';
       } else if (n.shape === 'diamond'){
@@ -4405,7 +4454,11 @@ if (typeof document !== "undefined") var UI = function(){
             '<circle class="port-hit" cx="'+sa.outR.x+'" cy="'+sa.outR.y+'" r="9" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(sideTip)+'</title></circle>';
         }
       }
-      return '<g data-node="'+escXml(n.id)+'">' +
+      // v0.27.8 跳转高亮的光晕：画在卡片外侧（先画、压在卡片下面），带呼吸动画
+      const halo = !jumpOn ? '' : (isLink
+        ? '<circle class="nd-halo" cx="'+(n.x+n.w/2)+'" cy="'+(n.y+n.h/2)+'" r="'+(n.w/2+5)+'"/>'
+        : '<rect class="nd-halo" x="'+(n.x-5)+'" y="'+(n.y-5)+'" width="'+(n.w+10)+'" height="'+(n.h+10)+'" rx="'+(R+4)+'"/>');
+      return '<g data-node="'+escXml(n.id)+'"'+(jumpOn?' class="nd-jump-g"':'')+'>' + halo +
         (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body + head + bodyTxt + fileTxt + durHtml + ports + '</g>';
     }).join('');
 
@@ -4728,6 +4781,9 @@ if (typeof document !== "undefined") var UI = function(){
   // ---------- 指针交互 ----------
   svg.addEventListener('pointerdown', ev => {
     stopPanTween();                                   // v0.27.7：用户一动就停下跳转动画，别抢操作
+    // v0.27.8：用户自己动手就清掉「跳转高亮」（下面的 setSel/render 会顺带把它抹掉）
+    const hadJump = !!jumpHl;
+    if (hadJump) jumpHl = null;
     const portEl = ev.target.closest('[data-port]');
     const nodeEl = ev.target.closest('[data-node]');
     const edgeEl = ev.target.closest('[data-edge]');
@@ -4759,6 +4815,7 @@ if (typeof document !== "undefined") var UI = function(){
       mode = { kind:'pan', sx:ev.clientX, sy:ev.clientY, ox:view.x, oy:view.y };
       svg.classList.add('panning');
       if (sel) setSel(null);
+      else if (hadJump) render();      // 只点了空白：也要把跳转高亮抹掉
     }
   });
   svg.addEventListener('pointermove', ev => {
@@ -4913,7 +4970,7 @@ if (typeof document !== "undefined") var UI = function(){
     if ((ev.ctrlKey||ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z'){ ev.preventDefault(); undo(); return; }
     if ((ev.ctrlKey||ev.metaKey) && (ev.key.toLowerCase() === 'y' || (ev.shiftKey && ev.key.toLowerCase() === 'z'))){ ev.preventDefault(); redo(); return; }
     if (ev.key === 'F2' && sel && sel.type === 'node'){ ev.preventDefault(); startInlineEdit(sel.id); return; }
-    if (ev.key === 'Escape'){ if (inlineCtx) closeInlineEdit(false); setSel(null); return; }
+    if (ev.key === 'Escape'){ if (inlineCtx) closeInlineEdit(false); jumpHl = null; setSel(null); return; }
     if ((ev.key === 'Delete' || ev.key === 'Backspace') && sel){
       ev.preventDefault();
       if (sel.type === 'node') deleteNode(sel.id);
@@ -5460,6 +5517,7 @@ if (typeof document !== "undefined") var UI = function(){
   function deleteWf(name){
     if (WF.list.length <= 1) return toast(T('至少保留一个工作流'));
     if (!confirm(tx('删除工作流「{0}」？', name))) return;
+    wfAllowShrink = true;   // v0.27.8：用户主动删的，允许服务端备份跟着变小（否则会被防误删闸门拦下）
     WF.list = WF.list.filter(w => w.name !== name);
     // 被删画布下的对话画布提升为顶层，避免悬空挂载
     WF.list.forEach(w => { if (w.src && w.src.parent === name) w.src.parent = ''; });
@@ -5517,6 +5575,16 @@ if (typeof document !== "undefined") var UI = function(){
     root.querySelectorAll('[data-nn]').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
       toggleNnCard(b.getAttribute('data-nn'));
+    }));
+    // v0.27.8：「🧠 加入神经网络」按钮（只加不减）+ 项目组级「本项目加入」
+    root.querySelectorAll('[data-nnon]').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const w = distCardByName(b.getAttribute('data-nnon'));
+      if (w) setNnCard(w, true);
+    }));
+    root.querySelectorAll('[data-nnproj]').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      nnAddProject(b.getAttribute('data-nnproj'));
     }));
     root.querySelectorAll('[data-delproj]').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
@@ -5689,7 +5757,8 @@ if (typeof document !== "undefined") var UI = function(){
       (isActive ? '<span class="cur" title="' + T('当前对话画布（自动跟随）') + '">' + T('当前') + '</span>' : '') + '</h5>' +
       (isConv ? '' : '<div class="meta">' + escXml(w.name) + '</div>') +
       '<div class="meta">' + tx('节点 {0} · 连线 {1}', (d.nodes||[]).length, (d.edges||[]).length) + (gates.length ? ' · ' + T('门') + ' ' + escXml(gates.join(',')) : '') + (subs.length ? '<br>' + T('子流程 → ') + escXml(subs.join('、')) : '') + '</div>' + agentRow + convMeta +
-      '<div class="ops"><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button><button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button><button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button><button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button></div></div>';
+      '<div class="ops"><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button><button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button><button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button><button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button>' +
+        '<button class="small' + (nnOff ? '' : ' nn-on') + '" data-nnon="' + escXml(w.name) + '" title="' + escXml(T('加入「🧠 智能体总结神经网络」视图')) + '">' + (nnOff ? T('🧠 加入神经网络') : T('🧠 已在神经网络')) + '</button></div></div>';
   }
   function renderDist(){
     const grid = $('wfGrid');
@@ -5717,6 +5786,7 @@ if (typeof document !== "undefined") var UI = function(){
           '<span class="pfname">' + (isFramework ? '🧩 ' : '📁 ') + escXml(grp.project) + '</span>' +
           '<span class="pfstat">' + tx('{0} 智能体 · {1} 会话', agents.length || 1, convs.length) + (nSub ? ' · 🤖 ' + nSub : '') + (grp.empty ? ' · ' + T('空项目') : '') + '</span>' +
           (chain ? '<span class="pfchain" title="' + T('协作接力顺序') + '">' + chain + '</span>' : '') +
+          (total ? '<button class="small" data-nnproj="' + escXml(grp.project) + '" title="' + T('把这个项目下的画布一键全部加入神经网络') + '">🧠 ' + T('本项目加入') + '</button>' : '') +
           (isExplicit && !total ? '<button class="small pfx" data-delproj="' + escXml(grp.project) + '" title="' + T('删除这个空项目') + '">✕ ' + T('删除项目') + '</button>' : '') +
         '</header>' +
         '<div class="pfbody">' + convs.concat(others).map(distCardHtml).join('') +
@@ -5761,8 +5831,19 @@ if (typeof document !== "undefined") var UI = function(){
     if (!n) return toast(on ? T('全部画布都已在神经网络里') : T('全部画布都已移出神经网络'));
     toast(on ? tx('已把 {0} 个画布加入神经网络', n) : tx('已把 {0} 个画布移出神经网络', n));
   }
-  function newProject(){
-    const nm = prompt(T('新项目名称：'), T('新项目'));
+  // v0.27.8 项目组级：把一个项目下的画布一键全部加入神经网络
+  function nnAddProject(projKey){
+    let n = 0;
+    WF.list.forEach(w => {
+      if (!(w.src && w.src.session)) return;
+      if (projectKeyOf(w) !== projKey) return;
+      if (w.nnOn === false){ delete w.nnOn; n++; }
+    });
+    saveAll(); renderDist();
+    if (curView === 'nn') renderNn();
+    toast(n ? tx('已把本项目 {0} 个画布加入神经网络', n) : T('本项目的画布都已在神经网络里'));
+  }
+  function newProject(){    const nm = prompt(T('新项目名称：'), T('新项目'));
     if (nm == null) return;
     const key = String(nm).trim().slice(0, 40);
     if (!key) return;
@@ -5861,7 +5942,7 @@ if (typeof document !== "undefined") var UI = function(){
       const refBy = (refs[w.name] || []).filter(x => x !== w.name);
       const conv = w.src ? ' <span class="hint">🗂 ' + escXml(w.src.task || T('对话画布')) + (w.src.parent ? ' · ' + T('挂在：') + escXml(w.src.parent) : '') + '</span>' : '';
       return '<tr><td>' + escXml(w.name) + (w.name === WF.active ? ' <span class="hint">' + T('（当前）') + '</span>' : '') + conv + '</td><td>' + (d.nodes||[]).length + '</td><td>' + (d.edges||[]).length + '</td><td>' + (gates.length ? escXml(gates.join(',')) : '—') + '</td><td>' + (subs.length ? escXml(subs.join('、')) : '—') + '</td><td>' + (refBy.length ? escXml(refBy.join('、')) : '—') + '</td>' +
-        '<td><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button> <button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button> <button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button> <button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button></td></tr>';
+        '<td><button class="small" data-open="' + escXml(w.name) + '">' + T('打开') + '</button> <button class="small" data-ren="' + escXml(w.name) + '">' + T('重命名') + '</button> <button class="small" data-del="' + escXml(w.name) + '">' + T('删除') + '</button> <button class="small" data-exp="' + escXml(w.name) + '">' + T('导出JSON') + '</button> <button class="small" data-nnon="' + escXml(w.name) + '" title="' + escXml(T('加入「🧠 智能体总结神经网络」视图')) + '">🧠</button></td></tr>';
     }).join('');
     bindWfOps($('ctlTable').querySelector('tbody'));
     renderCtlMap();
@@ -7418,6 +7499,44 @@ if (typeof document !== "undefined") var UI = function(){
     if (name) switchWorkflow(name);
   }
   $('qaCanvasBtn').addEventListener('click', genQaCanvas);
+  // v0.27.8 「🧠 导入神经网络」：把当前问答视图（已按过滤条件筛过）里出现的每个**会话**，
+  //   逐个生成/更新对话画布并加入神经网络 —— 问答 → 画布 → 神经网络 一条龙。
+  async function importQaSessionsToNn(){
+    const items = (lastQaItems && lastQaItems.length) ? lastQaItems : qaItems;
+    if (!items.length) return toast(T('先载入问答数据再导入神经网络'));
+    const pairs = [], seen = new Set();
+    items.forEach(it => {
+      const sid = qaBare(it.sessionId || '');
+      if (!sid) return;
+      const key = (it.client || 'zcode') + '|' + sid;
+      if (seen.has(key)) return;
+      seen.add(key);
+      pairs.push({ client: it.client || 'zcode', sid: sid, session: it.sessionId || sid });
+    });
+    if (!pairs.length) return toast(T('这些问答没有关联会话，无法导入神经网络'));
+    const LIMIT = 60;
+    const list = pairs.slice(0, LIMIT);
+    // 批量动作会一次性新建/刷新大量画布，先确认，避免误点把整个工作区刷一遍
+    if (list.length > 3 && !confirm(tx('确认把 {0} 个会话导入神经网络？会新建对话画布（已有画布若被手工编辑过不会被覆盖）。', list.length))) return;
+    toast(tx('正在导入 {0} 个会话到神经网络…', list.length));
+    let ok = 0;
+    for (const p of list){
+      try {
+        await importSessionToCanvas(p.client, p.session);
+        if (WF.list.some(w => w.src && w.src.session && qaBare(w.src.session) === p.sid)) ok++;
+      } catch(e){}
+    }
+    // 被「移出神经网络」过的重新加入（导入语义就是加入）
+    let back = 0;
+    WF.list.forEach(w => { if (w.src && w.src.session && w.nnOn === false){ delete w.nnOn; back++; } });
+    saveAll();
+    if (curView === 'dist') renderDist();
+    if (curView === 'ctl') renderCtl();
+    showView('nn');                                   // showView('nn') 内部会 renderNn()
+    toast(tx('已导入神经网络：{0} 个会话画布', ok) + (back ? tx('（{0} 个移出的重新加入）', back) : '') +
+      (pairs.length > LIMIT ? tx('，仅前 {0} 个会话', LIMIT) : ''));
+  }
+  if ($('qaNnBtn')) $('qaNnBtn').addEventListener('click', importQaSessionsToNn);
   // 按需从本地服务载入某客户端某会话（转跳问答 / 导入画布共用）；返回新增问答条数
   async function ensureQaSession(client, sid){
     const bare = qaBare(sid);
@@ -7453,7 +7572,24 @@ if (typeof document !== "undefined") var UI = function(){
     const exist = scope.session ? WF.list.find(w => w.src && w.src.session && qaBare(w.src.session) === qaBare(scope.session)) : null;
     markDirtyNow();
     if (exist){
+      // 保护手工编辑：记录上次导入时的节点数，若现在对不上 ⇒ 用户改过，且新导入并不更丰富 ⇒ 保留本地版本
+      const curN = (exist.data && exist.data.nodes ? exist.data.nodes.length : 0);
+      const impN = Number(exist.src.importedNodes || 0);
+      const newN = (tpl.nodes || []).length;
+      const edited = impN > 0 && curN !== impN;
+      if (edited || (impN === 0 && curN > newN)){
+        exist.src.turns = r.turns; exist.src.task = task; exist.src.updated = Date.now();
+        if (!exist.src.client && scope.client) exist.src.client = scope.client;
+        if (!exist.src.cwd && scope.cwd) exist.src.cwd = scope.cwd;
+        if (!exist.src.project && scope.project) exist.src.project = scope.project;
+        saveAll(); fillWfSel();
+        if (curView === 'dist') renderDist();
+        if (curView === 'ctl') renderCtl();
+        toast(tx('「{0}」本地已有 {1} 个节点（重新导入只有 {2} 个），已保留你手工编辑的版本，未覆盖', exist.name, curN, newN));
+        return exist.name;
+      }
       exist.data = { name: exist.name, dir: tpl.dir, nodes: tpl.nodes, edges: tpl.edges, subs: tpl.subs };
+      exist.src.importedNodes = newN;
       exist.src.turns = r.turns; exist.src.task = task; exist.src.updated = Date.now();
       if (!exist.src.client && scope.client) exist.src.client = scope.client;
       if (!exist.src.cwd && scope.cwd) exist.src.cwd = scope.cwd;
@@ -7481,6 +7617,7 @@ if (typeof document !== "undefined") var UI = function(){
     }
     WF.list.push({ name, data: { name, dir: tpl.dir, nodes: tpl.nodes, edges: tpl.edges, subs: tpl.subs },
       src: { parent, client: scope.client || '', session: scope.session || '', task, ts: Date.now(), turns: r.turns,
+             importedNodes: (tpl.nodes || []).length,
              cwd: scope.cwd || '', project: scope.project || projectOf(scope.cwd || '') } });
     saveAll(); wfCollapsed.delete(parent); fillWfSel();
     if (curView === 'dist') renderDist();
@@ -8901,7 +9038,10 @@ if (typeof document !== "undefined") var UI = function(){
     addGateNode, newProject, removeProject, moveCard, toggleNnCard, nnSetAll,
     projects: () => WF.projects, wfList: () => WF.list, distCardHtml, byOrderThenTsDown,
     // v0.27.7 测试钩子：连线去重叠 / 跳转
-    planLanes, jumpToNode, centerOnNode, animateViewTo, stopPanTween, view: () => view };
+    planLanes, jumpToNode, centerOnNode, animateViewTo, stopPanTween, view: () => view,
+    // v0.27.8 测试钩子：跳转持久高亮 / 各处导入神经网络
+    jumpHighlight: () => jumpHl, nnAddProject, importQaSessionsToNn, lastQaItems: () => lastQaItems,
+    wfAllowShrink: () => wfAllowShrink, pushWfBackup, wfTreeObj, deleteWf };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>
