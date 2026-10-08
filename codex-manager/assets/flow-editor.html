@@ -3563,6 +3563,8 @@ if (typeof document !== "undefined") var UI = function(){
     '已新建对话画布「{0}」（挂在「{1}」下，展开左侧列表可点击跳转）': 'Created conversation canvas “{0}” (nested under “{1}”; expand the left list to jump)',
     '「{0}」本地已有 {1} 个节点（重新导入只有 {2} 个），已保留你手工编辑的版本，未覆盖': '“{0}” already has {1} node(s) locally (re-import only yields {2}); your hand-edited version was kept, not overwritten',
     '确认把 {0} 个会话导入神经网络？会新建对话画布（已有画布若被手工编辑过不会被覆盖）。': 'Import {0} session(s) into the neural net? New conversation canvases will be created (canvases you hand-edited will not be overwritten).',
+    '本页数据已过期：服务端备份已被其他窗口更新，已停止回传（刷新页面即可重新载入）': 'This page is stale: the server backup was updated by another window, so pushing has stopped (refresh to reload it)',
+    '检测到本页加载的备份已被其他窗口更新，已停止把本页回传覆盖过去。请刷新页面载入最新备份后再继续编辑': 'The backup this page loaded has been updated by another window; pushing has stopped so it cannot overwrite it. Refresh to load the latest backup before editing further',
     '该提问的节点在此画布中不存在（画布可能已被修改）': 'This turn\u2019s node no longer exists on this canvas (it may have been modified)',
     '对话画布': 'Conversation canvas',
     '{0} 小对话': '{0} turn(s)',
@@ -3786,6 +3788,10 @@ if (typeof document !== "undefined") var UI = function(){
   let wfBackupTimer = null, wfBackupBusy = false, wfBackupAt = '';
   // v0.27.8：服务端「防误删闸门」配套 —— 只有用户主动删过画布，才允许备份变小
   let wfAllowShrink = false, wfShrinkWarned = false;
+  // v0.27.8：乐观并发 —— 记住本页加载到的服务端备份版本 srvRev，回传时带上；
+  //   若别的窗口/标签页已经写过（服务端版本变了），服务端会 409 拒绝这次回传，
+  //   避免一个挂着旧状态的页面把新备份整包盖回去（实测真丢过数据）。
+  let wfBaseRev = '', wfStaleWarned = false;
   // v0.27.6 防覆盖竞态：服务端备份要等「恢复尝试」结束之后才允许写。
   //   此前直接打开编辑器（无注入工作副本）时会先播种一个空/单画布树，
   //   若此时 restoreWfBackup 还没把服务端备份合并回来，一次 markDirty 就会把
@@ -3804,10 +3810,19 @@ if (typeof document !== "undefined") var UI = function(){
     if (wfBackupBusy){ scheduleWfBackup(); return; }
     wfBackupBusy = true;
     try {
-      const r = await fetch('__flow_wf_state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tree: wfTreeObj(), force: wfAllowShrink }) });
+      const r = await fetch('__flow_wf_state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tree: wfTreeObj(), force: wfAllowShrink, baseRev: wfBaseRev }) });
       const j = await r.json().catch(() => null);
       if (r.status === 409){
-        // 服务端备份里的画布明显更多：防误删闸门生效（常见于老页面，或刚打开还没把备份合并完的页面）
+        if (j && j.stale){
+          // 本页加载的备份版本已经落后（别的窗口/标签页写过）：这是「陈旧页面」，绝不能再回传
+          syncStatus('⚠ ' + T('本页数据已过期：服务端备份已被其他窗口更新，已停止回传（刷新页面即可重新载入）'));
+          if (!wfStaleWarned){
+            wfStaleWarned = true;
+            toast(T('检测到本页加载的备份已被其他窗口更新，已停止把本页回传覆盖过去。请刷新页面载入最新备份后再继续编辑'));
+          }
+          return;
+        }
+        // 服务端备份里的画布更多：防误删闸门生效（常见于老页面，或刚打开还没把备份合并完的页面）
         // 不覆盖、不报错，只在状态栏提示，避免用户以为"同步坏了"
         syncStatus('⚠ ' + tx('服务端备份有 {0} 个画布，本次只 {1} 个：已拒绝覆盖（防误删）',
           (j && j.existing) || '?', (j && j.incoming) || '?'));
@@ -3819,8 +3834,9 @@ if (typeof document !== "undefined") var UI = function(){
         return;
       }
       if (!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+      if (j.rev) wfBaseRev = j.rev;                    // 跟上服务端新版本，下一次回传才不会误判过期
       wfBackupAt = new Date().toLocaleTimeString();
-      wfAllowShrink = false; wfShrinkWarned = false;   // 写成功：复位
+      wfAllowShrink = false; wfShrinkWarned = false; wfStaleWarned = false;   // 写成功：复位
     } catch(e){ wfBackupAt = ''; }
     finally { wfBackupBusy = false; }
   }
@@ -3834,6 +3850,7 @@ if (typeof document !== "undefined") var UI = function(){
       // v0.27.6：恢复期间禁止写回，避免用「只有 1~4 个画布的残缺树」覆盖用户在服务端的完整备份。
       try { j = await (await fetch('__flow_wf_state?_=' + Date.now(), { cache: 'no-store' })).json(); } catch(e){ return 0; }
       if (!j || !j.ok || !j.exists || !j.tree) return 0;
+      if (j.tree.srvRev) wfBaseRev = String(j.tree.srvRev);   // 记下本页加载到的服务端版本（乐观并发）
       const parsed = wfTreeParse(JSON.stringify(j.tree));
       if (!parsed.ok || !parsed.entries.length) return 0;
       const keep = parsed.entries.filter(e => {

@@ -59,13 +59,17 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **⚠️ 会话导入绝不能无条件覆盖已有画布**：`storeConversationCanvas` 现在的规则是
   「`src.importedNodes` 与当前节点数不一致（手工改过）**或** 本地节点数 > 新模板节点数」→ **只刷元信息、保留本地 data** 并 toast。
   新建画布时务必写 `src.importedNodes = tpl.nodes.length`，否则这条保护永远不生效。
-- **服务端缩水保护**：`flow_serve.py` 的 `post_wf_state()` 在 `not force` 且 `new < cur - max(2, cur*0.35)` 时返回 **409**
-  （带 `existing` / `incoming`）；只有 `deleteWf` 会置 `wfAllowShrink = true` 并带 `force: true`。
-  客户端收到 409 只提示，不要重试覆盖。
+- **服务端两道闸门**（`flow_serve.py` `post_wf_state()`，都用 `not force` 守卫）：
+  ① `new < cur`（**任何数量下降，哪怕只少 1 个**）→ 409 + `existing`/`incoming`。
+  ⚠️ 别改回「少掉 > 35%」的阈值：实测 65→62 拦不住，而那正是陈旧标签页的形态。
+  ② `baseRev` 与服务端 `srvRev` 不一致 → 409 + `stale: true`（本页已过期）。
+  每次成功写入都会 `tree["srvRev"] = wf_state_next_rev(...)` 并回 `rev`；编辑器 `wfBaseRev` 要跟着更新，
+  否则下一次自己的回传会被误判过期。只有 `deleteWf` / 还原快照会置 `wfAllowShrink = true` 带 `force: true`。
+  客户端收到 409 只提示，**不要重试覆盖**。
 - **⚠️ 本地服务别用 `python flow_serve.py | head -N` 启动**：`head` 读满 N 行就退出，
   Python 写日志时收到 BrokenPipe 直接死掉 —— 页面还能打开，但之后所有 `fetch` 全 `Failed to fetch`（verify-live 会整片红）。
   启动请用 `> 日志文件 2>&1` 后台运行。
-- **测试**：单测 **121/121**、`e2e-nn` **124/124**、`e2e-canvas-nodes` **54/54**、`verify-live` **26/26**、
+- **测试**：单测 **121/121**、`e2e-nn` **124/124**、`e2e-canvas-nodes` **54/54**、`verify-live` **29/29**、
   i18n missing 0、守卫 4/4 + 4/4。
 
 **v0.27.7 关键行为**（画布 UI 优化：连线去重叠 + 输入输出胶囊可点击跳转；用户诉求原文「画布ui优化，连线不要有重叠，方框上下的由谁指向的加一个点击跳转，跳转那个高亮显示，为了理清工作流程」）：

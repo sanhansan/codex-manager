@@ -1464,6 +1464,26 @@ def wf_state_list_len():
         return 0
 
 
+def wf_state_srv_rev():
+    """备份的服务端版本号 srvRev（每次写入都换新；读不到 → ""）。"""
+    try:
+        with open(wf_state_file(), encoding="utf-8") as f:
+            obj = json.load(f)
+        r = obj.get("srvRev") if isinstance(obj, dict) else None
+        return r if isinstance(r, str) else ""
+    except Exception:
+        return ""
+
+
+def wf_state_next_rev(prev):
+    """严格递增的毫秒十六进制版本号（同一毫秒内也保证 +1，避免连续两次写入撞号）。"""
+    try:
+        n = int(prev, 16)
+    except Exception:
+        n = 0
+    return format(max(int(time.time() * 1000), n + 1), "x")
+
+
 class Handler(SimpleHTTPRequestHandler):
     watch = "flow-source.mmd"
     root = "."
@@ -2169,15 +2189,22 @@ class Handler(SimpleHTTPRequestHandler):
     def post_wf_state(self):
         """写工作流树备份（编辑器防抖回传整树）：须为含 list 数组的对象且 8MB 以内，原子写。
 
-        v0.27.8 防「备份被残缺树覆盖」：老版本编辑器（或刚打开的页面还没把服务端备份合并完）
-        可能回传一个只剩几个画布的树。若新树比现有备份**少得离谱**（少掉 > max(2, 35%)）且没有
-        force 标记，就拒绝写入并返回 409 + 两边数量，让编辑器提示用户，而不是静默删掉用户数据。
-        用户在界面上真的删了画布时，编辑器会带 force=true 放行。
+        v0.27.8 防「备份被残缺树覆盖」两道闸门：
+
+        ① **用量闸门**：老版本编辑器（或刚打开的页面还没把服务端备份合并完）可能回传一个只剩
+           几个画布的树。凡是**不带 force 又让画布数量下降**的回传，一律拒绝并返回 409 + 两边数量，
+           而不是静默删掉用户数据。用户在界面上真的删了画布时，编辑器会带 force=true 放行。
+           （只比数量、不看跌幅：实测「65 → 62」这种小跌幅用 35% 阈值是拦不住的，而那正是
+           一个挂着旧状态的标签页把备份盖回去的典型形态。）
+        ② **版本闸门**：每次写入都会盖一个新的 srvRev 并回给编辑器；编辑器下次回传时带上它加载到的
+           baseRev。若 baseRev 与服务端当前 srvRev 不一致，说明**这个页面已经过期**（别的窗口/标签页
+           改过备份），同样拒绝，避免陈旧页面把新数据盖回去。恢复/删除等确定性写入带 force=true 跳过。
         """
         try:
             body = self.read_body()
             tree = body.get("tree")
             force = bool(body.get("force"))
+            base_rev = body.get("baseRev")
             if not isinstance(tree, dict) or not isinstance(tree.get("list"), list):
                 raise ValueError("缺少 tree.list 字段")
             if len(tree["list"]) > WF_STATE_MAX_CANVASES:
@@ -2188,11 +2215,10 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_json(400, {"ok": False, "error": "请求体解析失败：%s" % e})
             return
+        cur = wf_state_list_len()
+        new = len(tree["list"])
         if not force:
-            cur = wf_state_list_len()
-            new = len(tree["list"])
-            floor = cur - max(2, int(cur * 0.35))
-            if cur >= 3 and new < floor:
+            if cur >= 3 and new < cur:
                 self.send_json(409, {
                     "ok": False,
                     "error": "服务端备份里有 %d 个画布，本次只回传 %d 个；为防误删已拒绝覆盖"
@@ -2200,14 +2226,27 @@ class Handler(SimpleHTTPRequestHandler):
                     "existing": cur, "incoming": new,
                 })
                 return
+            cur_rev = wf_state_srv_rev()
+            if cur_rev and isinstance(base_rev, str) and base_rev and base_rev != cur_rev:
+                self.send_json(409, {
+                    "ok": False, "stale": True,
+                    "error": "本页数据已过期：服务端备份已被其他窗口更新（服务端 %s / 本页 %s）；"
+                             "已拒绝本次回传，刷新页面即可重新载入最新备份"
+                             % (cur_rev[:8], base_rev[:8]),
+                    "existing": cur, "incoming": new,
+                    "rev": cur_rev,
+                })
+                return
         fp = wf_state_file()
         try:
             os.makedirs(os.path.dirname(fp), exist_ok=True)
+            tree["srvRev"] = wf_state_next_rev(wf_state_srv_rev())
+            text = json.dumps(tree, ensure_ascii=False)
             self.write_atomic(fp, text)
         except Exception as e:
             self.send_json(500, {"ok": False, "error": "备份写入失败：%s" % e})
             return
-        self.send_json(200, {"ok": True, "bytes": len(text.encode("utf-8"))})
+        self.send_json(200, {"ok": True, "bytes": len(text.encode("utf-8")), "rev": tree["srvRev"]})
 
     def log_message(self, fmt, *args):
         line = fmt % args
