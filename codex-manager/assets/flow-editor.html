@@ -259,6 +259,16 @@
 #cv .port-hit { fill:transparent; stroke:none; }
 #cv g[data-node]:hover .port-in, #cv g[data-node]:hover .port-out { r:6; stroke:var(--accent); }
 #cv g[data-node]:hover .port-out { fill:var(--accent); }
+/* v0.27.4 左右两侧的常驻连接点（与整体方向无关）：比主端口小一号、更淡，hover 时同样放大 */
+#cv .port-side { fill:var(--card-bg); stroke:var(--card-port-line); stroke-width:1.3; opacity:.75; }
+#cv .port-side.port-side-out { fill:var(--card-port-line); }
+#cv g[data-node]:hover .port-side { r:5; opacity:1; stroke:var(--accent); }
+#cv g[data-node]:hover .port-side.port-side-out { fill:var(--accent); }
+/* v0.27.4 连接符节点（左连接 / 右连接）：小圆 + 方向字形 + 下方标签 */
+#cv .nd-link { stroke-width:1.6; }
+#cv .nd-linkg { font-size:17px; font-weight:600; pointer-events:none; }
+#cv .nd-linkt { fill:var(--card-title); font-size:11px; pointer-events:none; }
+#cv .nd-link.nd-sel { stroke:var(--node-wire-hl); stroke-width:2.6; }
   #cv .port:hover { stroke:var(--accent); }
   #cv .eg { fill:none; stroke:var(--node-wire); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   #cv .eg-sel { stroke:var(--accent); stroke-width:3; }
@@ -514,6 +524,9 @@
     <button class="small" data-add="cond" data-i18n="＋条件" title="条件节点（是/否 两分支）">＋条件</button>
     <button class="small" data-add="merge" data-i18n="＋合并" title="合并节点（汇合并行分支）">＋合并</button>
     <button class="small" data-add="output" data-i18n="＋输出" title="输出节点（流程终点/交付）">＋输出</button>
+    <button class="small" data-add="link-in" data-i18n="＋左连接" data-i18n-title="左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）" title="左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）">＋左连接</button>
+    <button class="small" data-add="link-out" data-i18n="＋右连接" data-i18n-title="右连接符：贴到当前内容最右侧，并把所有出口节点自动接出（左右双连接点，用作下页续接 / 外部汇出）" title="右连接符：贴到当前内容最右侧，并把所有出口节点自动接出（左右双连接点，用作下页续接 / 外部汇出）">＋右连接</button>
+    <button class="small" data-add="not" data-i18n="＋非门" data-i18n-title="非门（NOT 取反）：圆角节点自动带 NOT 门徽章，校验要求恰好 1 个输入" title="非门（NOT 取反）：圆角节点自动带 NOT 门徽章，校验要求恰好 1 个输入">＋非门</button>
     <button id="btnTpl" data-i18n="＋框架" data-i18n-title="在当前画布插入 输入→Agent→条件→合并→输出 骨架（含反馈修正环），插入到现有内容右侧" title="在当前画布插入 输入→Agent→条件→合并→输出 骨架（含反馈修正环），插入到现有内容右侧">＋框架</button>
     <button id="btnLayout" data-i18n="自动重排">自动重排</button>
     <button id="btnTidy" data-i18n="✨ 一键整理" title="去重连线 + 自动排版">✨ 一键整理</button>
@@ -686,8 +699,14 @@
       <option value="time" data-i18n="🕒 按时间">🕒 按时间</option>
       <option value="load" data-i18n="📈 按活跃度">📈 按活跃度</option>
     </select>
+    <select id="nnLevels" title="显示层级" data-i18n-title="显示层级：可隐藏项目框 / 只留会话与文本，便于近看内容">
+      <option value="all" data-i18n="🗂 全部层级">🗂 全部层级</option>
+      <option value="noProj" data-i18n="🧩 隐藏项目框">🧩 隐藏项目框</option>
+      <option value="flat" data-i18n="▤ 只留会话与文本">▤ 只留会话与文本</option>
+    </select>
     <button id="nnFit" data-i18n="适应视图">适应视图</button>
     <button id="nnRefresh" data-i18n="🔄 重建">🔄 重建</button>
+    <button id="nnExport" data-i18n="⬇ 导出 PNG" data-i18n-title="把当前神经网络视图导出为 PNG（不含图例 / 统计浮层）" title="把当前神经网络视图导出为 PNG（不含图例 / 统计浮层）">⬇ 导出 PNG</button>
   </div>
   <div class="vbody" style="position:relative;padding:0">
     <canvas id="nnCv"></canvas>
@@ -751,7 +770,8 @@
 <dialog id="help">
   <h3 data-i18n="支持与限制">支持与限制</h3>
   <li data-i18n-html="help-mermaid">mermaid 子集：<code>flowchart TD / LR</code>；节点 <code>A[矩形]</code> <code>A{菱形}</code> <code>A(圆角)</code>；连线 <code>--&gt;</code> / <code>-.-&gt;</code> 与标签 <code>--&gt;|文字|</code>；<code>subgraph</code> 分组</li>
-  <li data-i18n-html="help-suffix">标签后缀随 mermaid/JSON/Markdown 携带：<code>⚙IF</code>（八类门）、<code>▸→工作流名</code>（子流程）、<code>◈agent</code>（节点类型：input / agent / map / cond / merge / output）</li>
+  <li data-i18n-html="help-suffix">标签后缀随 mermaid/JSON/Markdown 携带：<code>⚙IF</code>（八类门）、<code>▸→工作流名</code>（子流程）、<code>◈agent</code>（节点类型：input / agent / map / cond / merge / output / link-in 左连接 / link-out 右连接 / not 非门）</li>
+  <li data-i18n-html="help-links">左右连接：每个节点在<b>左右两侧</b>常驻一对连接点（左=输入、右=输出），TD 图里横向相邻的节点也能直接左右连；「＋左连接 / ＋右连接」插入的是<b>连接符节点</b>（小圆），会自动贴到当前内容最左 / 最右，并把现有入口 / 出口节点接上</li>
   <li data-i18n="「＋新建流程框架」一键生成 输入 → Agent → 条件（是/否）→ 合并 → 输出 骨架，含虚线反馈修正环；工具栏六个「＋类型」按钮可随时加节点">「＋新建流程框架」一键生成 输入 → Agent → 条件（是/否）→ 合并 → 输出 骨架，含虚线反馈修正环；工具栏六个「＋类型」按钮可随时加节点</li>
   <li data-i18n="连线：从圆点拖到另一节点新建；拖动连线端点到别的节点 = 改接；红色边 = 反馈环，平行边自动分道；「✨ 一键整理」去重连线并重新排版">连线：从圆点拖到另一节点新建；拖动连线端点到别的节点 = 改接；红色边 = 反馈环，平行边自动分道；「✨ 一键整理」去重连线并重新排版</li>
   <li data-i18n="节点就地编辑：双击节点直接改标签（或选中后按 F2），Enter / 点空白提交，Esc 取消；节点说明（STEP 文档）在右侧属性面板编辑，随 Markdown「节点说明」与 JSON 导出">节点就地编辑：双击节点直接改标签（或选中后按 F2），Enter / 点空白提交，Esc 取消；节点说明（STEP 文档）在右侧属性面板编辑，随 Markdown「节点说明」与 JSON 导出</li>
@@ -799,10 +819,38 @@
 const GATES = ['IF','AND','OR','NOT','NAND','NOR','XOR','XNOR'];
 const GATE_CN = { IF:'IF/ELSE', AND:'AND 全部成立', OR:'OR 任一成立', NOT:'NOT 取反', NAND:'NAND', NOR:'NOR', XOR:'XOR 奇真', XNOR:'XNOR 偶真' };
 // 节点类型（参考 DeepSeek Flow：输入 / Agent / Map Agent / 条件 / 合并 / 输出）
-const KINDS = ['input','output','agent','map','cond','merge'];
-const KIND_CN = { input:'输入', output:'输出', agent:'Agent', map:'Map Agent', cond:'条件', merge:'合并' };
-const KIND_COLOR = { input:'#2563eb', output:'#059669', agent:'#7c3aed', map:'#b45309', cond:'#dc2626', merge:'#0891b2' };
-const KIND_SHAPE = { input:'round', output:'round', cond:'diamond' };
+// v0.27.4：+ 左连接 / 右连接（连接符，左右双端口，用作左右边界续接与汇入汇出）、+ 非门（NOT 取反）
+const KINDS = ['input','output','agent','map','cond','merge','link-in','link-out','not'];
+const KIND_CN = { input:'输入', output:'输出', agent:'Agent', map:'Map Agent', cond:'条件', merge:'合并',
+  'link-in':'左连接', 'link-out':'右连接', not:'非门' };
+const KIND_COLOR = { input:'#2563eb', output:'#059669', agent:'#7c3aed', map:'#b45309', cond:'#dc2626', merge:'#0891b2',
+  'link-in':'#0ea5e9', 'link-out':'#f59e0b', not:'#e11d48' };
+const KIND_SHAPE = { input:'round', output:'round', cond:'diamond', not:'round' };
+// 连接符节点：小圆，**左右两侧常驻连接点**（输入在左、输出在右），与整体方向无关
+const LINK_KINDS = ['link-in','link-out'];
+const LINK_SIZE = 54;                 // 连接符直径（方形盒，画成圆）
+function isLinkKind(k){ return LINK_KINDS.indexOf(String(k == null ? '' : k).toLowerCase()) >= 0; }
+// 逻辑门默认形状：非门画圆角盒（形状可选，用户仍可在属性面板改）
+const KIND_GATE = { not:'NOT' };
+// v0.27.4 标签后缀解析：kind 的候选**由 KINDS 动态生成**，不再硬编码枚举。
+//   旧实现把 (input|output|agent|map|cond|merge) 写死在正则里，新增类型（link-in / link-out / not）
+//   根本匹配不上 → 后缀整段落回 label（"左连接 ◈link-in"），kind 丢失，mermaid 往返即掉类型。
+//   用动态候选表还能保证「未知的 ◈xxx 文本」不被误剥（仍原样留在标签里）。
+const KIND_ALT = KINDS.map(k => String(k).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+const KIND_SUFFIX_RE = new RegExp('^([\\s\\S]*?)(?:\\s*⚙([A-Za-z]+))?(?:\\s*▸→(\\S+?))?(?:\\s*◈(' + KIND_ALT + '))?\\s*$', 'i');
+// v0.27.4 一条连线该走「左右端口」还是「上下端口」（纯函数，可单测）
+//   任一端是连接符 → 左右；LR 图 → 左右；TD 图但两点横向明显拉开且几乎同一高度 → 左右；否则上下
+//   目的：TD 图里横向相邻的节点也能直接左右连，而不是绕一大圈
+function edgeDirFor(dir, a, b){
+  if (isLinkKind(a && a.kind) || isLinkKind(b && b.kind)) return 'LR';
+  if (dir === 'LR') return 'LR';
+  if (!a || !b) return 'TD';
+  const p1 = { x:a.x + a.w/2, y:a.y + a.h }, p2 = { x:b.x + b.w/2, y:b.y };
+  const dx = Math.abs(p2.x - p1.x), dy = Math.abs(p2.y - p1.y);
+  // 「同一行」的判据要跟卡片高度走：两个同 y 的卡片，端口 y 差恰好等于卡片高
+  const dyMax = Math.max(48, 1.4 * Math.min(a.h || 60, b.h || 60));
+  return (dx > 220 && dy < dyMax) ? 'LR' : 'TD';
+}
 // 代码客户端清单（CORE 内共享：分组/协作/神经网络与 UI 都读同一份，避免两处漂移）
 const QA_CLIENTS = { zcode: { label:'ZCode', color:'#2563eb' }, codex: { label:'Codex CLI', color:'#0d9488' }, qoder: { label:'Qoder CLI', color:'#7c3aed' }, gemini: { label:'Gemini (Antigravity)', color:'#ea580c' }, wb: { label:'WorkBuddy', color:'#db2777' }, qwen: { label:'Qwen Code', color:'#ca8a04' }, kimi: { label:'Kimi', color:'#0e7490' } };
 function qaClientInfo(c){ return QA_CLIENTS[c] || QA_CLIENTS.zcode; }
@@ -859,7 +907,7 @@ function fitText(t, maxW){
 
 function splitLabel(raw){
   const s = String(raw == null ? '' : raw);
-  const m = s.match(/^([\s\S]*?)(?:\s*⚙([A-Za-z]+))?(?:\s*▸→(\S+?))?(?:\s*◈(input|output|agent|map|cond|merge))?\s*$/i);
+  const m = s.match(KIND_SUFFIX_RE);   // v0.27.4：kind 候选由 KINDS 动态生成，新增类型同样能往返
   const gate = m && m[2] && GATES.includes(m[2].toUpperCase()) ? m[2].toUpperCase() : '';
   const kind = m && m[4] ? m[4].toLowerCase() : '';
   return { label: (m ? m[1] : s).trim(), gate, subflow: m && m[3] ? m[3] : '', kind };
@@ -875,6 +923,12 @@ function joinLabel(n){
 function sanitizeLabel(s){ return String(s == null ? '' : s).replace(/\\n|\\t|[\r\n\t]+/g, ' '); }
 function sizeNode(n){
   if (typeof n.label === 'string') n.label = sanitizeLabel(n.label);
+  // v0.27.4 连接符节点：固定小圆，不参与卡片三段式布局（无正文 / 无文件名条）
+  if (isLinkKind(n.kind)){
+    n.w = LINK_SIZE; n.h = LINK_SIZE;
+    n.bodyRows = []; n.bodyLines = 0; n.fileLabel = '';
+    return n;
+  }
   n.w = nodeW(n.label);
   // v0.27.0 卡片高度 = 标题区 + 正文（按真实折行行数）+ 文件名条（图3 三段式）
   // v0.27.2：正文行数组在这里算好存下来，渲染直接复用 —— 保证「框高」与「画出来的文字」永远一致，
@@ -3022,7 +3076,6 @@ if (typeof document !== "undefined") var UI = function(){
     '| 技能/工具 | 插件 | 类型 | 调用次数 | 占比 | 最近使用 |': '| Skill / tool | Plugin | Kind | Calls | Share | Last used |',
     // --- 动态文案：属性面板 ---
     '节点属性': 'Node properties', '标签': 'Label', '形状': 'Shape',
-    '类型（输入 / Agent / Map Agent / 条件 / 合并 / 输出）': 'Kind (Input / Agent / Map Agent / Condition / Merge / Output)',
     '节点说明（STEP 文档，随 Markdown/JSON 导出）': 'Node notes (STEP docs; exported with Markdown/JSON)',
     '子流程（虚线节点，双击可跳转）': 'Subflow (dashed node; double-click to jump)',
     '所属分组': 'Group', '删除节点': 'Delete node', '矩形': 'Rectangle', '菱形': 'Diamond', '圆角': 'Rounded',
@@ -3152,8 +3205,31 @@ if (typeof document !== "undefined") var UI = function(){
     '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
     '问答画布': 'Q&A canvas',
     // ---- v0.27.0 文字树图神经网络 / 分布式卡片 / 画布卡片 ----
-    // ---- v0.27.3 神经网络信息增强：着色维度 / 图例 / 小地图 / 统计芯片 / 富 tooltip ----
-    '🎨 按智能体': '🎨 By agent',
+    // ---- v0.27.4 神经网络：层级显隐 / 角色分布 / 导出 PNG ----
+    '🗂 全部层级': '🗂 All levels',
+    '🧩 隐藏项目框': '🧩 Hide project frames',
+    '▤ 只留会话与文本': '▤ Sessions + text only',
+    '显示层级：可隐藏项目框 / 只留会话与文本，便于近看内容': 'Visible levels: hide project frames / keep only sessions and text for a closer read',
+    '⬇ 导出 PNG': '⬇ Export PNG',
+    '把当前神经网络视图导出为 PNG（不含图例 / 统计浮层）': 'Export the current neural-network view as PNG (legend / stat overlays are HTML and not included)',
+    '已导出当前神经网络视图为 PNG': 'Exported the current neural-network view as PNG',
+    '导出失败：': 'Export failed: ',
+    '📊 问 {0} · 答 {1} · 子智能体 {2}': '📊 Q {0} · A {1} · sub-agents {2}',
+    // ---- v0.27.4 画布：左右连接节点 + 非门 + 左右常驻连接点 ----
+    '＋左连接': '＋Link in',
+    '＋右连接': '＋Link out',
+    '＋非门': '＋NOT gate',
+    '左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）': 'Left link: snap to the far left of the current content and auto-connect every entry node (left+right connection points; use as a previous-page continuation / external inflow)',
+    '右连接符：贴到当前内容最右侧，并把所有出口节点自动接出（左右双连接点，用作下页续接 / 外部汇出）': 'Right link: snap to the far right of the current content and auto-connect every exit node (left+right connection points; use as a next-page continuation / external outflow)',
+    '非门（NOT 取反）：圆角节点自动带 NOT 门徽章，校验要求恰好 1 个输入': 'NOT gate (invert): a rounded node that automatically carries the NOT badge; validation requires exactly one input',
+    '类型（输入 / Agent / Map Agent / 条件 / 合并 / 输出 / 左连接 / 右连接 / 非门）': 'Kind (Input / Agent / Map Agent / Condition / Merge / Output / Link in / Link out / NOT gate)',
+    '左连接：外部汇入点（从右侧接出）': 'Link in: external inflow point (wires out from its right side)',
+    '右连接：外部汇出点（从左侧接入）': 'Link out: external outflow point (wires in from its left side)',
+    '左右连接点（横向连线用）': 'Left/right connection point (for horizontal wiring)',
+    '已添加{0}：{1}': 'Added {0}: {1}',
+    '已添加{0}': 'Added {0}',
+    '自动连接 {0} 个节点': 'auto-connected {0} node(s)',
+    // ---- v0.27.3 神经网络信息增强：着色维度 / 图例 / 小地图 / 统计芯片 / 富 tooltip ----    '🎨 按智能体': '🎨 By agent',
     '🕒 按时间': '🕒 By time',
     '📈 按活跃度': '📈 By activity',
     '着色：按智能体': 'Color: by agent',
@@ -3378,9 +3454,11 @@ if (typeof document !== "undefined") var UI = function(){
   };
   const I18N_HTML = {
     'help-mermaid': 'mermaid subset: <code>flowchart TD / LR</code>; nodes <code>A[rect]</code> <code>A{diamond}</code> <code>A(rounded)</code>; edges <code>--&gt;</code> / <code>-.-&gt;</code> with labels <code>--&gt;|text|</code>; <code>subgraph</code> grouping',
-    'help-suffix': 'Label suffixes travel through mermaid/JSON/Markdown: <code>⚙IF</code> (8 gates), <code>▸→workflow</code> (subflow), <code>◈agent</code> (kind: input / agent / map / cond / merge / output)',
+    'help-suffix': 'Label suffixes travel through mermaid/JSON/Markdown: <code>⚙IF</code> (8 gates), <code>▸→workflow</code> (subflow), <code>◈agent</code> (kind: input / agent / map / cond / merge / output / link-in / link-out / not)',
+    'help-links': 'Left/right connections: every node carries a permanent pair of connection points on its <b>left (input) and right (output)</b> sides, so horizontally adjacent nodes in a TD chart can be wired directly; "+Link in / +Link out" insert <b>connector nodes</b> (small circles) that snap to the far left / far right of the current content and auto-connect the existing entry / exit nodes',
   };
-  const KIND_EN = { input:'Input', output:'Output', agent:'Agent', map:'Map Agent', cond:'Condition', merge:'Merge' };
+  const KIND_EN = { input:'Input', output:'Output', agent:'Agent', map:'Map Agent', cond:'Condition', merge:'Merge',
+    'link-in':'Link in', 'link-out':'Link out', not:'NOT gate' };
   const GATE_EN = { IF:'IF/ELSE', AND:'AND (all true)', OR:'OR (any true)', NOT:'NOT (invert)', NAND:'NAND', NOR:'NOR', XOR:'XOR (odd true)', XNOR:'XNOR (even true)' };
   function isEn(){ return LANG === 'en'; }
   function T(s){ if (LANG !== 'en') return s; const d = I18N[s]; return d === undefined ? s : d; }
@@ -3776,11 +3854,22 @@ if (typeof document !== "undefined") var UI = function(){
   }
   function nodeById(id){ return g.nodes.find(n=>n.id===id); }
   // v0.27.0 端口位置（图3）：LR 布局 = 卡片左/右边缘中点；TD 布局 = 上/下边缘中点
-  function anchors(n){
-    return g.dir === 'LR'
+  // 端口锚点：dir 省略时用整体方向；连接符节点**恒定左右**（这是「左右连接节点」的意义所在）
+  function anchors(n, dir){
+    const d = dir || g.dir;
+    if (isLinkKind(n && n.kind))
+      return { out:{x:n.x+n.w, y:n.y+n.h/2}, inn:{x:n.x, y:n.y+n.h/2} };
+    return d === 'LR'
       ? { out:{x:n.x+n.w, y:n.y+n.h/2}, inn:{x:n.x, y:n.y+n.h/2} }
       : { out:{x:n.x+n.w/2, y:n.y+n.h}, inn:{x:n.x+n.w/2, y:n.y} };
   }
+  // v0.27.4 左右两侧的常驻连接点（与整体方向无关）：左=输入、右=输出
+  // 用途：TD 图里的横向相邻节点也能直接左右连；连接符节点只用这一对
+  function sideAnchors(n){
+    return { innL:{x:n.x, y:n.y+n.h/2}, outR:{x:n.x+n.w, y:n.y+n.h/2} };
+  }
+  // 一条连线该走「左右端口」还是「上下端口」——纯逻辑在 __CORE 的 edgeDirFor（可单测）
+  function edgeDirOf(a, b){ return edgeDirFor(g.dir, a, b); }
   // v0.27.0 正交折线（图3）：端口之间走「横—竖—横」直角折线，圆角拐弯，不用曲线
   // v0.27.2：改用 routeOrtho 做**带障碍避让**的通道选择——
   //   此前 midX 固定取两端中点 + 分道偏移，会从中间卡片身上穿过去、或在卡片贴近时折返；
@@ -3788,10 +3877,11 @@ if (typeof document !== "undefined") var UI = function(){
   function edgePath(e, mt){
     const a = nodeById(e.from), b = nodeById(e.to);
     if (!a || !b) return '';
-    const p1 = anchors(a).out, p2 = anchors(b).inn;
+    const edir = edgeDirOf(a, b);
+    const p1 = anchors(a, edir).out, p2 = anchors(b, edir).inn;
     const R = 8;                        // 拐角圆角半径
     const raw = routeOrtho(p1, p2, {
-      dir: g.dir,
+      dir: edir,
       obstacles: g.nodes,
       a: a, b: b,
       laneIdx: (mt && mt.laneIdx) || 0,
@@ -3873,8 +3963,17 @@ if (typeof document !== "undefined") var UI = function(){
       const subCls = n.subflow ? ' nd-sub' : '';
       const cls = 'nd '+shapeCls+subCls+(selOn?' nd-sel':'');
       const R = 8;                            // 卡片圆角（图3 的圆角方卡）
+      const isLink = isLinkKind(n.kind);
       let body = '';
-      if (n.shape === 'diamond'){
+      if (isLink){
+        // v0.27.4 连接符：画成小圆 + 方向字形（◁ 左连接 / ▷ 右连接），圆形即「连接点」
+        const cx = n.x + n.w/2, cy = n.y + n.h/2;
+        const col = KIND_COLOR[n.kind] || '#0ea5e9';
+        const glyph = n.kind === 'link-in' ? '◁' : '▷';
+        body = '<circle class="nd nd-link'+subCls+(selOn?' nd-sel':'')+'" cx="'+cx+'" cy="'+cy+'" r="'+Math.max(8, n.w/2 - 1)+'"' +
+            ' fill="'+col+'" fill-opacity="0.12" stroke="'+col+'"/>' +
+          '<text class="nd-linkg" x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" fill="'+col+'">'+glyph+'</text>';
+      } else if (n.shape === 'diamond'){
         const cx=n.x+n.w/2, cy=n.y+n.h/2;
         body = '<polygon class="'+cls+'" points="'+cx+','+(n.y-4)+' '+(n.x+n.w+6)+','+cy+' '+cx+','+(n.y+n.h+4)+' '+(n.x-6)+','+cy+'"/>';
       } else {
@@ -3896,23 +3995,29 @@ if (typeof document !== "undefined") var UI = function(){
       const kindT = n.kind ? (KIND_CN[n.kind] || n.kind) : '';
       let head = '';
       let tx = n.x + CARD_PAD;
-      if (n.kind){
-        head += '<circle cx="'+(n.x + CARD_PAD + 4)+'" cy="'+(titleY-4)+'" r="3.6" fill="'+(KIND_COLOR[n.kind]||'#64748b')+'"/>';
-        tx = n.x + CARD_PAD + 14;
-      }
-      const titleTxt = fitText((n.subflow ? '▸ ' : '') + String(n.label||''), n.w - (tx - n.x) - CARD_PAD - (n.gate ? 34 : 0));
-      head += '<text class="nd-t" x="'+tx+'" y="'+titleY+'" font-size="12.5">'+escXml(titleTxt)+'</text>';
-      if (n.gate){
-        const gT = String(n.gate);
-        const gw = gT.length * 6.6 + 10;
-        head += '<rect class="badge-r" x="'+(n.x+n.w-CARD_PAD-gw)+'" y="'+(titleY-11)+'" width="'+gw+'" height="14" rx="3"/>' +
-          '<text class="badge-t" x="'+(n.x+n.w-CARD_PAD-gw/2)+'" y="'+(titleY)+'" text-anchor="middle">'+escXml(gT)+'</text>';
+      if (isLink){
+        // 连接符：标签放在圆下方（圆内只有方向字形）
+        head = '<text class="nd-linkt" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h+13)+'" text-anchor="middle">'+
+          escXml(fitText(String(n.label||'')+(n.gate?' ⚙'+n.gate:''), 96))+'</text>';
+      } else {
+        if (n.kind){
+          head += '<circle cx="'+(n.x + CARD_PAD + 4)+'" cy="'+(titleY-4)+'" r="3.6" fill="'+(KIND_COLOR[n.kind]||'#64748b')+'"/>';
+          tx = n.x + CARD_PAD + 14;
+        }
+        const titleTxt = fitText((n.subflow ? '▸ ' : '') + String(n.label||''), n.w - (tx - n.x) - CARD_PAD - (n.gate ? 34 : 0));
+        head += '<text class="nd-t" x="'+tx+'" y="'+titleY+'" font-size="12.5">'+escXml(titleTxt)+'</text>';
+        if (n.gate){
+          const gT = String(n.gate);
+          const gw = gT.length * 6.6 + 10;
+          head += '<rect class="badge-r" x="'+(n.x+n.w-CARD_PAD-gw)+'" y="'+(titleY-11)+'" width="'+gw+'" height="14" rx="3"/>' +
+            '<text class="badge-t" x="'+(n.x+n.w-CARD_PAD-gw/2)+'" y="'+(titleY)+'" text-anchor="middle">'+escXml(gT)+'</text>';
+        }
       }
       // 正文区：多行说明（图3 的卡片中段文字）
       // v0.27.2：直接用 sizeNode 算好的 n.bodyRows —— 框高与文字行数同源，不会再出现
       //   「框里一大片空白」或「文字溢出框」；也不再在正文里回退重复标题。
       let bodyTxt = '';
-      if (n.shape !== 'diamond' && (n.bodyRows || []).length){
+      if (!isLink && n.shape !== 'diamond' && (n.bodyRows || []).length){
         const rows = n.bodyRows;
         const y0 = n.y + Math.min(CARD_HEAD, n.h) + CARD_PAD;
         const isCode = looksLikeCode(rows.join('\n'));
@@ -3922,24 +4027,48 @@ if (typeof document !== "undefined") var UI = function(){
       }
       // 底部文件名条（图3 的 "05-预检通过/STEP.md"）——高度已在 sizeNode 里留好
       let fileTxt = '';
-      if (n.fileLabel){
+      if (!isLink && n.fileLabel){
         fileTxt = '<text class="nd-file" x="'+(n.x+CARD_PAD)+'" y="'+(n.y+n.h-5)+'">'+escXml(fitText(n.fileLabel, n.w - CARD_PAD*2))+'</text>';
       }
       const durMs = durs.get(n.id) || 0;
-      const durTxt = fmtDurMs(durMs, LANG);
+      const durTxt = isLink ? '' : fmtDurMs(durMs, LANG);
       const durHtml = durTxt ? '<text class="nd-dur" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h+12)+'" text-anchor="middle">⏱ '+escXml(durTxt)+'</text>' : '';
       // v0.27.0 端口：左右各一空心圆（图3 的 ◯ 端口）
       // v0.27.2：输入/输出分开样式（空心 / 实心），并加透明大热区（r=10）——
       //   此前两个圆完全一样、半径只有 4.5，既看不出方向也几乎点不中（「点问题」）。
+      // v0.27.4：**左右两侧再加一对常驻连接点**（左=输入、右=输出），与整体方向无关——
+      //   TD 图里的横向相邻节点也能直接左右连，连接符节点只用这一对。
       const a = anchors(n);
       const pi = a.inn, po = a.out;
+      const sa = sideAnchors(n);
       const portTip = T('拖到另一节点的端口即可连线');
+      const sideTip = n.kind === 'link-in' ? T('左连接：外部汇入点（从右侧接出）')
+        : n.kind === 'link-out' ? T('右连接：外部汇出点（从左侧接入）')
+        : T('左右连接点（横向连线用）');
+      let ports = '';
+      if (isLink){
+        ports = '<circle class="port port-in" cx="'+sa.innL.x+'" cy="'+sa.innL.y+'" r="4.5" pointer-events="none"/>' +
+          '<circle class="port port-out" cx="'+sa.outR.x+'" cy="'+sa.outR.y+'" r="4.5" pointer-events="none"/>' +
+          '<circle class="port-hit" cx="'+sa.innL.x+'" cy="'+sa.innL.y+'" r="11" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(sideTip)+'</title></circle>' +
+          '<circle class="port-hit" cx="'+sa.outR.x+'" cy="'+sa.outR.y+'" r="11" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(sideTip)+'</title></circle>';
+      } else {
+        // 主端口（按整体方向）+ 左右常驻连接点；若主端口本身就是左/右，则不重复画
+        const mainIsLR = (anchors(n, 'LR').out.x === po.x);
+        ports =
+          '<circle class="port port-in" cx="'+pi.x+'" cy="'+pi.y+'" r="4" pointer-events="none"/>' +
+          '<circle class="port port-out" cx="'+po.x+'" cy="'+po.y+'" r="4" pointer-events="none"/>' +
+          '<circle class="port-hit" cx="'+pi.x+'" cy="'+pi.y+'" r="10" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(portTip)+'</title></circle>' +
+          '<circle class="port-hit" cx="'+po.x+'" cy="'+po.y+'" r="10" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(portTip)+'</title></circle>';
+        if (!mainIsLR){
+          ports +=
+            '<circle class="port port-side port-side-in" cx="'+sa.innL.x+'" cy="'+sa.innL.y+'" r="3.4" pointer-events="none"/>' +
+            '<circle class="port port-side port-side-out" cx="'+sa.outR.x+'" cy="'+sa.outR.y+'" r="3.4" pointer-events="none"/>' +
+            '<circle class="port-hit" cx="'+sa.innL.x+'" cy="'+sa.innL.y+'" r="9" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(sideTip)+'</title></circle>' +
+            '<circle class="port-hit" cx="'+sa.outR.x+'" cy="'+sa.outR.y+'" r="9" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(sideTip)+'</title></circle>';
+        }
+      }
       return '<g data-node="'+escXml(n.id)+'">' +
-        (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body + head + bodyTxt + fileTxt + durHtml +
-        '<circle class="port port-in" cx="'+pi.x+'" cy="'+pi.y+'" r="4" pointer-events="none"/>' +
-        '<circle class="port port-out" cx="'+po.x+'" cy="'+po.y+'" r="4" pointer-events="none"/>' +
-        '<circle class="port-hit" cx="'+pi.x+'" cy="'+pi.y+'" r="10" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(portTip)+'</title></circle>' +
-        '<circle class="port-hit" cx="'+po.x+'" cy="'+po.y+'" r="10" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(portTip)+'</title></circle></g>';
+        (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body + head + bodyTxt + fileTxt + durHtml + ports + '</g>';
     }).join('');
 
     let overlayHtml = '';
@@ -3948,8 +4077,10 @@ if (typeof document !== "undefined") var UI = function(){
     } else if (mode && mode.kind==='relink' && mode.w){
       const e = g.edges[mode.idx];
       const other = e ? nodeById(mode.end==='from' ? e.to : e.from) : null;
+      const self2 = e ? nodeById(mode.end==='from' ? e.from : e.to) : null;
       if (other){
-        const p = mode.end==='from' ? anchors(other).inn : anchors(other).out;
+        const edir = self2 ? edgeDirOf(self2, other) : g.dir;
+        const p = mode.end==='from' ? anchors(other, edir).inn : anchors(other, edir).out;
         overlayHtml = '<path d="M'+p.x+','+p.y+' L'+mode.w.x+','+mode.w.y+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4,3"/>';
       }
     }
@@ -4064,7 +4195,7 @@ if (typeof document !== "undefined") var UI = function(){
       const wfSel2 = '<option value="">'+escXml(T('（不是子流程）'))+'</option>' + entryNames().map(nm=>'<option value="'+escXml(nm)+'"'+(n.subflow===nm?' selected':'')+'>▸ '+escXml(nm)+'</option>').join('');
       p.innerHTML = '<h4>'+escXml(T('节点属性'))+'</h4><label>ID</label><input type="text" value="'+escXml(n.id)+'" disabled>' +
         '<label>'+escXml(T('标签'))+'</label><textarea id="pLabel">'+escXml(n.label)+'</textarea>' +
-        '<label>'+escXml(T('类型（输入 / Agent / Map Agent / 条件 / 合并 / 输出）'))+'</label><select id="pKind">'+kindSel+'</select>' +
+        '<label>'+escXml(T('类型（输入 / Agent / Map Agent / 条件 / 合并 / 输出 / 左连接 / 右连接 / 非门）'))+'</label><select id="pKind">'+kindSel+'</select>' +
         '<label>'+escXml(T('形状'))+'</label><select id="pShape">'+shapeSel+'</select>' +
         '<label>'+escXml(T('逻辑门'))+'</label><select id="pGate">'+gateSel+'</select>' +
         '<label>'+escXml(T('节点说明（STEP 文档，随 Markdown/JSON 导出）'))+'</label><textarea id="pDoc" style="height:80px">'+escXml(n.doc||'')+'</textarea>' +
@@ -4078,6 +4209,10 @@ if (typeof document !== "undefined") var UI = function(){
         pushHistory();
         n.kind = $('pKind').value;
         if (n.kind && KIND_SHAPE[n.kind] && n.shape !== KIND_SHAPE[n.kind]) n.shape = KIND_SHAPE[n.kind];
+        // v0.27.4：类型自带默认门（非门 → NOT）；换成其它类型时把自动带上的门收回，避免残留
+        if (KIND_GATE[n.kind]) n.gate = KIND_GATE[n.kind];
+        else if (KIND_GATE[n._autoGate]) n.gate = '';
+        n._autoGate = KIND_GATE[n.kind] ? n.kind : '';
         sizeNode(n); render(); syncCode(); markDirty(); renderPanel();
       });
       $('pDoc').addEventListener('focus', pushHistory);
@@ -4202,7 +4337,8 @@ if (typeof document !== "undefined") var UI = function(){
       if (e){
         const w = clientToWorld(ev.clientX, ev.clientY);
         const a = nodeById(e.from), b = nodeById(e.to);
-        const pa = a ? anchors(a).out : null, pb = b ? anchors(b).inn : null;
+        const edir = (a && b) ? edgeDirOf(a, b) : g.dir;
+        const pa = a ? anchors(a, edir).out : null, pb = b ? anchors(b, edir).inn : null;
         const near = p => p && Math.hypot(w.x-p.x, w.y-p.y) < 26; // port 圆点盖住锚点，半径放宽保证捏得住端点
         if (near(pa)) mode = { kind:'relink', idx, end:'from' };
         else if (near(pb)) mode = { kind:'relink', idx, end:'to' };
@@ -4407,16 +4543,60 @@ if (typeof document !== "undefined") var UI = function(){
     setSel({type:'node', id}); syncCode(); markDirty();
     flashNodes([id]);
   });
-  const KIND_LABEL = { input:'输入', output:'输出', agent:'Agent 任务', map:'Map Agent', cond:'是否通过?', merge:'合并' };
-  const KIND_LABEL_EN = { input:'Input', output:'Output', agent:'Agent task', map:'Map Agent', cond:'Pass?', merge:'Merge' };
+  const KIND_LABEL = { input:'输入', output:'输出', agent:'Agent 任务', map:'Map Agent', cond:'是否通过?', merge:'合并',
+    'link-in':'左连接', 'link-out':'右连接', not:'非门（取反）' };
+  const KIND_LABEL_EN = { input:'Input', output:'Output', agent:'Agent task', map:'Map Agent', cond:'Pass?', merge:'Merge',
+    'link-in':'Link in', 'link-out':'Link out', not:'NOT (invert)' };
   function addKindNode(kind){
     const id = newNodeId(g);
     pushHistory();
     const lb = isEn() ? (KIND_LABEL_EN[kind] || 'New node') : (KIND_LABEL[kind] || '新节点');
     const n = upsertNode(g, id, lb, KIND_SHAPE[kind] || 'rect', null);
     n.kind = kind;
+    if (KIND_GATE[kind]){ n.gate = n.gate || KIND_GATE[kind]; n._autoGate = kind; }
     if (kind === 'cond') n.gate = n.gate || 'IF';
     const r = svg.getBoundingClientRect(), w = clientToWorld(r.left + r.width/2, r.top + r.height/2);
+    if (isLinkKind(kind)){
+      // v0.27.4 连接符：贴到当前内容的**最左 / 最右**边界，并自动接上现有入口 / 出口节点
+      sizeNode(n);
+      const others = g.nodes.filter(x => x.id !== id);
+      const linked = [];
+      if (others.length){
+        const deg = {};
+        others.forEach(x => deg[x.id] = { in:0, out:0 });
+        g.edges.forEach(e => { if (deg[e.to]) deg[e.to].in++; if (deg[e.from]) deg[e.from].out++; });
+        // 入口 = 入度为 0；优先接「自身还能往下走」的入口（出度 > 0），避免把孤立悬空节点也接上
+        const pick = (side) => {
+          const zero = others.filter(x => side === 'in' ? deg[x.id].in === 0 : deg[x.id].out === 0);
+          const live = zero.filter(x => side === 'in' ? deg[x.id].out > 0 : deg[x.id].in > 0);
+          return live.length ? live : zero;
+        };
+        if (kind === 'link-in'){
+          const x1 = Math.min.apply(null, others.map(x => x.x));
+          const yc = (Math.min.apply(null, others.map(x => x.y)) + Math.max.apply(null, others.map(x => x.y + x.h))) / 2;
+          n.x = Math.round(x1 - n.w - 130); n.y = Math.round(yc - n.h/2);
+          pick('in').forEach(x => {
+            if (g.edges.some(e => e.from === id && e.to === x.id)) return;
+            g.edges.push({ from:id, to:x.id, label:'', style:'solid' }); linked.push(x.id);
+          });
+        } else {
+          const x2 = Math.max.apply(null, others.map(x => x.x + x.w));
+          const yc = (Math.min.apply(null, others.map(x => x.y)) + Math.max.apply(null, others.map(x => x.y + x.h))) / 2;
+          n.x = Math.round(x2 + 130); n.y = Math.round(yc - n.h/2);
+          pick('out').forEach(x => {
+            if (g.edges.some(e => e.from === x.id && e.to === id)) return;
+            g.edges.push({ from:x.id, to:id, label:'', style:'solid' }); linked.push(x.id);
+          });
+        }
+      } else {
+        n.x = Math.round(w.x - n.w/2); n.y = Math.round(w.y - n.h/2);
+      }
+      setSel({type:'node', id}); syncCode(); markDirty(); flashNodes([id]);
+      toast(linked.length
+        ? tx('已添加{0}：{1}', isEn() ? (KIND_LABEL_EN[kind] || kind) : KIND_LABEL[kind], tx('自动连接 {0} 个节点', linked.length))
+        : tx('已添加{0}', isEn() ? (KIND_LABEL_EN[kind] || kind) : KIND_LABEL[kind]));
+      return;
+    }
     const k = g.nodes.length % 6;
     n.x = Math.round(w.x - n.w/2 + k * 26); n.y = Math.round(w.y - n.h/2 + k * 20);
     setSel({type:'node', id}); syncCode(); markDirty();
@@ -6793,6 +6973,8 @@ if (typeof document !== "undefined") var UI = function(){
   // v0.27.3：智能体过滤（点击图例切换）与着色维度（#nnColor）
   let nnFilterClient = '';
   let nnColorMode = 'client';
+  // v0.27.4：显示层级（#nnLevels）：all 全部 / noProj 隐藏项目框 / flat 只留会话与文本
+  let nnLevel = 'all';
   const NT_STRIPS_FROM_PX = 0.6;    // 每行像素 < 0.6 → 纯色块（code-map STRIPS_FROM_PX）
   const NT_TEXT_FROM_PX = 9.0;      // 每行像素 ≥ 9 → 真实文本（code-map TEXT_FROM_PX）
   const NT_LABEL_BUDGET = 420;      // 每帧标签上限
@@ -6916,6 +7098,8 @@ if (typeof document !== "undefined") var UI = function(){
           client: cid, color: ci.color, canvas: w.name, ts: (w.src && w.src.ts) || 0, proj: grp.project,
           sub: String(ci.label).replace(/ CLI$/, '') + ' · 💬' + turns.length + (nSub2 ? ' · 🤖' + nSub2 : ''),
           lines: lines, children: [], weight: 0, codeLines: 0,
+          // v0.27.4：行角色分布（问 / 答 / 子智能体 / 其它）→ 会话抬头条上的迷你堆叠条
+          roles: lines.reduce((a, l) => { a[ntRoleOf(l)] = (a[ntRoleOf(l)] || 0) + 1; return a; }, { ask:0, ans:0, sub:0, misc:0 }),
           stat: { turns: turns.length, subs: nSub2, lines: 0, ts: (w.src && w.src.ts) || 0, client: cid } };
         // 对话轮作为最内层「代码块」：每个轮 = 一段多行文本（code-map 的 file）
         // 关键：轮的权重 = 它的代码行数，布局时按行数分配高度，
@@ -7224,7 +7408,10 @@ if (typeof document !== "undefined") var UI = function(){
         '<i style="background:' + escXml(ci.color || '#2563eb') + '"></i>' +
         '<b>' + escXml(String(ci.label).replace(/ CLI$/, '')) + '</b><u>' + clients[k] + '</u></div>';
     }).join('');
-    el.innerHTML = '<div class="lgh">' + escXml(modeTxt) + '</div>' + rows +
+    el.innerHTML = '<div class="lgh">' + escXml(modeTxt) + '</div>' +
+      '<div class="lgh" style="font-weight:400;color:var(--muted)">' +
+        escXml(tx('📊 问 {0} · 答 {1} · 子智能体 {2}', s.ask || 0, s.ans || 0, s.subDeclared || 0)) + '</div>' +
+      rows +
       (nnFilterClient ? '<div class="lgr" id="nnLegendReset">' + T('显示全部') + '</div>' : '');
     el.querySelectorAll('.lg[data-cl]').forEach(d => d.addEventListener('click', () => {
       const k = d.getAttribute('data-cl');
@@ -7271,9 +7458,10 @@ if (typeof document !== "undefined") var UI = function(){
     ctx.fillRect(0, 0, mw, mh);
     const B = ntMiniBox();
     if (!B) return;
-    // 逐项目（含会话）铺缩略块：颜色跟随当前着色维度
+    // 逐项目（含会话）铺缩略块：颜色跟随当前着色维度；层级为 flat 时只画会话
     for (const r of st.rects){
       if (r.kind !== 'proj' && r.kind !== 'sess') continue;
+      if (nnLevel === 'flat' && r.kind === 'proj') continue;
       ctx.fillStyle = ntRectColor(r, th);
       ctx.globalAlpha = r.kind === 'proj' ? 0.30 : 0.72;
       const x = B.mx(r.x), y = B.my(r.y);
@@ -7453,7 +7641,9 @@ if (typeof document !== "undefined") var UI = function(){
     // ---------- 1) 先铺父层底色（proj → agent → sess），再画最内层的 turn 内容 ----------
     //    注意顺序：会话底色会覆盖整块区域，必须在 turn 之前画，否则会把 turn 文字擦掉。
     const bgLayers = ['proj', 'agent', 'sess'];
-    for (const layer of bgLayers){
+    // v0.27.4 显示层级：flat 只留会话与文本、noProj 再藏掉项目框（布局不变，只改绘制）
+    const drawLayers = nnLevel === 'flat' ? ['sess'] : nnLevel === 'noProj' ? ['agent', 'sess'] : bgLayers;
+    for (const layer of drawLayers){
       for (const r of st.rects){
         if (r.kind !== layer) continue;
         if (r.x > vx2 || r.y > vy2 || r.x + r.w < vx1 || r.y + r.h < vy1) continue;   // 屏外剔除
@@ -7477,7 +7667,7 @@ if (typeof document !== "undefined") var UI = function(){
       }
     }
     // 边框 + 标题（自外向内：先 proj 后 sess，保证内层边框压在外层之上）
-    for (const layer of ['proj', 'agent', 'sess']){
+    for (const layer of drawLayers){
       for (const r of st.rects){
         if (r.kind !== layer) continue;
         if (r.x > vx2 || r.y > vy2 || r.x + r.w < vx1 || r.y + r.h < vy1) continue;
@@ -7688,6 +7878,21 @@ if (typeof document !== "undefined") var UI = function(){
       ctx.fillStyle = ntRectColor(r, th) || th.accent;
       ctx.fillRect(x, y, Math.max(1.5, Math.min(3, w * 0.02)), h);
     }
+    // v0.27.4 抬头条右侧的「角色分布迷你堆叠条」：问 / 答 / 子智能体 三段占比
+    //   一眼看出这个会话是「问答交替」还是「子智能体密集」；宽度不足或行数太少时不画
+    const roles = r.node && r.node.roles;
+    if (roles && w > 74 && headH >= 8){
+      const a1 = roles.ask || 0, a2 = roles.ans || 0, a3 = roles.sub || 0, tot = a1 + a2 + a3;
+      if (tot > 0){
+        const bw = Math.max(24, Math.min(72, w * 0.26));
+        const bx = x + w - bw - 6, by = y + (headH - 4) / 2;
+        let off = 0;
+        const part = (n2, col) => { if (!n2) return; const sw = bw * n2 / tot; ctx.fillStyle = col; ctx.fillRect(bx + off, by, Math.max(0.8, sw), 4); off += sw; };
+        part(a2, th.dark ? 'rgba(255,255,255,.42)' : 'rgba(0,0,0,.30)');   // 回答正文（中性）
+        part(a1, th.accent || '#2563eb');                                    // 提问（强调色）
+        part(a3, '#7c3aed');                                                 // 子智能体（紫）
+      }
+    }
     ctx.restore();
   }
 
@@ -7872,6 +8077,23 @@ if (typeof document !== "undefined") var UI = function(){
     nnColorMode = $('nnColor').value || 'client';
     renderNnLegend(); ntStartLoop();
   });
+  // v0.27.4：显示层级切换（只影响绘制，不重建树 → 即时生效）
+  if ($('nnLevels')) $('nnLevels').addEventListener('change', () => {
+    nnLevel = $('nnLevels').value || 'all';
+    ntStartLoop();
+  });
+  // v0.27.4：把当前神经网络视图导出为 PNG（画布本体；图例/统计为 HTML 浮层，不含在内）
+  if ($('nnExport')) $('nnExport').addEventListener('click', () => {
+    const cv = $('nnCv');
+    if (!cv) return;
+    try {
+      const a = document.createElement('a');
+      a.href = cv.toDataURL('image/png');
+      a.download = 'neural-net-' + String(WF.active || 'flow').replace(/[\\/:*?"<>|]/g, '_') + '.png';
+      a.click();
+      toast(T('已导出当前神经网络视图为 PNG'));
+    } catch(e){ toast(T('导出失败：') + ((e && e.message) || e)); }
+  });
   // v0.27.3：点击小地图 → 视口飞到该处
   if ($('nnMini')) $('nnMini').addEventListener('click', ev => {
     if (!nnTextState || !nnTextView) return;
@@ -7971,7 +8193,11 @@ if (typeof document !== "undefined") var UI = function(){
     nnStats, ntRoleOf, ntRoleColor, ntShadeOf, ntSpanOf, ntRectColor, ntMiniBox, ntDrawMini, renderNnLegend,
     nnStat: () => (nnTextState && nnTextState.stat) || null,
     nnFilter: () => nnFilterClient, setNnFilter: v => { nnFilterClient = v || ''; renderNn(); },
-    nnColor: () => nnColorMode, setNnColor: v => { nnColorMode = v || 'client'; if ($('nnColor')) $('nnColor').value = nnColorMode; renderNnLegend(); } };
+    nnColor: () => nnColorMode, setNnColor: v => { nnColorMode = v || 'client'; if ($('nnColor')) $('nnColor').value = nnColorMode; renderNnLegend(); },
+    // v0.27.4 测试钩子：显示层级 / 角色分布 / 画布节点类型
+    nnLevel: () => nnLevel, setNnLevel: v => { nnLevel = v || 'all'; if ($('nnLevels')) $('nnLevels').value = nnLevel; ntStartLoop(); },
+    nnDrawLayers: () => (nnLevel === 'flat' ? ['sess'] : nnLevel === 'noProj' ? ['agent', 'sess'] : ['proj', 'agent', 'sess']),
+    isLinkKind, edgeDirFor, edgeDirOf, sideAnchors, KIND_GATE, KINDS: () => KINDS, KIND_CN: () => KIND_CN };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

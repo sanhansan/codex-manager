@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf, isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -34,6 +34,7 @@ const core = await import(pathToFileURL(corePath).href);
   nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText,
   ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows,
   ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf,
+  isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN,
 } = core;
 
 let pass = 0, fail = 0;
@@ -1217,6 +1218,63 @@ t("ntSpanOf：<1 分钟 / 分钟 / 小时 / 天 四档，零跨度返回空单�
   eq(ntSpanOf(0, 3 * 3600000).unit, "hour");
   eq(ntSpanOf(0, 2 * 86400000).unit, "day");
   eq(ntSpanOf(0, 2 * 86400000).n, 2);
+});
+
+// ---------- v0.27.4 画布：左右连接节点 + 非门 ----------
+t("KINDS：新增 link-in / link-out / not 三个类型且有中文名与默认门", () => {
+  okTest(KINDS.indexOf("link-in") >= 0, "含 link-in（左连接）");
+  okTest(KINDS.indexOf("link-out") >= 0, "含 link-out（右连接）");
+  okTest(KINDS.indexOf("not") >= 0, "含 not（非门）");
+  eq(KIND_CN["link-in"], "左连接");
+  eq(KIND_CN["link-out"], "右连接");
+  eq(KIND_CN["not"], "非门");
+  eq(KIND_GATE.not, "NOT", "非门自带 NOT 门");
+  eq(KIND_GATE["link-in"], undefined, "连接符不带门");
+});
+
+t("isLinkKind：只认 link-in / link-out（大小写无关、空值安全）", () => {
+  eq(isLinkKind("link-in"), true);
+  eq(isLinkKind("link-out"), true);
+  eq(isLinkKind("LINK-IN"), true, "大写也认");
+  eq(isLinkKind("input"), false);
+  eq(isLinkKind("not"), false, "非门不是连接符");
+  eq(isLinkKind(""), false);
+  eq(isLinkKind(null), false);
+  eq(isLinkKind(undefined), false);
+});
+
+t("edgeDirFor：连接符一律左右；LR 图左右；TD 横拉开转左右；TD 竖排仍上下", () => {
+  const link = { kind: "link-in", x: 0, y: 0, w: 54, h: 54 };
+  const a = { kind: "agent", x: 0, y: 0, w: 236, h: 60 };
+  const b = { kind: "agent", x: 400, y: 0, w: 236, h: 60 };
+  const c = { kind: "agent", x: 0, y: 400, w: 236, h: 60 };
+  eq(edgeDirFor("TD", link, a), "LR", "任一端是连接符 → 左右");
+  eq(edgeDirFor("TD", a, link), "LR", "另一端是连接符也成立");
+  eq(edgeDirFor("LR", a, c), "LR", "LR 图一律左右");
+  eq(edgeDirFor("TD", a, b), "LR", "TD 图但横向拉开（dx>220 且 dy<48）→ 左右");
+  eq(edgeDirFor("TD", a, c), "TD", "TD 图竖向关系 → 上下");
+  eq(edgeDirFor("TD", null, a), "TD", "缺节点时安全退回上下");
+  eq(edgeDirFor("TD", { kind:"agent", x:0, y:0, w:236, h:60 }, { kind:"agent", x:142, y:0, w:236, h:60 }), "TD",
+    "横拉开但不足阈值（dx=142 < 220）→ 仍上下");
+  eq(edgeDirFor("TD", { kind:"agent", x:0, y:0, w:236, h:120 }, { kind:"agent", x:400, y:0, w:236, h:120 }), "LR",
+    "同一行的高卡片（dy=120 但 ≤1.4×卡高）也算左右");
+  eq(edgeDirFor("TD", { kind:"agent", x:0, y:0, w:236, h:60 }, { kind:"agent", x:400, y:90, w:236, h:60 }), "LR",
+    "错开不足一个卡高仍算同一行");
+});
+
+t("splitLabel/joinLabel：新增类型能往返，未知 ◈文本不被误剥", () => {
+  const lbl = joinLabel({ id: "x", label: "左连接", gate: "", subflow: "", kind: "link-in" });
+  okTest(/◈link-in/.test(lbl), "joinLabel 写出 ◈link-in（实际 " + lbl + "）");
+  const p = splitLabel(lbl);
+  eq(p.kind, "link-in");
+  eq(p.label, "左连接");
+  const n2 = splitLabel("非门（取反） ⚙NOT ◈not");
+  eq(n2.kind, "not"); eq(n2.gate, "NOT"); eq(n2.label, "非门（取反）");
+  eq(splitLabel("右连接 ◈link-out").kind, "link-out");
+  // 回归：旧实现把 kind 写死在正则里，未知后缀会被吞进标签前先被剥掉；现在必须原样保留
+  eq(splitLabel("说明文字 ◈未知类型").kind, "", "未知后缀不当作 kind");
+  eq(splitLabel("说明文字 ◈未知类型").label, "说明文字 ◈未知类型", "未知后缀原样留在标签里");
+  eq(splitLabel("需求 ◈input").kind, "input", "旧的六种类型仍正常");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

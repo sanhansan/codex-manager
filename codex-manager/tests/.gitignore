@@ -1,4 +1,3 @@
 core.extracted.mjs
-_tmp-shots.html
-_tmp-shots-nn-enrich.html
+_tmp-*.html
 _shots/
