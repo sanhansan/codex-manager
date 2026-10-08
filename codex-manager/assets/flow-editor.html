@@ -144,6 +144,20 @@
     border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 90%, transparent); color:var(--ink);
     font:11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing:.02em; }
   .nntip i { display:block; color:var(--muted); font-size:11px; font-style:normal; }
+  /* v0.27.3 神经网络信息增强：小地图（左上，LOD 档位下方，可点击飞视口）+ 智能体图例（左下，点击过滤） */
+  .nnmini { position:absolute; left:10px; top:46px; z-index:7; width:168px; height:104px; border-radius:4px;
+    border:1px solid var(--line); background:color-mix(in srgb, var(--panel) 88%, transparent); cursor:pointer; }
+  .nnlegend { position:absolute; left:10px; bottom:10px; z-index:8; display:flex; flex-direction:column; gap:3px;
+    align-items:flex-start; padding:6px 9px; border-radius:4px; border:1px solid var(--line);
+    background:color-mix(in srgb, var(--panel) 90%, transparent); font-size:11px; color:var(--muted); max-width:250px; }
+  .nnlegend .lgh { font-weight:600; color:var(--ink); font-size:10.5px; letter-spacing:.03em; }
+  .nnlegend .lg { display:flex; align-items:center; gap:5px; cursor:pointer; max-width:100%; }
+  .nnlegend .lg i { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .nnlegend .lg b { font-weight:400; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nnlegend .lg u { text-decoration:none; color:var(--muted); flex-shrink:0; }
+  .nnlegend .lg:hover b { color:var(--accent); }
+  .nnlegend .lg.off { opacity:.38; }
+  .nnlegend .lgr { cursor:pointer; color:var(--accent); font-size:10.5px; }
   .nd-dur { font-size:9px; fill:var(--muted); pointer-events:none; }
   .suboutbox { border:1px dashed var(--line); border-radius:2px; padding:6px 8px; margin:6px 0 2px; }
   #subDlg pre { white-space:pre-wrap; word-break:break-word; max-height:52vh; overflow:auto; font:12.5px/1.55 Consolas,Menlo,monospace; background:var(--canvas); padding:8px 10px; border:1px solid var(--line); border-radius:2px; margin:0 0 8px; }
@@ -667,11 +681,18 @@
       <option value="turns" data-i18n="💬 按对话轮数">💬 按对话轮数</option>
       <option value="even" data-i18n="▦ 等面积">▦ 等面积</option>
     </select>
+    <select id="nnColor" title="着色维度">
+      <option value="client" data-i18n="🎨 按智能体">🎨 按智能体</option>
+      <option value="time" data-i18n="🕒 按时间">🕒 按时间</option>
+      <option value="load" data-i18n="📈 按活跃度">📈 按活跃度</option>
+    </select>
     <button id="nnFit" data-i18n="适应视图">适应视图</button>
     <button id="nnRefresh" data-i18n="🔄 重建">🔄 重建</button>
   </div>
   <div class="vbody" style="position:relative;padding:0">
     <canvas id="nnCv"></canvas>
+    <canvas id="nnMini" class="nnmini" title="小地图：点击跳转视口"></canvas>
+    <div id="nnLegend" class="nnlegend"></div>
     <div id="nnTip" class="nntip"></div>
     <div id="nnHud" class="nnhud"></div>
     <div id="nnLod" class="nnlod"></div>
@@ -2736,6 +2757,81 @@ function ntFocusSetIn(rects, rc){
   });
   return set;
 }
+
+// ---------- v0.27.3 神经网络信息增强：行角色 / 统计 / 着色维度（纯函数，可单测） ----------
+// 代码块内部每一行的角色：问 → 'ask'、子智能体输出 → 'sub'、其余正文 → 'ans'、空行 → 'misc'。
+// 作用：最内层「代码块」左侧色条与条带档配色按角色区分，放大后一眼看出「问 / 答 / 子智能体」。
+function ntRoleOf(line){
+  const s = String(line == null ? '' : line).trim();
+  if (!s) return 'misc';
+  if (/^🤖/.test(s)) return 'sub';
+  if (/^问\s*[:：]/.test(s)) return 'ask';
+  return 'ans';
+}
+// 角色 → 颜色（问=强调色、子智能体=紫、正文=中性）
+function ntRoleColor(role, accent, ink){
+  if (role === 'ask') return accent || '#2563eb';
+  if (role === 'sub') return '#7c3aed';
+  return ink || '#64748b';
+}
+// 神经网络统计：从矩形集合汇总（HUD / 图例 / 断言共用一份口径）
+function nnStats(rects){
+  const c = { proj: 0, agent: 0, sess: 0, turn: 0, lines: 0, sub: 0, subDeclared: 0, chars: 0, ask: 0, ans: 0,
+    tMin: 0, tMax: 0, loadMax: 0, clients: {} };
+  (rects || []).forEach(x => {
+    if (c[x.kind] != null) c[x.kind]++;
+    if (x.kind === 'turn'){
+      const L = (x.lines && x.lines.length) ? x.lines : [];
+      c.lines += L.length || 1;
+      L.forEach(l => {
+        const s = String(l == null ? '' : l);
+        c.chars += s.length;
+        const role = ntRoleOf(s);
+        if (role === 'sub') c.sub++;          // 画面上真实可见的「🤖」行数
+        else if (role === 'ask') c.ask++;
+        else if (role === 'ans') c.ans++;
+      });
+    }
+    if (x.kind === 'sess'){
+      const k = x.client || 'zcode';
+      c.clients[k] = (c.clients[k] || 0) + 1;
+      // 声明式计数：该会话登记的子智能体任务数（与画布上的 🤖 节点数一致）
+      c.subDeclared += ((x.node && x.node.stat && x.node.stat.subs) || 0);
+      const t = (x.node && x.node.ts) || 0;
+      if (t){ if (!c.tMin || t < c.tMin) c.tMin = t; if (t > c.tMax) c.tMax = t; }
+    }
+    if (x.kind === 'agent' || x.kind === 'sess'){
+      const ld = (x.node && x.node.codeLines) || 0;
+      if (ld > c.loadMax) c.loadMax = ld;
+    }
+  });
+  return c;
+}
+// 着色维度 → 颜色：client（按智能体原色）/ time（按时间，冷=早 → 暖=近）/ load（按活跃度，浅 → 深）
+function ntShadeOf(mode, o){
+  o = o || {};
+  const cl = t => t < 0 ? 0 : (t > 1 ? 1 : t);
+  const lerp = (a, b, t) => Math.round(a + (b - a) * cl(t));
+  if (mode === 'time'){
+    const t = (o.tMax > o.tMin && o.ts) ? (o.ts - o.tMin) / (o.tMax - o.tMin) : 0.5;
+    return 'rgb(' + lerp(37, 234, t) + ',' + lerp(99, 88, t) + ',' + lerp(235, 12, t) + ')';
+  }
+  if (mode === 'load'){
+    const t = o.loadMax > 0 ? (o.load || 0) / o.loadMax : 0;
+    return 'rgb(' + lerp(96, 190, t) + ',' + lerp(165, 42, t) + ',' + lerp(250, 42, t) + ')';
+  }
+  return o.color || '#2563eb';
+}
+// 时间跨度：返回 { n, unit }（unit: sec/min/hour/day），文案由 UI 侧按语言拼装
+// 约定：tMax 为 0 表示「没有任何带时间戳的会话」→ 空单位；tMin 允许为 0（最早一条恰为 0 时不影响跨度）
+function ntSpanOf(tMin, tMax){
+  if (!tMax) return { n: 0, unit: '' };
+  const d = Math.max(0, tMax - (tMin || 0));
+  if (d < 60000) return { n: 0, unit: 'sec' };
+  if (d < 3600000) return { n: Math.round(d / 60000), unit: 'min' };
+  if (d < 86400000) return { n: Math.round(d / 3600000 * 10) / 10, unit: 'hour' };
+  return { n: Math.round(d / 86400000 * 10) / 10, unit: 'day' };
+}
 //__CORE_END__
 
 // ---------- 数据注入位（/codex-flow-edit 会把下面这行标记替换为 JSON） ----------
@@ -3056,6 +3152,33 @@ if (typeof document !== "undefined") var UI = function(){
     '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
     '问答画布': 'Q&A canvas',
     // ---- v0.27.0 文字树图神经网络 / 分布式卡片 / 画布卡片 ----
+    // ---- v0.27.3 神经网络信息增强：着色维度 / 图例 / 小地图 / 统计芯片 / 富 tooltip ----
+    '🎨 按智能体': '🎨 By agent',
+    '🕒 按时间': '🕒 By time',
+    '📈 按活跃度': '📈 By activity',
+    '着色：按智能体': 'Color: by agent',
+    '着色：按时间': 'Color: by time',
+    '着色：按活跃度': 'Color: by activity',
+    '显示全部': 'Show all',
+    '🎯 只看 {0} ✕': '🎯 {0} only ✕',
+    '🧠 智能体 {0}': '🧠 Agents {0}',
+    '💬 对话轮 {0}': '💬 Turns {0}',
+    '📄 文本行 {0}': '📄 Text lines {0}',
+    '🤖 子智能体 {0}': '🤖 Sub-agents {0}',
+    '🕒 跨度 {0}': '🕒 Span {0}',
+    '{0} {1}': '{0} {1}',
+    '<1 分钟': '<1 min',
+    '分钟': 'min',
+    '小时': 'h',
+    '天': 'd',
+    '点击跳转该画布': 'Click to jump to this canvas',
+    '点击只显示该智能体': 'Click to show this agent only',
+    '第 {0} 轮 · 共 {1} 行': 'Turn {0} · {1} lines',
+    '双击放大到该块': 'Double-click to zoom into this block',
+    '角色：提问': 'Role: question',
+    '角色：回答正文': 'Role: answer body',
+    '角色：子智能体输出': 'Role: sub-agent output',
+    '角色：空行': 'Role: blank line',
     '项目 / 智能体 / 会话 / 对话轮四层嵌套的文字树图（参考 code-map）：远看是一片密排代码纹理，滚轮放大到「文字档」即可读出真实对话文字，点击会话跳转画布。': 'A four-level nested text treemap (project / agent / session / turn), inspired by code-map: from afar it is a dense field of code texture; zoom until the "text" tier to read real conversation lines; click a session to jump to its canvas.',
     '搜索项目/会话/文字…（Enter 飞下一个）': 'Search project / session / text\u2026 (Enter flies to next)',
     '📏 按文字行数': '📏 By text lines',
@@ -3742,6 +3865,8 @@ if (typeof document !== "undefined") var UI = function(){
     }).join('');
 
     const durs = activeDurs();  // 对话画布：小对话节点徽章（距下一次提问）
+    let clipSeq = 0;            // v0.27.3 标题区 clipPath 的唯一 id 序号（每次 render 重建）
+    const clipDefs = [];        // 所有卡片的 clipPath 汇总到一个 <defs>（不塞进每个 <g>，避免撑大组 bbox）
     const nodesHtml = g.nodes.map(n => {
       const selOn = sel && sel.type==='node' && sel.id===n.id;
       const shapeCls = n.shape==='diamond' ? 'nd-diam' : n.shape==='round' ? 'nd-round' : 'nd-rect';
@@ -3754,18 +3879,16 @@ if (typeof document !== "undefined") var UI = function(){
         body = '<polygon class="'+cls+'" points="'+cx+','+(n.y-4)+' '+(n.x+n.w+6)+','+cy+' '+cx+','+(n.y+n.h+4)+' '+(n.x-6)+','+cy+'"/>';
       } else {
         // 卡片主体 + 标题区分隔线（图3：标题区 / 多行正文 / 底部文件名）
-        // v0.27.2 修复：标题区路径此前走成 (x+w,y) → (x+w-R,y-R) → (x+R,y-R) → (x,y)，
-        // 顶边落在 y-R 上，导致色块**高出卡片上边框 8px**（方框显示问题）。
-        // 现在两侧圆角严格落在卡片顶边 y 上，与 body 的 rx=R 完全吻合。
+        // v0.27.3 修复「画布边缘图像泄露」：标题区此前用 <path> 带**相对弧命令**
+        // （`A8,8 0 0 0 -8,-8`）画圆角，实测该 d 字符串虽语法合法（getBBox 被算成
+        // 245×148 而非 236×26），渲染出的填充多边形会**向左上溢出到画布边缘**。
+        // 现在改为「普通矩形 + clipPath 裁到卡片圆角」——完全不依赖弧命令解析，
+        // 物理上不可能画出卡片之外。
         const headH = Math.min(CARD_HEAD, n.h);
+        const clipId = 'cvhc' + (clipSeq++);
+        clipDefs.push('<clipPath id="'+clipId+'"><rect x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+n.h+'" rx="'+R+'"/></clipPath>');
         body = '<rect class="'+cls+'" x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+n.h+'" rx="'+R+'"/>' +
-          '<path class="nd-head" d="M'+n.x+','+(n.y+headH)+
-            ' L'+(n.x+n.w)+','+(n.y+headH)+
-            ' L'+(n.x+n.w)+','+(n.y+R)+
-            ' A'+R+','+R+' 0 0 0 '+(-R)+','+(-R)+
-            ' L'+(n.x+R)+','+n.y+
-            ' A'+R+','+R+' 0 0 0 '+(-R)+','+R+
-            ' Z"/>' +
+          '<rect class="nd-head" clip-path="url(#'+clipId+')" x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+headH+'"/>' +
           '<line class="nd-headline" x1="'+n.x+'" y1="'+(n.y+headH)+'" x2="'+(n.x+n.w)+'" y2="'+(n.y+headH)+'"/>';
       }
       // 标题区：色点 + 类型/门徽章 + 标题（图3 的顶部小标题）
@@ -3831,7 +3954,8 @@ if (typeof document !== "undefined") var UI = function(){
       }
     }
 
-    world.innerHTML = subsHtml + edgesHtml + nodesHtml + overlayHtml;
+    world.innerHTML = (clipDefs.length ? '<defs>' + clipDefs.join('') + '</defs>' : '')
+      + subsHtml + edgesHtml + nodesHtml + overlayHtml;
   }
 
   function applyView(){
@@ -6666,6 +6790,9 @@ if (typeof document !== "undefined") var UI = function(){
   let nnTextState = null, nnTextView = null, nnTextRaf = 0, nnTextHover = null, nnTextFocus = null;
   let nnTextFps = 0, nnTextFpsT = 0, nnTextDrag = null, nnTextSearch = '', nnTextSearchOn = false;
   let nnTextMatches = [], nnTextMatchAt = -1;
+  // v0.27.3：智能体过滤（点击图例切换）与着色维度（#nnColor）
+  let nnFilterClient = '';
+  let nnColorMode = 'client';
   const NT_STRIPS_FROM_PX = 0.6;    // 每行像素 < 0.6 → 纯色块（code-map STRIPS_FROM_PX）
   const NT_TEXT_FROM_PX = 9.0;      // 每行像素 ≥ 9 → 真实文本（code-map TEXT_FROM_PX）
   const NT_LABEL_BUDGET = 420;      // 每帧标签上限
@@ -6680,6 +6807,15 @@ if (typeof document !== "undefined") var UI = function(){
   const NT_SESS_HEAD_H = 1.0;       // 会话抬头占比（以行高为单位）
   const NT_AGENT_HEAD_H = 1.15;     // 智能体标题条（以行高为单位）
   const NT_PROJ_HEAD_H = 1.6;       // 项目标题栏（以行高为单位）
+  // v0.27.3 时间跨度单位文案（走 T() 取英文；见 I18N 字典）
+  const SPAN_UNIT = { sec: '<1 分钟', min: '分钟', hour: '小时', day: '天' };
+  // v0.27.3 代码块角色文案（tooltip 用）
+  const ROLE_TXT = { ask: '角色：提问', ans: '角色：回答正文', sub: '角色：子智能体输出', misc: '角色：空行' };
+  // 矩形内部行（turn 矩形带 lines；其它取 label）
+  function ntRectLines(r){
+    if (r && r.lines && r.lines.length) return r.lines;
+    return [String((r && r.label) || '')];
+  }
 
   // 会话「对话正文行」：把该会话的**真实问答内容**（问 + 答 + 子智能体输出）逐行铺成 treemap 文本行。
   // v0.27.2 修复三处「一直在重复」的根因：
@@ -6687,9 +6823,15 @@ if (typeof document !== "undefined") var UI = function(){
   //   ② 子智能体一律写死同一句 '  🤖 子智能体执行' → 同句复读；
   //   ③ ntPackRows 会把内容循环续写填满 → 同一句被复制 N 遍。
   // 现在：问题 + 回答 + 子智能体真实描述都进正文；内容不够就少几行，绝不复读。
-  function ntSessionLines(canvasName, list, qaArr){
-    const w = list.find(x => x.name === canvasName);
-    const bare = w && w.src && w.src.session ? qaBare(w.src.session) : '';
+  // v0.27.3 修复：首参既接受画布名、也接受画布对象。
+  // 旧实现只按 name 查 list → 若存在同名画布（如注入的种子画布与对话画布同名），
+  // 会取到没有 src 的那一个，导致该会话在神经网络里一个字都不显示。
+  function ntSessionLines(wOrName, list, qaArr){
+    const w = (wOrName && typeof wOrName === 'object')
+      ? wOrName
+      : (list || []).find(x => x.name === wOrName);
+    if (!w) return [];
+    const bare = (w.src && w.src.session) ? qaBare(w.src.session) : '';
     const qaArr2 = qaArr || [];
     const ofSess = it => bare && qaBare(it.sessionId) === bare;
     const out = [];
@@ -6745,7 +6887,9 @@ if (typeof document !== "undefined") var UI = function(){
   function ntBuildTree(list, qaArr){
     // 面积权重模式（#nnLayout）：lines 按文字行数 / turns 按对话轮数 / even 等面积
     const wmode = ($('nnLayout') && $('nnLayout').value) || 'lines';
-    const L = (list || []).filter(w => w && w.data && w.src && w.src.session);
+    // v0.27.3：按智能体过滤（图例点击）——只保留该客户端（cwd 客户端 id）的会话
+    const L = (list || []).filter(w => w && w.data && w.src && w.src.session
+      && (!nnFilterClient || (w.src.client || 'zcode') === nnFilterClient));
     const groups = groupByProject(L).filter(g => g.convs.length);
     const root = { id: 'root', kind: 'root', label: '全部项目', children: [], weight: 0,
       sub: groups.length + ' 项目 · ' + L.length + ' 对话' };
@@ -6754,7 +6898,8 @@ if (typeof document !== "undefined") var UI = function(){
       const nSub = agents.reduce((a, g) => a + g.subs, 0);
       const pnode = { id: 'p:' + grp.project, kind: 'proj', label: grp.project,
         sub: agents.length + ' 智能体 · ' + grp.convs.length + ' 对话' + (nSub ? ' · 🤖' + nSub : ''),
-        convs: grp.convs.length, children: [], weight: 0, group: grp };
+        convs: grp.convs.length, children: [], weight: 0, group: grp,
+        stat: { agents: agents.length, sess: grp.convs.length, subs: nSub, turns: 0, lines: 0, tMin: 0, tMax: 0 } };
       grp.convs.slice().sort((a, b) => ((a.src && a.src.ts) || 0) - ((b.src && b.src.ts) || 0)).forEach(w => {
         const cid = (w.src && w.src.client) || 'zcode';
         const ci = (typeof QA_CLIENTS !== 'undefined' && QA_CLIENTS[cid]) || { label: cid, color: '#2563eb' };
@@ -6764,13 +6909,14 @@ if (typeof document !== "undefined") var UI = function(){
             client: cid, color: ci.color, proj: grp.project, children: [], weight: 0, convs: 0 };
           pnode.children.push(anode);
         }
-        const lines = ntSessionLines(w.name, list, qaArr);
+        const lines = ntSessionLines(w, list, qaArr);
         const turns = (w.src && w.src.turns) || [];
         const nSub2 = turns.reduce((a, t) => a + ((t.subs || []).length), 0);
         const snode = { id: 's:' + w.name, kind: 'sess', label: String((w.src && w.src.task) || w.name),
           client: cid, color: ci.color, canvas: w.name, ts: (w.src && w.src.ts) || 0, proj: grp.project,
           sub: String(ci.label).replace(/ CLI$/, '') + ' · 💬' + turns.length + (nSub2 ? ' · 🤖' + nSub2 : ''),
-          lines: lines, children: [], weight: 0, codeLines: 0 };
+          lines: lines, children: [], weight: 0, codeLines: 0,
+          stat: { turns: turns.length, subs: nSub2, lines: 0, ts: (w.src && w.src.ts) || 0, client: cid } };
         // 对话轮作为最内层「代码块」：每个轮 = 一段多行文本（code-map 的 file）
         // 关键：轮的权重 = 它的代码行数，布局时按行数分配高度，
         // 这样「一行」在世界坐标里始终 ≈ 1 个行高，放大后才是可读的多行代码（图2）。
@@ -6802,6 +6948,17 @@ if (typeof document !== "undefined") var UI = function(){
           : wmode === 'turns' ? Math.max(1, (s.children || []).length)
           : Math.max(1, s.codeLines || s.lines.length);
         a.weight += s.weight;
+        // v0.27.3：把会话统计累加到智能体 / 项目（标题栏徽章与 tooltip 直接用）
+        if (s.stat){
+          s.stat.lines = Math.max(1, s.codeLines || s.lines.length);
+          a.stat = a.stat || { sess: 0, subs: 0, turns: 0, lines: 0, tMin: 0, tMax: 0 };
+          a.stat.sess++; a.stat.subs += s.stat.subs; a.stat.turns += s.stat.turns; a.stat.lines += s.stat.lines;
+          const ts = s.stat.ts || 0;
+          if (ts){ if (!a.stat.tMin || ts < a.stat.tMin) a.stat.tMin = ts; if (ts > a.stat.tMax) a.stat.tMax = ts; }
+          const ps = pnode.stat;
+          ps.turns += s.stat.turns; ps.lines += s.stat.lines;
+          if (ts){ if (!ps.tMin || ts < ps.tMin) ps.tMin = ts; if (ts > ps.tMax) ps.tMax = ts; }
+        }
       });
       pnode.weight += a.weight;
     });
@@ -6848,7 +7005,7 @@ if (typeof document !== "undefined") var UI = function(){
       .forEach(rc => {
         const p = rc.node;
         if (!p) return;
-        const rec = { kind: 'proj', id: p.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, label: p.label, sub: p.sub, depth: 0, node: p };
+        const rec = { kind: 'proj', id: p.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, label: p.label, sub: p.sub, depth: 0, node: p, stat: p.stat };
         rects.push(rec); p.rect = rc;
         // 项目标题栏：以「行高」为单位换算（保证缩放后视觉一致）
         const lineH = Math.max(1.5, rc.h / Math.max(1, totalLines) * (root.children.length ? 1 : 1));
@@ -6898,6 +7055,7 @@ if (typeof document !== "undefined") var UI = function(){
               // 每个对话轮 = 一段可读代码块（最内层 LOD 的载体）
               rects.push({ kind: 'turn', id: t.id, x: lr.x, y: lr.y, w: lr.w, h: lr.h,
                 label: t.label, lines: seg, rowH: rowH, sub: '', color: snode.color, depth: 3, node: t,
+                role: ntRoleOf(seg[0]), stat: snode.stat,
                 session: snode, canvas: snode.canvas, client: snode.client, proj: snode.proj, sessId: snode.id });
               cy += lr.h;
             });
@@ -6914,7 +7072,8 @@ if (typeof document !== "undefined") var UI = function(){
       const c = rc.node;
       if (!c) return;
       rects.push({ kind: kind, id: c.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, label: c.label, sub: c.sub,
-        color: c.color, depth: kind === 'agent' ? 1 : 2, node: c, canvas: c.canvas, client: c.client });
+        color: c.color, depth: kind === 'agent' ? 1 : 2, node: c, canvas: c.canvas, client: c.client,
+        ts: c.ts || 0, load: c.codeLines || 0, stat: c.stat });
       c.rect = rc;
       if (deeper) deeper(c, rc);
     });
@@ -6936,13 +7095,14 @@ if (typeof document !== "undefined") var UI = function(){
     const tree = ntBuildTree(WF.list, qaItems);
     ntLayoutTree(tree, W, H);
     nnTextState = { tree: tree, W: W, H: H, bw: 0, bh: 0, dpr: 1, born: performance.now(),
-      rects: tree.rects || [], th: ntTheme(), thSig: document.documentElement.getAttribute('data-theme') || '' };
+      rects: tree.rects || [], stat: nnStats(tree.rects || []), th: ntTheme(), thSig: document.documentElement.getAttribute('data-theme') || '' };
     resizeNnCanvas(true);
     nnTextView = { x: 0, y: 0, z: 1, tx: 0, ty: 0, tz: 1, vx: 0, vy: 0, flying: false };
     nnTextHover = null; nnTextFocus = null; nnTextDrag = null;
     ntRunSearch(nnTextSearch);
     ntFitView(true);
     ntUpdateHud();
+    renderNnLegend();
     bindNnEvents();
     ntFrame._laid = 0;
     ntStartLoop();
@@ -6961,10 +7121,12 @@ if (typeof document !== "undefined") var UI = function(){
     const tree = ntBuildTree(WF.list, qaItems);
     ntLayoutTree(tree, W, H);
     nnTextState.tree = tree; nnTextState.W = W; nnTextState.H = H; nnTextState.rects = tree.rects || [];
+    nnTextState.stat = nnStats(nnTextState.rects);
     resizeNnCanvas(true);
     ntRunSearch(nnTextSearch);
     ntFitView(true);
     ntUpdateHud();
+    renderNnLegend();
   }
   function ntTheme(){
     const cs = getComputedStyle(document.documentElement);
@@ -6984,6 +7146,14 @@ if (typeof document !== "undefined") var UI = function(){
     if (force || bw !== nnTextState.bw || bh !== nnTextState.bh || dpr !== nnTextState.dpr){
       nnTextState.bw = bw; nnTextState.bh = bh; nnTextState.dpr = dpr;
       cv.width = Math.round(bw * dpr); cv.height = Math.round(bh * dpr);
+      // v0.27.3 小地图：与主画布同 DPR（CSS 尺寸固定在 .nnmini 里）
+      const mi = $('nnMini');
+      if (mi){
+        const mr = mi.getBoundingClientRect();
+        const mw = Math.max(60, Math.round(mr.width || 168)), mh = Math.max(40, Math.round(mr.height || 104));
+        mi.width = Math.round(mw * dpr); mi.height = Math.round(mh * dpr);
+        nnTextState.mw = mw; nnTextState.mh = mh;
+      }
     }
   }
   // 当前 LOD 档位（色块档 / 条带档 / 文字档）：由当前缩放推算，独立于帧循环，随时可读
@@ -7014,19 +7184,113 @@ if (typeof document !== "undefined") var UI = function(){
   function ntUpdateHud(){
     const hud = $('nnHud');
     if (!hud || !nnTextState) return;
-    const r = nnTextState.rects;
-    const nProj = r.filter(x => x.kind === 'proj').length;
-    const nSess = r.filter(x => x.kind === 'sess').length;
-    const nTurn = r.filter(x => x.kind === 'turn').length;
+    const s = nnTextState.stat || nnStats(nnTextState.rects);
+    const sp = ntSpanOf(s.tMin, s.tMax);
+    const spanTxt = sp.unit ? tx('{0} {1}', sp.n, T(SPAN_UNIT[sp.unit])) : '—';
     const searchChip = nnTextSearchOn ? '<span class="chip2">' + tx('🔎 {0} 命中', nnTextMatches.length) + '</span>' : '';
+    const filterChip = nnFilterClient
+      ? '<span class="chip2" id="nnFilterChip" style="cursor:pointer">' + tx('🎯 只看 {0} ✕', qaClientInfo(nnFilterClient).label.replace(/ CLI$/, '')) + '</span>'
+      : '';
     hud.innerHTML =
-      '<span class="chip2">' + tx('📁 项目 {0}', nProj) + '</span>' +
-      '<span class="chip2">' + tx('🧩 会话 {0}', nSess) + '</span>' +
-      '<span class="chip2">' + tx('💬 文本行 {0}', nTurn) + '</span>' +
-      searchChip +
+      '<span class="chip2">' + tx('📁 项目 {0}', s.proj) + '</span>' +
+      '<span class="chip2">' + tx('🧠 智能体 {0}', s.agent) + '</span>' +
+      '<span class="chip2">' + tx('🧩 会话 {0}', s.sess) + '</span>' +
+      '<span class="chip2">' + tx('💬 对话轮 {0}', s.turn) + '</span>' +
+      '<span class="chip2">' + tx('📄 文本行 {0}', s.lines) + '</span>' +
+      '<span class="chip2">' + tx('🤖 子智能体 {0}', s.subDeclared || 0) + '</span>' +
+      '<span class="chip2">' + tx('🕒 跨度 {0}', spanTxt) + '</span>' +
+      searchChip + filterChip +
       '<span class="chip2" id="nnFps">— fps</span>' +
       '<span class="chip2">' + T('滚轮缩放 · 拖拽平移 · 点击跳转') + '</span>';
+    const fc = $('nnFilterChip');
+    if (fc) fc.addEventListener('click', () => { nnFilterClient = ''; renderNn(); });
     ntUpdateLod();
+  }
+  // v0.27.3 智能体图例（左下）：色点 + 名称 + 会话数；点击 = 只看该智能体，再点 = 取消
+  function renderNnLegend(){
+    const el = $('nnLegend');
+    if (!el || !nnTextState) return;
+    const s = nnTextState.stat || {};
+    const clients = s.clients || {};
+    const keys = Object.keys(clients).sort((a, b) => clients[b] - clients[a]);
+    if (!keys.length){ el.innerHTML = ''; el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    const modeTxt = nnColorMode === 'time' ? T('着色：按时间') : nnColorMode === 'load' ? T('着色：按活跃度') : T('着色：按智能体');
+    const rows = keys.map(k => {
+      const ci = qaClientInfo(k);
+      const off = nnFilterClient && nnFilterClient !== k;
+      // 图例色点始终是「智能体本色」（身份），着色维度只影响画布上的填充（见图例标题）
+      return '<div class="lg' + (off ? ' off' : '') + '" data-cl="' + escXml(k) + '">' +
+        '<i style="background:' + escXml(ci.color || '#2563eb') + '"></i>' +
+        '<b>' + escXml(String(ci.label).replace(/ CLI$/, '')) + '</b><u>' + clients[k] + '</u></div>';
+    }).join('');
+    el.innerHTML = '<div class="lgh">' + escXml(modeTxt) + '</div>' + rows +
+      (nnFilterClient ? '<div class="lgr" id="nnLegendReset">' + T('显示全部') + '</div>' : '');
+    el.querySelectorAll('.lg[data-cl]').forEach(d => d.addEventListener('click', () => {
+      const k = d.getAttribute('data-cl');
+      nnFilterClient = (nnFilterClient === k) ? '' : k;
+      renderNn();
+    }));
+    const rs = $('nnLegendReset');
+    if (rs) rs.addEventListener('click', () => { nnFilterClient = ''; renderNn(); });
+  }
+  // v0.27.3 着色：按当前 #nnColor 维度取矩形颜色（client=智能体原色 / time=时间冷→暖 / load=活跃度浅→深）
+  function ntRectColor(r, th){
+    if (nnColorMode === 'client') return r.color || th.accent;
+    const s = (nnTextState && nnTextState.stat) || {};
+    if (nnColorMode === 'time') return ntShadeOf('time', { ts: r.ts || (r.node && r.node.ts) || 0, tMin: s.tMin, tMax: s.tMax });
+    return ntShadeOf('load', { load: r.load != null ? r.load : ((r.node && r.node.codeLines) || 0), loadMax: s.loadMax });
+  }
+  // 小地图几何：世界包围盒 → 小地图像素（等比 + 内边距）
+  function ntMiniBox(){
+    const st = nnTextState;
+    if (!st) return null;
+    const rs = (st.rects || []).filter(r => r.kind === 'proj');
+    if (!rs.length) return null;
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    rs.forEach(r => { x1 = Math.min(x1, r.x); y1 = Math.min(y1, r.y); x2 = Math.max(x2, r.x + r.w); y2 = Math.max(y2, r.y + r.h); });
+    const mw = st.mw || 168, mh = st.mh || 104, pad = 5;
+    const sc = Math.min((mw - pad * 2) / Math.max(1, x2 - x1), (mh - pad * 2) / Math.max(1, y2 - y1));
+    const ox = (mw - (x2 - x1) * sc) / 2 - x1 * sc, oy = (mh - (y2 - y1) * sc) / 2 - y1 * sc;
+    return { x1, y1, x2, y2, mw, mh, sc, ox, oy,
+      mx: wx => wx * sc + ox, my: wy => wy * sc + oy,
+      wx: mx => (mx - ox) / sc, wy: my => (my - oy) / sc };
+  }
+  // 小地图：整棵树的缩略 + 当前视口框（点击即可把视口飞过去）
+  function ntDrawMini(){
+    const mi = $('nnMini'), st = nnTextState;
+    if (!mi || !st) return;
+    const ctx = mi.getContext('2d');
+    if (!ctx) return;
+    const dpr = st.dpr || 1;
+    const mw = st.mw || 168, mh = st.mh || 104;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const th = st.th || ntTheme();
+    ctx.clearRect(0, 0, mw, mh);
+    ctx.fillStyle = th.dark ? 'rgba(15,23,42,.55)' : 'rgba(255,255,255,.6)';
+    ctx.fillRect(0, 0, mw, mh);
+    const B = ntMiniBox();
+    if (!B) return;
+    // 逐项目（含会话）铺缩略块：颜色跟随当前着色维度
+    for (const r of st.rects){
+      if (r.kind !== 'proj' && r.kind !== 'sess') continue;
+      ctx.fillStyle = ntRectColor(r, th);
+      ctx.globalAlpha = r.kind === 'proj' ? 0.30 : 0.72;
+      const x = B.mx(r.x), y = B.my(r.y);
+      ctx.fillRect(x, y, Math.max(1, r.w * B.sc), Math.max(1, r.h * B.sc));
+    }
+    ctx.globalAlpha = 1;
+    // 当前视口框：世界可见矩形 → 小地图坐标
+    const v = nnTextView;
+    if (v && v.z > 0){
+      const vx1 = (-v.x) / v.z, vy1 = (-v.y) / v.z;
+      const wx2 = (st.bw - v.x) / v.z, wy2 = (st.bh - v.y) / v.z;
+      const rx = B.mx(Math.max(B.x1, vx1)), ry = B.my(Math.max(B.y1, vy1));
+      const rr = B.mx(Math.min(B.x2, wx2)), rb = B.my(Math.min(B.y2, wy2));
+      ctx.strokeStyle = th.accent || '#2563eb';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(rx + 0.5, ry + 0.5, Math.max(2, rr - rx), Math.max(2, rb - ry));
+    }
   }
   function ntFitView(instant){
     if (!nnTextState) return;
@@ -7126,6 +7390,7 @@ if (typeof document !== "undefined") var UI = function(){
       v.x += v.vx; v.y += v.vy; v.tx = v.x; v.ty = v.y; v.vx *= 0.9; v.vy *= 0.9;
     }
     drawNn(now);
+    ntDrawMini();
     const el = $('nnFps');
     if (el && now - (ntFrame._hud || 0) > 500){ ntFrame._hud = now; el.textContent = Math.round(nnTextFps) + ' fps'; ntUpdateLod(); }
   }
@@ -7249,13 +7514,32 @@ if (typeof document !== "undefined") var UI = function(){
         const nm = hoverRect.kind === 'sess' ? (hoverRect.canvas || hoverRect.label)
           : hoverRect.kind === 'turn' ? hoverRect.label
           : hoverRect.label;
+        const sta = (hoverRect.stat || (hoverRect.node && hoverRect.node.stat)) || null;
         const meta = [];
         if (hoverRect.sub) meta.push(hoverRect.sub);
-        if (hoverRect.kind === 'turn') meta.push(T('对话轮') + ' #' + (hoverRect.node && hoverRect.node.line != null ? hoverRect.node.line + 1 : ''));
-        if (z < 0.4) meta.push(T('滚轮放大可读真实文字'));
-        tip.innerHTML = '<b>' + escXml(nm || '') + '</b>' + (meta.length ? '<i>' + escXml(meta.join(' · ')) + '</i>' : '');
+        if (hoverRect.kind === 'proj' && sta){
+          meta.push('🧠 ' + (sta.agents || 0) + ' · 🧩 ' + (sta.sess || 0) + ' · 💬 ' + (sta.turns || 0) + ' · 📄 ' + (sta.lines || 0));
+          const sp = ntSpanOf(sta.tMin, sta.tMax);
+          if (sp.unit) meta.push('🕒 ' + tx('{0} {1}', sp.n, T(SPAN_UNIT[sp.unit])));
+        } else if (hoverRect.kind === 'agent' && sta){
+          meta.push('🧩 ' + (sta.sess || 0) + ' · 💬 ' + (sta.turns || 0) + (sta.subs ? ' · 🤖 ' + sta.subs : ''));
+        } else if (hoverRect.kind === 'sess'){
+          const t2 = (hoverRect.node && hoverRect.node.ts) || 0;
+          meta.push('💬 ' + ((sta && sta.turns) || 0) + ((sta && sta.subs) ? ' · 🤖 ' + sta.subs : '') + ' · 📄 ' + ((sta && sta.lines) || 0));
+          if (t2) meta.push('🕒 ' + fmtWfWhen(t2));
+          meta.push(T('点击跳转该画布'));
+        } else if (hoverRect.kind === 'turn'){
+          const rl = ntRectLines(hoverRect);
+          const nT = hoverRect.node && hoverRect.node.line != null ? hoverRect.node.line + 1 : 0;
+          meta.push(T('第 {0} 轮 · 共 {1} 行').replace('{0}', nT).replace('{1}', rl.length));
+          const rt = ROLE_TXT[hoverRect.role || ntRoleOf(rl[0])];
+          if (rt) meta.push(T(rt));
+          meta.push(z < NT_TEXT_FROM_PX ? T('滚轮放大可读真实文字') : T('双击放大到该块'));
+        }
+        if (hoverRect.kind === 'agent') meta.push(T('点击只显示该智能体'));
+        tip.innerHTML = '<b>' + escXml(nm || '') + '</b>' + (meta.filter(Boolean).length ? '<i>' + escXml(meta.filter(Boolean).join(' · ')) + '</i>' : '');
         tip.style.display = 'block';
-        const tw = 260;
+        const tw = 300;
         tip.style.left = Math.max(4, Math.min(st.bw - tw - 4, X(hoverRect.x))) + 'px';
         tip.style.top = Math.max(4, Y(hoverRect.y) - 6) + 'px';
       }
@@ -7276,10 +7560,10 @@ if (typeof document !== "undefined") var UI = function(){
     } else if (r.kind === 'sess'){
       ntDrawSessionBody(ctx, st, v, th, r, x, y, w, h);
     } else if (r.kind === 'agent'){
-      ctx.fillStyle = ntMix(th.code, r.color || th.accent, th.dark ? 0.16 : 0.07);
+      ctx.fillStyle = ntMix(th.code, ntRectColor(r, th) || th.accent, th.dark ? 0.16 : 0.07);
       ctx.fillRect(x, y, w, h);
     } else if (r.kind === 'proj'){
-      ctx.fillStyle = ntMix(th.canvas, r.color || th.accent, th.dark ? 0.10 : 0.045);
+      ctx.fillStyle = ntMix(th.canvas, ntRectColor(r, th) || th.accent, th.dark ? 0.10 : 0.045);
       ctx.fillRect(x, y, w, h);
     }
     ctx.restore();
@@ -7294,9 +7578,19 @@ if (typeof document !== "undefined") var UI = function(){
     const rowH = h / nL;                            // 每行像素
     const lpx = rowH;                               // 每行像素 = 屏幕行高
     const fs = Math.min(15, Math.max(6, rowH * 0.78));
+    // v0.27.3 角色色条：块首行属于「问 / 答 / 子智能体」→ 左侧 2px 色条（宽块才画）
+    const role = r.role || ntRoleOf(lines[0]);
+    const roleC = ntRoleColor(role, th.accent, th.codeInk);
+    if (w > 14 && h > 3){
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = roleC;
+      ctx.fillRect(x, y, Math.max(1.5, Math.min(2.5, w * 0.02)), h);
+      ctx.restore();
+    }
     if (lpx < NT_STRIPS_FROM_PX){
-      // 纯色块：远看只是一片密色
-      ctx.fillStyle = ntMix(th.code, th.codeInk, th.dark ? 0.55 : 0.35);
+      // 纯色块：远看只是一片密色（按角色轻微偏色，远看也能分出「问 / 答 / 子智能体」的色带）
+      ctx.fillStyle = ntMix(ntMix(th.code, th.codeInk, th.dark ? 0.55 : 0.35), roleC, role === 'ans' ? 0.12 : 0.30);
       ctx.fillRect(x, y + h * 0.18, w, Math.max(0.7, h * 0.55));
       return;
     }
@@ -7309,8 +7603,11 @@ if (typeof document !== "undefined") var UI = function(){
         if (ly > y + h) break;
         const txt = String(lines[li] || '');
         const seed = ntHash(txt);
-        let bx = x + 1, i = 0;
-        ctx.fillStyle = ntMix(th.codeInk, th.code, 0.32);
+        const lr = ntRoleOf(txt);
+        let bx = x + (w > 14 ? 3 : 1), i = 0;
+        ctx.fillStyle = lr === 'ask' ? ntMix(roleC, th.code, 0.30)
+          : lr === 'sub' ? ntMix(roleC, th.code, 0.34)
+          : ntMix(th.codeInk, th.code, 0.32);
         while (bx < x + w - 1.5){
           const rr = ntHash(txt + '#' + i);
           const bl = Math.max(2, ((seed + rr) % 9) + 2) * gap;   // 2~10 字符的宽度
@@ -7339,13 +7636,15 @@ if (typeof document !== "undefined") var UI = function(){
       const ly = y + li * lh;
       if (ly > y + h + 1) break;
       const ty = ly + lh / 2;
+      const txt = String(lines[li] == null ? '' : lines[li]);
       if (noW){
-        ctx.fillStyle = th.dark ? 'rgba(255,255,255,.26)' : 'rgba(0,0,0,.26)';
+        const lr = ntRoleOf(txt);
+        ctx.fillStyle = (lr === 'ask' || lr === 'sub') ? lr === 'sub' ? '#7c3aed' : (th.accent || '#2563eb')
+          : (th.dark ? 'rgba(255,255,255,.26)' : 'rgba(0,0,0,.26)');
         ctx.textAlign = 'right';
         ctx.fillText(String(baseNo + li + 1), x + noW - 5, ty);
         ctx.textAlign = 'left';
       }
-      const txt = String(lines[li] == null ? '' : lines[li]);
       const cont = txt.charAt(0) === ' ' && txt.charAt(1) === ' ';   // 续行降透明度
       if (cont) ctx.globalAlpha = 0.72;
       const toks = ntTokenize(txt);
@@ -7381,12 +7680,12 @@ if (typeof document !== "undefined") var UI = function(){
     // 抬头条高度固定为「一个屏幕行高」量级，不再乘缩放（x/y/w/h 已是屏幕坐标）
     const headH = Math.min(h, Math.max(9, Math.min(15, h * 0.16)));
     if (h > 3){
-      ctx.fillStyle = ntMix(th.code, r.color || th.accent, th.dark ? 0.30 : 0.16);
+      ctx.fillStyle = ntMix(th.code, ntRectColor(r, th) || th.accent, th.dark ? 0.30 : 0.16);
       ctx.fillRect(x, y, w, headH);
     }
-    // 左侧色条（智能体标识）
+    // 左侧色条（智能体标识；着色维度为「按时间 / 按活跃度」时同样跟随）
     if (w > 6){
-      ctx.fillStyle = r.color || th.accent;
+      ctx.fillStyle = ntRectColor(r, th) || th.accent;
       ctx.fillRect(x, y, Math.max(1.5, Math.min(3, w * 0.02)), h);
     }
     ctx.restore();
@@ -7402,7 +7701,7 @@ if (typeof document !== "undefined") var UI = function(){
     const isProj = r.kind === 'proj', isAgent = r.kind === 'agent', isSess = r.kind === 'sess';
     ctx.lineWidth = isProj ? 1.6 : isAgent ? 1.1 : 0.8;
     ctx.strokeStyle = isProj ? ntMix(th.line, th.ink, th.dark ? 0.35 : 0.45)
-      : isAgent ? ntMix(th.line, r.color || th.accent, th.dark ? 0.45 : 0.35)
+      : isAgent ? ntMix(th.line, ntRectColor(r, th) || th.accent, th.dark ? 0.45 : 0.35)
       : ntMix(th.line, th.ink, th.dark ? 0.18 : 0.22);
     ntRoundRect(ctx, x + 0.5, y + 0.5, Math.max(1, w - 1), Math.max(1, h - 1), isProj ? 4 : isSess ? 2 : 3);
     ctx.stroke();
@@ -7420,7 +7719,7 @@ if (typeof document !== "undefined") var UI = function(){
     ctx.beginPath(); ctx.rect(x, y, w, barH); ctx.clip();
     ctx.fillStyle = isProj
       ? (th.dark ? 'rgba(10,14,26,.92)' : 'rgba(17,24,39,.86)')
-      : isAgent ? ntMix(r.color || th.accent, '#000000', th.dark ? 0.35 : 0.15)
+      : isAgent ? ntMix(ntRectColor(r, th) || th.accent, '#000000', th.dark ? 0.35 : 0.15)
       : (th.dark ? 'rgba(22,27,34,.92)' : 'rgba(255,255,255,.9)');
     ctx.globalAlpha = 0.94;
     ctx.fillRect(x, y, w, barH);
@@ -7435,12 +7734,31 @@ if (typeof document !== "undefined") var UI = function(){
       tx = x + 5 + fs * 0.7 + 4;
     }
     const label = r.kind === 'sess' ? String(r.canvas || r.label || '') : String(r.label || '');
-    const maxW = w - (tx - x) - 6;
+    // v0.27.3 标题条右侧统计徽章（语言无关的符号 + 数字）：项目 🧩会话·📄行；会话 💬轮·🤖子；智能体 🧩会话
+    const sta = (r.stat || (r.node && r.node.stat)) || null;
+    let badge = '';
+    if (sta){
+      if (isProj) badge = '🧩' + (sta.sess || 0) + ' · 📄' + (sta.lines || 0);
+      else if (r.kind === 'sess') badge = '💬' + (sta.turns || 0) + (sta.subs ? ' · 🤖' + sta.subs : '');
+      else badge = '🧩' + (sta.sess || 0);
+    }
+    ctx.font = Math.round(Math.max(6.5, fs * 0.92)) + 'px ui-monospace, Menlo, Consolas, monospace';
+    const bw2 = badge ? ctx.measureText(badge).width : 0;
+    const useBadge = badge && bw2 > 0 && (w - bw2 - 16) > 34;
+    const maxW = w - (tx - x) - 6 - (useBadge ? bw2 + 10 : 0);
     ctx.font = (isProj ? '600 ' : '') + Math.round(fs) + 'px system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
-    ctx.fillStyle = (isProj || isAgent) ? '#f3f4f6' : (th.dark ? '#e6edf3' : '#111827');
+    const barInk = (isProj || isAgent) ? '#f3f4f6' : (th.dark ? '#e6edf3' : '#111827');
+    ctx.fillStyle = barInk;
     ctx.fillText(ntFit(ctx, label, maxW), tx, ty);
+    if (useBadge){
+      ctx.font = Math.round(Math.max(6.5, fs * 0.92)) + 'px ui-monospace, Menlo, Consolas, monospace';
+      ctx.textAlign = 'right';
+      ctx.globalAlpha = 0.72;
+      ctx.fillText(badge, x + w - 6, ty);
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
   // 文本像素宽度：优先 measureText，不可用时按等宽字体经验值兜底
@@ -7549,6 +7867,22 @@ if (typeof document !== "undefined") var UI = function(){
 
   // 工具栏 / 缩放按钮 / 搜索框 绑定
   if ($('nnLayout')) $('nnLayout').addEventListener('change', () => { renderNn(); });
+  // v0.27.3：着色维度切换（只影响绘制，不重建树 → 即时生效）
+  if ($('nnColor')) $('nnColor').addEventListener('change', () => {
+    nnColorMode = $('nnColor').value || 'client';
+    renderNnLegend(); ntStartLoop();
+  });
+  // v0.27.3：点击小地图 → 视口飞到该处
+  if ($('nnMini')) $('nnMini').addEventListener('click', ev => {
+    if (!nnTextState || !nnTextView) return;
+    const mi = $('nnMini');
+    const r = mi.getBoundingClientRect();
+    const B = ntMiniBox();
+    if (!B) return;
+    const mx = (ev.clientX - r.left) * ((nnTextState.mw || r.width) / Math.max(1, r.width));
+    const my = (ev.clientY - r.top) * ((nnTextState.mh || r.height) / Math.max(1, r.height));
+    ntFlyTo(B.wx(mx), B.wy(my), nnTextView.tz);
+  });
   if ($('nnRefresh')) $('nnRefresh').addEventListener('click', () => renderNn());
   if ($('nnFit')) $('nnFit').addEventListener('click', () => ntFitView(false));
   if ($('nnFit2')) $('nnFit2').addEventListener('click', () => ntFitView(false));
@@ -7632,7 +7966,12 @@ if (typeof document !== "undefined") var UI = function(){
     // v0.27.2 测试钩子：卡片几何 / 连线路由 / 神经网络正文（供 tests/*.mjs 断言）
     sizeNode, normalize: gg => normalize(gg), cardBodyRows, cardBodyText, ntCardRows, qaTextLines, looksLikeCode,
     routeOrtho, segHitsRect, polylineFree, anchors, edgePath, edgeMeta, refresh: fn => refresh(fn),
-    ntPackRows, ntSessionLines, ntBuildTree2: (l, q) => ntBuildTree(l, q), enrichNodeDocs: () => enrichNodeDocs() };
+    ntPackRows, ntSessionLines, ntBuildTree2: (l, q) => ntBuildTree(l, q), enrichNodeDocs: () => enrichNodeDocs(),
+    // v0.27.3 测试钩子：神经网络统计 / 着色 / 图例 / 小地图 / 过滤
+    nnStats, ntRoleOf, ntRoleColor, ntShadeOf, ntSpanOf, ntRectColor, ntMiniBox, ntDrawMini, renderNnLegend,
+    nnStat: () => (nnTextState && nnTextState.stat) || null,
+    nnFilter: () => nnFilterClient, setNnFilter: v => { nnFilterClient = v || ''; renderNn(); },
+    nnColor: () => nnColorMode, setNnColor: v => { nnColorMode = v || 'client'; if ($('nnColor')) $('nnColor').value = nnColorMode; renderNnLegend(); } };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

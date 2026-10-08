@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -33,6 +33,7 @@ const core = await import(pathToFileURL(corePath).href);
   projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration,
   nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText,
   ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows,
+  ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf,
 } = core;
 
 let pass = 0, fail = 0;
@@ -1145,6 +1146,77 @@ t("routeOrtho：平行边分道产生不同通道", () => {
   const g1 = routeOrtho(p1, p2, { dir: "LR", obstacles: [a, b], a, b, laneIdx: 0, laneCnt: 3 });
   const g2 = routeOrtho(p1, p2, { dir: "LR", obstacles: [a, b], a, b, laneIdx: 1, laneCnt: 3 });
   okTest(g1[1].x !== g2[1].x, "不同道次的通道位置不同");
+});
+
+// ---------- v0.27.3 神经网络信息增强（行角色 / 统计 / 着色 / 时间跨度） ----------
+t("ntRoleOf：问 / 答 / 子智能体 / 空行 四类角色判定", () => {
+  eq(ntRoleOf("问：实现自动评测"), "ask");
+  eq(ntRoleOf("问: 半角冒号也算"), "ask");
+  eq(ntRoleOf("🤖 子智能体输出：已完成"), "sub");
+  eq(ntRoleOf("  "), "misc");
+  eq(ntRoleOf("const a = 1;"), "ans");
+  eq(ntRoleOf("按国家标准打分，59.9 不及格。"), "ans");
+});
+
+t("ntRoleColor：问=强调色、子智能体=紫、正文=中性（缺省兜底）", () => {
+  const accent = "#2563eb", ink = "#64748b";
+  eq(ntRoleColor("ask", accent, ink), accent);
+  eq(ntRoleColor("sub", accent, ink), "#7c3aed");
+  eq(ntRoleColor("ans", accent, ink), ink);
+  eq(ntRoleColor("misc", "", ""), "#64748b", "缺省 accent/ink 时仍有合法颜色");
+});
+
+t("nnStats：聚合项目/智能体/会话/轮/行/子智能体/字符数与时间跨度", () => {
+  const rects = [
+    { kind: "proj", id: "p:甲", x: 0, y: 0, w: 100, h: 100 },
+    { kind: "agent", id: "a:甲:zcode", client: "zcode", node: { codeLines: 5 } },
+    { kind: "sess", id: "s:1", client: "zcode", node: { ts: 1000, stat: { subs: 2 } } },
+    { kind: "sess", id: "s:2", client: "codex", node: { ts: 9000, stat: { subs: 1 } } },
+    { kind: "turn", id: "s:1#0", lines: ["问：甲", "答案正文"] },
+    { kind: "turn", id: "s:1#1", lines: ["🤖 子智能体输出"] },
+    { kind: "turn", id: "s:2#0", lines: ["问：乙"] },
+  ];
+  const s = nnStats(rects);
+  eq(s.proj, 1); eq(s.agent, 1); eq(s.sess, 2); eq(s.turn, 3);
+  eq(s.lines, 4, "文本行 = 各 turn 行数之和");
+  eq(s.ask, 2); eq(s.sub, 1, "画面上可见的 🤖 行数");
+  eq(s.subDeclared, 3, "声明式子智能体任务数 = 各会话 stat.subs 之和");
+  eq(s.ans, 1);
+  eq(s.tMin, 1000); eq(s.tMax, 9000);
+  eq(s.clients.zcode, 1); eq(s.clients.codex, 1);
+  eq(s.loadMax, 5, "活跃度上限取智能体/会话的 codeLines 最大值");
+  okTest(s.chars > 0, "统计了字符数");
+});
+
+t("nnStats：空输入不抛异常且各计数为 0", () => {
+  const s = nnStats(null);
+  eq(s.proj, 0); eq(s.sess, 0); eq(s.turn, 0); eq(s.lines, 0);
+  eq(s.tMin, 0); eq(s.tMax, 0); eq(s.loadMax, 0);
+  eq(Object.keys(s.clients).length, 0);
+});
+
+t("ntShadeOf：client 原样返回；time 早→冷、晚→暖；load 单调变深", () => {
+  eq(ntShadeOf("client", { color: "#123456" }), "#123456");
+  eq(ntShadeOf("client", {}), "#2563eb", "缺色有默认色");
+  const early = ntShadeOf("time", { ts: 0, tMin: 0, tMax: 100 });
+  const late = ntShadeOf("time", { ts: 100, tMin: 0, tMax: 100 });
+  okTest(early !== late, "时间两端颜色不同");
+  const rgb = s => s.match(/\d+/g).map(Number);
+  okTest(rgb(late)[0] > rgb(early)[0], "越晚越暖（红分量上升）");
+  const lo = rgb(ntShadeOf("load", { load: 0, loadMax: 10 }));
+  const hi = rgb(ntShadeOf("load", { load: 10, loadMax: 10 }));
+  okTest(hi[0] > lo[0] && hi[1] < lo[1], "越活跃越深（红升绿降）");
+  eq(ntShadeOf("time", { ts: 0, tMin: 0, tMax: 0 }), ntShadeOf("time", { ts: 5, tMin: 0, tMax: 0 }), "跨度为零时取恒定中值");
+});
+
+t("ntSpanOf：<1 分钟 / 分钟 / 小时 / 天 四档，零跨度返回空单位", () => {
+  eq(ntSpanOf(0, 0).unit, "");
+  eq(ntSpanOf(1000, 1000).unit, "sec");
+  eq(ntSpanOf(0, 5 * 60000).unit, "min");
+  eq(ntSpanOf(0, 5 * 60000).n, 5);
+  eq(ntSpanOf(0, 3 * 3600000).unit, "hour");
+  eq(ntSpanOf(0, 2 * 86400000).unit, "day");
+  eq(ntSpanOf(0, 2 * 86400000).n, 2);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

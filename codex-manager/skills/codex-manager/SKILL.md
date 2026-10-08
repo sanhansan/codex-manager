@@ -44,6 +44,20 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
 - **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
 
+**v0.27.3 关键行为**（画布**边缘图像泄露**修复 + 神经网络**信息增强**；用户诉求原文「画布边界问题导致泄露，神经网络再丰富一些」）：
+
+- **画布边缘图像泄露（根因：SVG 相对弧命令）**：卡片标题区旧实现用 `<path>` 画圆角，d 串里混了**相对弧命令** `A R,R 0 0 0 -R,-R`（终点相对当前点）。该 d 串**语法合法、不报错**，但 `getBBox()` 量出 **245×148**（卡片真实只有 **236×26**），填充多边形**溢出卡片、在画布左侧边缘留下斜切色块**。修复：改为「普通矩形 + `clipPath` 裁到卡片圆角」——每次 `render()` 用自增序号生成唯一 `cvhcN` id（`clipSeq`），`<rect class="nd-head" clip-path="url(#cvhcN)">` 落在 `y..y+headH`，物理上不可能画出卡片外。**排查要点**：这类「无报错的几何错位」用 `getBBox()` 对账是唯一可靠手段，`tests/diag-*.mjs` 系列就是为此写的。
+- **同名画布导致神经网络整块空白**：`ntSessionLines` 原为 `(canvasName, list, qaArr)` 且只 `list.find(x => x.name === canvasName)`；当存在**同名但无 `src`** 的画布（命令注入的种子画布 vs 从会话生成的对话画布）时会命中错的那个 → 该会话**一个字都不显示**。现在首参**同时接受画布名与画布对象**（`typeof wOrName === 'object'` 分支），`ntBuildTree` 直接传 `w`。e2e 有专项回归（插入同名无 src 画布后仍须有正文）。
+- **着色维度 `#nnColor`**：`client`（默认，智能体本色）/ `time`（冷=早 → 暖=近）/ `load`（浅 → 深）。**只重绘不重建树**（`nnColorMode` 全局 + `ntRectColor(r, th)` 统一取色），作用于智能体底色/边框、会话抬头条与左侧色条、小地图缩略块；图例色点**始终**用智能体本色（身份），模式只写在图例标题行。
+- **智能体图例 `#nnLegend`**（左下）：由 `nnTextState.stat.clients` 生成，色点 + 名称 + 会话数；点击 = `nnFilterClient = client` → `renderNn()`，再点取消；过滤态 HUD 追加 `🎯 只看 X ✕` 芯片（点击复位）且图例出现 `#nnLegendReset`「显示全部」。过滤在 `ntBuildTree` 的最前面按 `w.src.client` 生效。
+- **小地图 `#nnMini`**（左上，`.nnlod` 下方；**独立 canvas**，避免与主画布 pointer 事件互相干扰）：`ntMiniBox()` 把 `proj` 层包围盒等比映射到小地图，`ntDrawMini()` 每帧画「项目/会话缩略块（颜色跟随着色维度）+ 当前视口框」；点击 → `ntFlyTo(B.wx(mx), B.wy(my), tz)`。尺寸随 DPR 在 `resizeNnCanvas()` 里一起设置（`nnTextState.mw/mh`）。
+- **统计 HUD** 3 → 8 芯片：📁项目 / 🧠智能体 / 🧩会话 / 💬对话轮 / 📄文本行 / 🤖子智能体 / 🕒跨度 / fps（口径统一来自 `nnStats(rects)`，存于 `nnTextState.stat`）。
+- **富 tooltip**：`proj` → `🧠智能体 · 🧩会话 · 💬轮 · 📄行` + 时间跨度；`sess` → `💬轮 · 🤖子 · 📄行` + `fmtWfWhen(ts)` + 「点击跳转该画布」；`turn` → 「第 N 轮 · 共 M 行」+ **行角色** + 放大提示；`agent` → 「点击只显示该智能体」。注意 `turn` 的命中优先级高于 `sess`，要悬停到**会话抬头条**（顶部 ~10px）才会命中 `sess`。
+- **标题条统计徽章**（语言无关符号 + 数字，无需 i18n）：`proj` → `🧩会话 · 📄行`；`sess` → `💬轮 · 🤖子`；`agent` → `🧩会话`。徽章先测量再参与 `maxW` 预算，宽度不够时自动不画，不会与标题重叠。
+- **代码块角色色条**：`ntRoleOf(line)` → `ask`（`^问\s*[:：]`）/ `sub`（`^🤖`）/ `ans` / `misc`；布局时写入 `turn.role`，绘制时左侧 2px 色条、纯色块档 `ntMix(..., roleC, 0.30)` 偏色、条带档**逐行**配色、文字档**行号**按角色着色（`ntRoleColor`）。
+- **`__CORE` 新增纯函数**：`ntRoleOf` / `ntRoleColor` / `nnStats` / `ntShadeOf` / `ntSpanOf`。
+- **视觉验收脚本 `tests/shots-nn-enrich.mjs`**：**file:// + PAYLOAD 注入，绝不连本地服务**——直接对 8380 跑截图脚本会把样例画布 **POST 进 `~/.zcode/codex-manager/wf-backup.json`**（本版踩过并已手工清理，备份留在工作区）。输出 6 张图：总览 / 条带档角色色条 / 文字档角色行号 / 按时间 / 按活跃度 / 图例过滤。
+
 **v0.27.2 关键行为**（画布 UI 四项修复 + 神经网络写入**具体问答**；这一版解决的是「一直在重复标题、重复一句话」以及线条/方框/端口四类手感问题）：
 
 - **神经网络复读的三个根因（叠加起来才显得那么糟，缺一不可）**

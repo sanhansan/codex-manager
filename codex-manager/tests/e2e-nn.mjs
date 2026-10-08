@@ -471,6 +471,132 @@ ok(dist.curName === "画布-项目乙-主", "当前画布被标记 wfcur（实�
 ok(!/问答画布/.test(dist.text), "卡片标题不再出现「问答画布」");
 ok(dist.titles.some(t => /登录接口|评审登录|统计报表/.test(t)), "卡片标题取真实对话题目（来自问答记录）： " + dist.titles.slice(0, 4).join(" / "));
 ok(dist.curTitle && /统计报表/.test(dist.curTitle), "当前卡片标题为真实对话题目（" + dist.curTitle + "）");
+// ========== v0.27.3 神经网络信息增强：统计 HUD / 图例过滤 / 着色维度 / 小地图 / 富 tooltip / 标题徽章 ==========
+await page.evaluate(() => { window.__flow.showView("nn"); });
+await page.waitForTimeout(700);
+const enr = await page.evaluate(() => {
+  const F = window.__flow, st = F.nnTextState();
+  const stat = F.nnStat();
+  const hud = (document.getElementById("nnHud") || {}).textContent || "";
+  const legend = document.getElementById("nnLegend");
+  const legendChips = legend ? [...legend.querySelectorAll(".lg[data-cl]")].map(e => ({
+    cl: e.dataset.cl, txt: e.textContent.trim(), off: e.classList.contains("off") })) : [];
+  const colorSel = document.getElementById("nnColor");
+  const mini = document.getElementById("nnMini");
+  const proj = st.rects.filter(r => r.kind === "proj");
+  const sess = st.rects.filter(r => r.kind === "sess");
+  const turn = st.rects.filter(r => r.kind === "turn");
+  return {
+    stat: stat, hud: hud, legendChips: legendChips, colorOpts: colorSel ? colorSel.options.length : 0,
+    miniW: mini ? mini.width : 0, miniH: mini ? mini.height : 0,
+    projStat: proj.filter(r => r.stat).length, projN: proj.length,
+    sessStat: sess.filter(r => r.stat).length, sessN: sess.length,
+    turnRole: turn.filter(r => r.role).length, turnN: turn.length,
+    roleKinds: [...new Set(turn.map(r => r.role))],
+    miniBox: !!F.ntMiniBox(),
+    cclient: (function(){ const old = F.nnColor(); F.setNnColor("client");
+      const c = F.ntRectColor(sess[0] || {}, F.nnTextState().th); F.setNnColor(old); return c; })(),
+    ctime: (function(){ const old = F.nnColor(); F.setNnColor("time");
+      const c = F.ntRectColor(sess[0] || {}, F.nnTextState().th); F.setNnColor(old); return c; })(),
+    cload: (function(){ const old = F.nnColor(); F.setNnColor("load");
+      const c = F.ntRectColor(sess[0] || {}, F.nnTextState().th); F.setNnColor(old); return c; })(),
+  };
+});
+ok(enr.stat && enr.stat.proj > 0 && enr.stat.sess > 0, "神经网络统计：项目/会话计数可用（" + (enr.stat ? enr.stat.proj + " 项目 / " + enr.stat.sess + " 会话" : "无") + "）");
+ok(enr.stat && enr.stat.turn > 0 && enr.stat.lines > 0, "神经网络统计：对话轮 / 文本行统计可用（" + (enr.stat ? enr.stat.turn + " 轮 / " + enr.stat.lines + " 行" : "无") + "）");
+ok(enr.stat && enr.stat.clients && Object.keys(enr.stat.clients).length >= 2, "神经网络统计：按智能体计数覆盖多个客户端");
+ok(/智能体/.test(enr.hud) && /对话轮/.test(enr.hud) && /跨度/.test(enr.hud), "HUD 新增「智能体 / 对话轮 / 跨度」芯片");
+ok(/子智能体/.test(enr.hud), "HUD 显示子智能体数量芯片");
+ok(enr.legendChips.length >= 2, "智能体图例渲染出 ≥2 个客户端芯片（实际 " + enr.legendChips.length + "）");
+ok(enr.colorOpts === 3, "着色维度下拉有 3 个选项（按智能体 / 按时间 / 按活跃度）");
+ok(enr.miniW > 0 && enr.miniH > 0 && enr.miniBox, "小地图 canvas 已按 DPR 尺寸化且几何可用");
+ok(enr.projStat === enr.projN && enr.projN > 0, "项目矩形全部挂载统计（" + enr.projStat + "/" + enr.projN + "）");
+ok(enr.sessStat === enr.sessN && enr.sessN > 0, "会话矩形全部挂载统计（" + enr.sessStat + "/" + enr.sessN + "）");
+ok(enr.turnRole === enr.turnN && enr.turnN > 0, "对话轮矩形全部带角色标记（" + enr.turnRole + "/" + enr.turnN + "）");
+ok(enr.roleKinds.indexOf("ask") >= 0, "角色标记包含「问」（" + enr.roleKinds.join("/") + "）");
+ok(enr.ctime !== enr.cclient && enr.cload !== enr.cclient, "着色维度「按时间 / 按活跃度」与原色不同（即时生效）");
+
+// 图例点击 → 过滤为单一智能体；再点 → 取消
+const nnFiltered = await page.evaluate(async () => {
+  const F = window.__flow;
+  const before = F.nnTextState().stat;
+  const chip = document.querySelector("#nnLegend .lg[data-cl]");
+  const cl = chip && chip.dataset.cl;
+  chip.click();
+  await new Promise(r => setTimeout(r, 260));
+  const after = F.nnTextState().stat;
+  const only = F.nnFilter();
+  const legendNow = [...document.querySelectorAll("#nnLegend .lg[data-cl]")];
+  const hasReset = !!document.getElementById("nnLegendReset");
+  // 复位
+  const rs = document.getElementById("nnLegendReset");
+  if (rs) rs.click();
+  await new Promise(r => setTimeout(r, 260));
+  const back = F.nnTextState().stat;
+  return { cl, only, hasReset, sessBefore: before.sess, sessAfter: after.sess, sessBack: back.sess,
+    clientsAfter: Object.keys(after.clients || {}).length, clientsBack: Object.keys(back.clients || {}).length };
+});
+ok(nnFiltered.only && nnFiltered.only === nnFiltered.cl, "点击图例后进入单智能体过滤（" + nnFiltered.only + "）");
+ok(nnFiltered.clientsAfter === 1, "过滤后只剩 1 个客户端的会话（实际 " + nnFiltered.clientsAfter + "）");
+ok(nnFiltered.sessAfter <= nnFiltered.sessBefore, "过滤后会话数不增加（" + nnFiltered.sessBefore + " → " + nnFiltered.sessAfter + "）");
+ok(nnFiltered.hasReset, "过滤态出现「显示全部」复位入口");
+ok(nnFiltered.clientsBack >= 2 && nnFiltered.sessBack === nnFiltered.sessBefore, "复位后恢复全部客户端与会话数（" + nnFiltered.sessBack + "）");
+
+// 悬停会话矩形 → tooltip 富信息（含跳转提示）；悬停对话轮 → 角色/轮次信息
+const tipHtml = await page.evaluate(async () => {
+  const F = window.__flow;
+  F.showView("nn");
+  await new Promise(r => setTimeout(r, 400));
+  const st = F.nnTextState(), v = F.nnTextView();
+  const hover = async (rc, px, py) => {
+    // 相机直接落到目标（绕开 NT_FLY_K 缓动），再按世界→屏幕映射派发 pointermove
+    const scale = Math.max(2, Math.min(60, 240 / Math.max(40, rc.w)));
+    v.tz = scale; v.tx = st.bw / 2 - (rc.x + rc.w / 2) * scale; v.ty = st.bh / 2 - (rc.y + rc.h / 2) * scale;
+    v.z = scale; v.x = v.tx; v.y = v.ty; v.tz = scale; v.flying = false;
+    await new Promise(r2 => setTimeout(r2, 120));
+    const cv = document.getElementById("nnCv");
+    const r0 = cv.getBoundingClientRect();
+    const sx = r0.left + (rc.x + px) * v.z + v.x;
+    const sy = r0.top + (rc.y + py) * v.z + v.y;
+    cv.dispatchEvent(new PointerEvent("pointermove", { clientX: sx, clientY: sy, bubbles: true }));
+    await new Promise(r2 => setTimeout(r2, 220));
+    const t = document.getElementById("nnTip");
+    const hit = F.nnHitTest(sx - r0.left, sy - r0.top);
+    return { disp: t ? t.style.display : "", html: t ? t.innerHTML : "", kind: hit ? hit.kind : "" };
+  };
+  const s = st.rects.filter(r => r.kind === "sess")[0];
+  // 会话矩形顶部 2px 是「抬头条」，不会被内部 turn 覆盖 → 命中 sess
+  const sessTip = await hover(s, s.w / 2, Math.min(3, Math.max(1, s.h * 0.1)));
+  const t0 = st.rects.filter(r => r.kind === "turn" && r.h > 2)[0];
+  const turnTip = await hover(t0, t0.w / 2, t0.h / 2);
+  return { sessTip: sessTip, turnTip: turnTip };
+});
+ok(tipHtml.sessTip.kind === "sess", "会话抬头条命中会话矩形（实际 " + tipHtml.sessTip.kind + "）");
+ok(tipHtml.sessTip.disp === "block" && /点击跳转该画布/.test(tipHtml.sessTip.html), "悬停会话 → tooltip 提示「点击跳转该画布」");
+ok(/💬/.test(tipHtml.sessTip.html) && /📄/.test(tipHtml.sessTip.html), "会话 tooltip 展示轮数 / 文本行等富信息");
+ok(tipHtml.turnTip.kind === "turn" && /第 \d+ 轮/.test(tipHtml.turnTip.html), "悬停对话轮 → tooltip 展示「第 N 轮 · 共 M 行」");
+ok(/角色：/.test(tipHtml.turnTip.html), "对话轮 tooltip 展示行角色（问 / 回答正文 / 子智能体输出）");
+
+// v0.27.3 回归：存在「同名但无 src」的画布时，神经网络不得丢失该会话正文
+// （旧实现 ntSessionLines 只按 name 在 list 里 find，会命中同名种子画布 → 整块空白）
+const dupName = await page.evaluate(async () => {
+  const F = window.__flow, WF = F.wf();
+  const conv = WF.list.find(w => w.src && w.src.session);
+  const decoy = { name: conv.name, data: { name: conv.name, dir: "TD", nodes: [], edges: [], subs: [] } };
+  WF.list.unshift(decoy);                       // 同名且排在最前 → 旧实现必然命中它
+  F.renderNn();
+  await new Promise(r => setTimeout(r, 600));
+  const st = F.nnTextState();
+  const turns = st.rects.filter(r => r.kind === "turn" && (r.lines || []).length);
+  const lines = st.stat ? st.stat.lines : 0;
+  WF.list.splice(WF.list.indexOf(decoy), 1);    // 复原
+  F.renderNn();
+  await new Promise(r => setTimeout(r, 400));
+  return { turns: turns.length, lines: lines };
+});
+ok(dupName.turns > 0 && dupName.lines > 0,
+  "同名（无 src）画布存在时神经网络仍有正文（" + dupName.turns + " 块 / " + dupName.lines + " 行）");
+
 // ---------- 收尾：汇总 + 释放浏览器（缺这段会让进程挂在打开的浏览器上不退出） ----------
 if (errs.length) console.log("\n页面错误：\n  " + errs.slice(0, 8).join("\n  "));
 console.log("\n" + pass + " passed, " + fail + " failed" + (errs.length ? " , " + errs.length + " page errors" : ""));
