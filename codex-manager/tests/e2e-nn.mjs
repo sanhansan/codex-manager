@@ -597,6 +597,101 @@ const dupName = await page.evaluate(async () => {
 ok(dupName.turns > 0 && dupName.lines > 0,
   "同名（无 src）画布存在时神经网络仍有正文（" + dupName.turns + " 块 / " + dupName.lines + " 行）");
 
+// ========== v0.27.6 分布工作区：拖动调整 / 新建项目 / 删除 / 一键加入神经网络 ==========
+await page.evaluate(() => { window.__flow.showView("dist"); });
+await page.waitForTimeout(500);
+const distUi = await page.evaluate(() => ({
+  newWf: !!document.getElementById("btnNewWf2"),
+  newProj: !!document.getElementById("btnNewProj"),
+  nnAll: !!document.getElementById("btnNnAll"),
+  cards: [...document.querySelectorAll("#wfGrid .wfcard[data-card]")].map(c => ({
+    name: c.dataset.card, draggable: c.getAttribute("draggable") === "true", nn: !!c.querySelector("[data-nn]"),
+    proj: (c.closest(".pfgroup") || {}).dataset ? c.closest(".pfgroup").dataset.proj : "",
+  })),
+}));
+ok(distUi.newWf && distUi.newProj && distUi.nnAll, "分布工作区头部新增「＋新建画布 / ＋新建项目 / 🧠 全部加入神经网络」");
+ok(distUi.cards.length >= 3, "分布工作区渲染出卡片（实际 " + distUi.cards.length + "）");
+ok(distUi.cards.every(c => c.draggable), "所有卡片都可拖动（draggable=true）");
+ok(distUi.cards.every(c => c.nn), "每张卡片都有 🧠 神经网络开关");
+
+// —— 🧠 一键加入 / 移出神经网络：移出后该会话从神经网络里消失 ——
+const nnToggle = await page.evaluate(async () => {
+  const F = window.__flow;
+  const before = F.nnTextState() ? F.nnTextState().stat.sess : 0;
+  const name = F.wf().list.find(w => w.src && w.src.session && w.nnOn !== false).name;
+  F.showView("nn"); F.renderNn(); await new Promise(r => setTimeout(r, 600));
+  const mid = F.nnTextState().stat.sess;
+  F.showView("dist"); F.toggleNnCard(name); await new Promise(r => setTimeout(r, 300));
+  F.showView("nn"); F.renderNn(); await new Promise(r => setTimeout(r, 600));
+  const off = F.nnTextState().stat.sess;
+  F.showView("dist"); F.toggleNnCard(name); await new Promise(r => setTimeout(r, 300));
+  F.showView("nn"); F.renderNn(); await new Promise(r => setTimeout(r, 600));
+  const back = F.nnTextState().stat.sess;
+  const flag = F.wf().list.find(w => w.name === name).nnOn;
+  F.showView("dist"); await new Promise(r => setTimeout(r, 300));
+  return { name: name, mid: mid, off: off, back: back, flag: flag };
+});
+ok(nnToggle.off === nnToggle.mid - 1, "「移出神经网络」后该会话从神经网络消失（" + nnToggle.mid + " → " + nnToggle.off + "）");
+ok(nnToggle.back === nnToggle.mid, "再点一次可加回神经网络（" + nnToggle.back + "）");
+ok(nnToggle.flag !== false, "加回后 nnOn 不再是 false");
+
+// —— ＋新建项目 / 拖动改归属 / 拖动排序 / 删除空项目 ——
+const proj = await page.evaluate(async () => {
+  const F = window.__flow;
+  window.prompt = () => "测验项目";                 // 绕开原生 prompt（headless 下默认返回 null）
+  document.getElementById("btnNewProj").click();
+  await new Promise(r => setTimeout(r, 300));
+  const hasProj = (F.projects() || []).some(p => p.key === "测验项目");
+  const emptyBox = !!document.querySelector('#wfGrid .pfgroup[data-proj="测验项目"]');
+  const emptyHint = !!document.querySelector('#wfGrid .pfgroup[data-proj="测验项目"] .pfdrop');
+  // 把第一张会话卡片拖到这个新项目下
+  const card = F.wf().list.find(w => w.src && w.src.session);
+  F.moveCard(card.name, "测验项目", "");
+  await new Promise(r => setTimeout(r, 300));
+  const moved = F.wf().list.find(w => w.name === card.name);
+  const boxNow = document.querySelector('#wfGrid .pfgroup[data-proj="测验项目"]');
+  const inBox = boxNow ? [...boxNow.querySelectorAll(".wfcard[data-card]")].map(e => e.dataset.card) : [];
+  // 对话画布不允许拖到「流程框架」
+  F.moveCard(card.name, "流程框架", "");
+  await new Promise(r => setTimeout(r, 200));
+  const afterRefuse = F.wf().list.find(w => w.name === card.name).proj;
+  // 拖动排序：把第二张卡片排到第一张前面
+  const others = F.wf().list.filter(w => w.src && w.src.session && w.name !== card.name && w.proj === "测验项目");
+  let order = null;
+  if (others.length){
+    F.moveCard(others[0].name, "测验项目", card.name);
+    await new Promise(r => setTimeout(r, 250));
+    const c2 = F.wf().list.find(w => w.name === card.name);
+    const o2 = F.wf().list.find(w => w.name === others[0].name);
+    order = { card: c2.order, other: o2.order };
+  }
+  return { hasProj: hasProj, emptyBox: emptyBox, emptyHint: emptyHint, moved: moved.proj, movedOrder: moved.order,
+    inBox: inBox, afterRefuse: afterRefuse, order: order, sessionCards: F.wf().list.filter(w => w.src && w.src.session).length };
+});
+ok(proj.hasProj, "「＋新建项目」把项目写进 WF.projects");
+ok(proj.emptyBox && proj.emptyHint, "空项目也渲染成项目框，并提示「把画布卡片拖到这里」");
+ok(proj.moved === "测验项目" && proj.movedOrder === 0, "拖动把卡片改归属到新项目并写入 order（proj=" + proj.moved + "，order=" + proj.movedOrder + "）");
+ok(proj.inBox.indexOf(proj.inBox[0]) >= 0 && proj.inBox.length >= 1, "新项目框里出现被拖入的卡片（" + proj.inBox.length + " 张）");
+ok(proj.afterRefuse === "测验项目", "对话画布拖到「流程框架」被拒绝（归属未变）");
+if (proj.order) ok(proj.order.other < proj.order.card, "拖到某张卡片上可插到它前面（order " + proj.order.other + " < " + proj.order.card + "）");
+
+const cleaned = await page.evaluate(async () => {
+  const F = window.__flow;
+  // 有画布的项目不显示 ✕（防止误删带走卡片）
+  const hasXWhenFilled = !!document.querySelector('#wfGrid .pfgroup[data-proj="测验项目"] [data-delproj]');
+  // 把拖进去的卡片移出（回到原项目），项目空了才出现 ✕ 按钮
+  F.wf().list.forEach(w => { if (w.proj === "测验项目") delete w.proj; });
+  F.renderDist();
+  await new Promise(r => setTimeout(r, 300));
+  const xAfterEmpty = !!document.querySelector('#wfGrid .pfgroup[data-proj="测验项目"] [data-delproj]');
+  document.querySelectorAll('#wfGrid [data-delproj]').forEach(b => b.click());
+  await new Promise(r => setTimeout(r, 300));
+  return { hasXWhenFilled: hasXWhenFilled, xAfterEmpty: xAfterEmpty, keys: (F.projects() || []).map(p => p.key) };
+});
+ok(!cleaned.hasXWhenFilled, "非空项目不显示「✕ 删除项目」（不会误删带走卡片）");
+ok(cleaned.xAfterEmpty, "项目空了才出现「✕ 删除项目」");
+ok(cleaned.keys.indexOf("测验项目") < 0, "「✕ 删除项目」可删掉空项目（剩余：" + cleaned.keys.join(",") + "）");
+
 // ---------- 收尾：汇总 + 释放浏览器（缺这段会让进程挂在打开的浏览器上不退出） ----------
 if (errs.length) console.log("\n页面错误：\n  " + errs.slice(0, 8).join("\n  "));
 console.log("\n" + pass + " passed, " + fail + " failed" + (errs.length ? " , " + errs.length + " page errors" : ""));

@@ -78,6 +78,19 @@ CLIENT_USAGE_TTL = 20.0                   # 多客户端用量聚合缓存（秒
 _USAGE_CACHE = {"t": 0.0, "key": None, "v": None}
 WF_STATE_MAX_BYTES = 8 * 1024 * 1024      # /__flow_wf_state 工作流树备份上限
 WF_STATE_MAX_CANVASES = 300               # 备份中画布数量上限
+# v0.27.6 「正在改动中的文件」检测：扫描服务根目录下最近 N 分钟改动过的源码/文档文件
+RECENT_SKIP_DIRS = {
+    ".git", ".hg", ".svn", "node_modules", "__pycache__", ".zcode", ".workbuddy",
+    ".idea", ".vscode", ".venv", "venv", "env", "dist", "build", "out", "target",
+    ".next", ".nuxt", ".cache", "coverage", ".pytest_cache", ".mypy_cache",
+}
+RECENT_EXTS = {
+    ".mmd", ".md", ".markdown", ".txt", ".json", ".jsonl", ".csv", ".yml", ".yaml", ".toml", ".ini", ".env",
+    ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".vue", ".svelte", ".html", ".htm", ".css", ".scss", ".less",
+    ".py", ".java", ".kt", ".go", ".rs", ".rb", ".php", ".cs", ".c", ".h", ".cc", ".cpp", ".hpp",
+    ".sql", ".sh", ".ps1", ".bat", ".xml", ".gradle", ".properties",
+}
+RECENT_MAX_SCAN = 20000                   # 单次扫描的文件数上限（防止在巨大目录树上卡住）
 PRICE_MAX_MODELS = 300                    # 单价表模型数上限
 PRICE_MAX_VALUE = 1e6                     # 单价上限（防误输入）
 
@@ -1469,6 +1482,99 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return None
 
+    # ---------- v0.27.6 路径解析 / 「正在改动中的文件」检测 ----------
+    def allow_roots(self):
+        """写回 / 扫描允许的根目录列表：--dir 优先，其余来自 --scan-dir（去重）。"""
+        roots = []
+        for d in [self.root] + list(getattr(self, "scan_dirs", []) or []):
+            if not d:
+                continue
+            try:
+                r = os.path.realpath(d)
+            except Exception:
+                continue
+            if os.path.isdir(r) and r not in roots:
+                roots.append(r)
+        return roots
+
+    def resolve_under_root(self, rel):
+        """相对（相对第一个允许根）或绝对路径 → 绝对路径；不在任何允许根内时返回 None。"""
+        if not isinstance(rel, str) or not rel.strip():
+            return None
+        roots = self.allow_roots()
+        if not roots:
+            return None
+        try:
+            raw = rel.replace("\\", "/")
+            p = raw if os.path.isabs(raw) else os.path.join(roots[0], raw.lstrip("/"))
+            p = os.path.realpath(p)
+            for r in roots:
+                try:
+                    if os.path.commonpath([r, p]) == r and p != r:
+                        return p
+                except ValueError:
+                    continue
+            return None
+        except Exception:
+            return None
+
+    def recent_files(self, within_min, limit):
+        """允许根目录下最近 within_min 分钟内改动过的文件，按 mtime 倒序。
+
+        用于编辑器工具栏的「正在改动中的文件」下拉：一键把画布连到那个文件上。
+        跳过隐藏目录/依赖目录，只收源码与文档类扩展名。
+        返回的 rel 优先相对第一个根；不在其下时给绝对路径（写回接口同样接受绝对路径）。
+        """
+        roots = self.allow_roots()
+        if not roots:
+            return []
+        base = roots[0]
+        now = time.time()
+        within = max(1, int(within_min or 180)) * 60
+        out = []
+        scanned = 0
+        seen = set()
+        for root in roots:
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in RECENT_SKIP_DIRS]
+                for fn in filenames:
+                    if fn.startswith("."):
+                        continue
+                    if os.path.splitext(fn)[1].lower() not in RECENT_EXTS:
+                        continue
+                    scanned += 1
+                    if scanned > RECENT_MAX_SCAN:
+                        break
+                    fp = os.path.join(dirpath, fn)
+                    if fp in seen:
+                        continue
+                    seen.add(fp)
+                    try:
+                        st = os.stat(fp)
+                    except OSError:
+                        continue
+                    age = now - st.st_mtime
+                    if age > within:
+                        continue
+                    try:
+                        rel = os.path.relpath(fp, base).replace("\\", "/")
+                        if rel.startswith(".."):
+                            rel = fp.replace("\\", "/")
+                    except ValueError:
+                        rel = fp.replace("\\", "/")
+                    out.append({
+                        "rel": rel,
+                        "name": fn,
+                        "ext": os.path.splitext(fn)[1].lower(),
+                        "mtime": int(st.st_mtime * 1000),
+                        "ageSec": int(age),
+                        "size": st.st_size,
+                    })
+                if scanned > RECENT_MAX_SCAN:
+                    break
+        out.sort(key=lambda x: x["mtime"], reverse=True)
+        return out[: max(1, min(int(limit or 40), 200))]
+
     def rollout_path(self, name):
         """rollout 文件名 → 会话文件绝对路径；名字不符或越界返回 None。"""
         if not (self.rollout_dir and isinstance(name, str) and ROLLOUT_FILE_RE.match(name)):
@@ -1701,6 +1807,8 @@ class Handler(SimpleHTTPRequestHandler):
                 "registry": True, # /__flow_agents_registry 端点存在（已连接智能体分类）
                 "settings": True,  # /__flow_settings 端点存在（数据来源目录设置）
                 "wfstate": True,   # /__flow_wf_state 端点存在（工作流树自动备份/恢复）
+                "recent": True,    # /__flow_recent_files 端点存在（正在改动中的文件检测）
+                "writePath": True, # /__flow_write_path 端点存在（按相对路径写回，配「连接正在改动的文件」）
                 "clientUsage": any(bool((getattr(self, a["attr"], "") or "") and os.path.isdir(getattr(self, a["attr"], "")))
                                    for a in ADAPTERS),
             })
@@ -1845,6 +1953,21 @@ class Handler(SimpleHTTPRequestHandler):
             except OSError as e:
                 self.send_json(500, {"ok": False, "error": "读取失败：%s" % e})
             return
+        if path == "/__flow_recent_files":
+            # v0.27.6：服务根目录下最近改动过的文件（编辑器「正在改动中的文件」下拉）
+            qs = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+            try:
+                within = int((qs.get("within") or ["180"])[0])
+                limit = int((qs.get("limit") or ["40"])[0])
+            except Exception:
+                within, limit = 180, 40
+            try:
+                files = self.recent_files(within, limit)
+            except Exception as e:
+                self.send_json(500, {"ok": False, "error": "扫描失败：%s" % e})
+                return
+            self.send_json(200, {"ok": True, "root": self.root, "withinMin": within, "files": files})
+            return
         if path in ("/", "/index.html"):
             editor = os.path.join(os.path.realpath(self.root), "flow-editor.html")
             if os.path.isfile(editor):
@@ -1877,6 +2000,28 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path == "/__flow_wf_state":
             self.post_wf_state()
+            return
+        if path == "/__flow_write_path":
+            # v0.27.6：按**相对路径**写回（配「🔗 连接正在改动的文件」下拉）；路径必须落在服务根目录内
+            try:
+                body = self.read_body()
+                rel = body.get("path")
+                text = body.get("text")
+                if not isinstance(text, str):
+                    raise ValueError("缺少 text 字段")
+            except Exception as e:
+                self.send_json(400, {"ok": False, "error": "请求体解析失败：%s" % e})
+                return
+            fp = self.resolve_under_root(rel)
+            if not fp:
+                self.send_json(400, {"ok": False, "error": "path 非法或不在服务根目录内"})
+                return
+            try:
+                self.write_atomic(fp, text)
+            except Exception as e:
+                self.send_json(500, {"ok": False, "error": "写入失败：%s" % e})
+                return
+            self.send_json(200, {"ok": True, "path": rel, "bytes": len(text.encode("utf-8"))})
             return
         if path != "/__flow_write":
             self.send_json(404, {"ok": False, "error": "unknown endpoint"})
@@ -2049,6 +2194,9 @@ def main():
         pass
     ap = argparse.ArgumentParser(description="codex-flow-edit 本地托管服务")
     ap.add_argument("--dir", default=".", help="静态托管目录（编辑器与源文件所在目录）")
+    ap.add_argument("--scan-dir", action="append", default=[], metavar="DIR",
+                    help="v0.27.6 额外扫描目录（可重复）：也参与「正在改动中的文件」检测，"
+                         "且允许把画布连到其中的文件（写回白名单 = --dir + 全部 --scan-dir）")
     ap.add_argument("--watch", default="flow-source.mmd", help="双向同步的目标文件（相对 --dir）")
     ap.add_argument("--port", type=int, default=8380, help="起始端口（被占用则依次 +1 重试）")
     ap.add_argument("--usage", default="", help="usage.jsonl 路径（默认 %%USERPROFILE%%\\.zcode\\codex-manager\\usage.jsonl）")
@@ -2080,6 +2228,8 @@ def main():
     saved = settings_load()
     Handler.root = root
     Handler.watch = a.watch
+    # v0.27.6：额外扫描目录（参与「正在改动中的文件」检测，也在写回白名单里）
+    Handler.scan_dirs = [os.path.realpath(d) for d in (getattr(a, "scan_dir", None) or []) if d and os.path.isdir(d)]
     Handler.settings_cli = cli_paths
     Handler.settings_default = defaults
     Handler.settings_saved = saved

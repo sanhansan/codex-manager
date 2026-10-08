@@ -1351,5 +1351,33 @@ t("newNodeId：跳过已占用 id，且能通过第二参预留尚未插入的 i
   eq(newNodeId({ nodes: [{ id: "n1" }, { id: "n3" }] }), "n2", "从空缺处补位");
 });
 
+// ---------- v0.27.6 分布工作区：显式项目 / 拖动归属 ----------
+t("projectKeyOf：w.proj（显式项目）优先于 src.project 与 cwd 推导", () => {
+  eq(projectKeyOf({ proj: "甲项目", src: { project: "乙项目", cwd: "C:/w/丙项目" } }), "甲项目");
+  eq(projectKeyOf({ src: { project: "乙项目", cwd: "C:/w/丙项目" } }), "乙项目");
+  eq(projectKeyOf({ src: { cwd: "C:/w/丙项目" } }), "丙项目");
+  eq(projectKeyOf(null), "未标注项目");
+  eq(projectKeyOf({ proj: "", src: { project: "乙项目" } }), "乙项目", "空字符串不算显式项目");
+});
+
+t("groupByProject：显式项目即使没有画布也要出现，且不算「流程框架」", () => {
+  const list = [
+    { name: "会话A", src: { session: "sess_a", project: "体测", cwd: "C:/w/体测" } },
+    { name: "手工草图" },
+    { name: "归到项目的草图", proj: "论文" },
+  ];
+  const g1 = groupByProject(list);
+  okTest(g1.some(x => x.project === "体测" && x.convs.length === 1), "会话画布按 src.project 归组");
+  okTest(g1.some(x => x.project === "流程框架" && x.frame), "无 proj 的手工画布仍在「流程框架」");
+  okTest(g1.some(x => x.project === "论文" && !x.frame && x.others.length === 1), "带 proj 的手工画布归到显式项目且不算流程框架");
+  // 显式项目列表：空项目也建组
+  const g2 = groupByProject(list, [{ key: "空项目" }, { key: "论文" }]);
+  okTest(g2.some(x => x.project === "空项目" && x.empty === true && x.convs.length === 0), "显式空项目建组并标记 empty");
+  eq(g2.filter(x => x.project === "论文").length, 1, "已存在的项目不会因显式列表重复建组");
+  // 「流程框架」永远排最后
+  const frameIdx = g2.findIndex(x => x.frame);
+  eq(frameIdx, g2.length - 1, "「流程框架」排在末位");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 codex-cli-adapter/codex-flow-*.md
 *.bak-*
+
+# 测试用的临时草稿文件（verify-live 会创建并清空）
+codex-manager/assets/_verify-live-scratch.mmd
+codex-manager/assets/_scratch*.txt

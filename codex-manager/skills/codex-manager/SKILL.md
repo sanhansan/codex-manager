@@ -44,6 +44,50 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
 - **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
 
+**v0.27.6 关键行为**（画布逻辑门 / 具体输入输出 / 后台文件检测与一键连接 + 分布工作区拖动增删建项目；用户诉求原文「画布添加逻辑门，添加输入输出，体现具体输入输出了什么，画布支持后台程序文件检测，下拉列表选择连接正在改动中的文件，分布式工作区支持拖动调整，添加或者删除，添加按键，分布式可以一键添加到神经网络，创建项目等」）：
+
+- **逻辑门快捷添加**：工具栏 `#gateSel`（8 个门）+ `#btnGate`；`addGateNode()` 用 `gt==='IF' ? 'diamond' : 'round'`，
+  写 `n.gate` + `n._autoGate`，`IF` 同时落 `kind='cond'`。
+- **具体输入输出**：卡片上在**端口外侧**画 `.io-tag`（`⬅ 来源（边标签）` / `目标（边标签） ➡`，多条时 `+N`）——
+  只画在卡片外，**不参与任何高度计算**；连接符节点不画（端口恒左右会打架）。
+  属性面板新增 `.iolist` 两段（「具体输入（谁连进来）/ 具体输出（连到哪里）」），点条目 `setSel({type:'edge'})`。
+- **后台文件检测（flow_serve.py）**：
+  - `GET /__flow_recent_files?within=&limit=` → `recent_files()`：`os.walk` 允许根目录，
+    跳过 `RECENT_SKIP_DIRS`，只收 `RECENT_EXTS`，按 mtime 倒序，返回 `rel/name/ext/mtime/ageSec/size`；
+  - `--scan-dir`（**append**）→ `Handler.scan_dirs`；`allow_roots()` = `[root] + scan_dirs`（写回白名单）；
+  - `POST /__flow_write_path {"path","text"}` → `resolve_under_root()` 必须落在任一 allow_root 内，否则 **400**；
+  - `ping` 增加 `recent` / `writePath` 两项能力位（编辑器据此判断服务够不够新）。
+- **下拉连接正在改动的文件**：底栏 `#fileSel` + `#btnFileRefresh` + `#btnFileConn`；
+  `refreshRecentFiles(quiet)` 填充下拉（title 显示数量与根目录，focus 时 12s 节流重扫）；
+  `connectHttpWatchFile(rel)` 设 `httpWatch = {name, fileUrl:rel, writeUrl:'__flow_write_path', writePath:rel}`，
+  之后 `pollHttpFile` / `scheduleSyncWrite` 走同一套；写回时**带 `path` 字段**（`httpWatch.writePath`）。
+  ⚠️ **连接前必须 `ensureSyncOwnerCanvas()`**：否则停在对话画布上时 `pickSyncOwner()` 会静默拦下写回，
+  表现成「连上了却没同步」。
+- **分布工作区**：
+  - 分组：`groupByProject(list, explicit)` 第二参是显式项目（空项目也建组、`empty:true`、`frame:false`）；
+    `projectKeyOf` **优先读 `w.proj`**（拖动归属用），其次 `src.project`，再 `cwd` 推导。
+  - 拖动：`bindDistDrag(grid)`——卡片 `draggable`，拖到 `.pfgroup` = 改归属，拖到 `.wfcard` = 插到它前面
+    （`stopPropagation` 保证卡片优先）。落位统一走 `moveCard(name, projKey, beforeName)`：
+    设 `w.proj`、把目标组成员重排 `order`。**对话画布拖到「流程框架」会被拒绝**。
+  - 排序：`renderDist` 用 `byOrderThenTsDown`（有 `order` 的按 order，其余按会话时间倒序）。
+  - 增删：头部 `#btnNewWf2`（等价左侧「＋新建工作流」）/ `#btnNewProj`（`newProject()`，用 `prompt`）、
+    每卡「删除」；**「✕ 删除项目」只在项目为空时渲染**（`data-delproj`），避免误删带走卡片。
+  - 🧠 策展：`#btnNnAll` / 每卡 `.nnbtn` → `toggleNnCard` / `nnSetAll`，写 `w.nnOn = false`；
+    `ntBuildTree` 过滤条件加 `w.nnOn !== false`。
+  - 持久化：`WF.projects = [{key, ts}]`；启动补空数组、`wfTreeObj()` 带上、`restoreWfBackup()` 合并回来。
+- **⚠️ 服务端工作副本备份的两个数据安全闸门（本轮实测踩到并修掉）**：
+  1. `wfRestoreTried` —— **恢复尝试结束前禁止 `pushWfBackup()`**。直接打开编辑器时会先播种空/单画布的树，
+     若此刻恢复还没合并完就写回，会把残缺树 POST 上去覆盖用户完整备份（真丢过一次：8 → 4）。
+     `restoreWfBackup` 用 `try/finally` 置位，`saveAllLocalOnly()` 只写 localStorage 不触发备份。
+  2. 同名条目**看本地是否为空画布**：空的「主流程」种子应让位给备份里的真内容；真·工作副本才优先。
+- **⚠️ `tests/verify-live.mjs` 现在会先快照再还原服务端工作副本**（开跑 GET `/__flow_wf_state`、收尾 POST 回去）——
+  它会真的切画布与写盘，没有这层保护就会把临时画布留在用户的 `wf-backup.json` 里。
+  **给实时服务写新脚本时请照抄这个快照/还原模式。**
+- **测试**：单测 **116/116**、`e2e-nn` **105/105**、`e2e-canvas-nodes` **41/41**、`verify-live` **21/21**、
+  i18n missing 0、守卫 4/4 + 4/4。`verify-live` 的文件同步段全程用临时草稿文件（结束时清空），**不碰真实文件**。
+- **本地服务推荐启动方式**（要跑文件检测）：
+  `python flow_serve.py --port 8380 --scan-dir <你的项目目录>`（`--scan-dir` 可重复）。
+
 **v0.27.5 关键行为**（画布**是否等判断**；用户诉求原文「画布加入是否等判断」）：
 
 - **判断词预设 `BRANCH_PAIRS`**（`__CORE`，可单测）：五组常用判断词，每组中英各一对

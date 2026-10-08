@@ -177,6 +177,17 @@
   .pfgroup { border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:6px; padding:10px 12px 12px; margin-bottom:14px;
     background:color-mix(in srgb, var(--panel) 96%, var(--accent)); }
   .pfgroup-fw { border-left-color:var(--muted); }
+  /* v0.27.6 分布工作区：空项目框 / 拖动落点高亮 / 卡片拖起与插入位 / 🧠 神经网络开关 */
+  .pfgroup-empty { border-left-color:var(--muted); background:color-mix(in srgb, var(--panel) 92%, var(--muted)); }
+  .pfgroup.dropover { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+  .pfgroup .pfx { margin-left:6px; }
+  .pfdrop { border:1px dashed var(--line); border-radius:4px; padding:10px; text-align:center; margin:0; }
+  .wfcard.dragging { opacity:.45; }
+  .wfcard.dropbefore { box-shadow:-3px 0 0 0 var(--accent); }
+  .wfcard h5 .nnbtn { font-size:10.5px; font-weight:400; padding:1px 7px; border-radius:9px; border:1px solid var(--line); cursor:pointer; flex-shrink:0; color:var(--muted); }
+  .wfcard h5 .nnbtn.on { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); background:color-mix(in srgb, var(--accent) 8%, transparent); }
+  .wfcard h5 .nnbtn.off { opacity:.75; }
+  .wfcard h5 .nnbtn:hover { border-color:var(--accent); color:var(--accent); }
   .pfhead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:7px; border-bottom:1px dashed var(--line); }
   .pfhead .pfname { font-weight:700; font-size:13.5px; }
   .pfhead .pfstat { color:var(--muted); font-size:11.5px; }
@@ -269,6 +280,10 @@
 #cv .nd-linkg { font-size:17px; font-weight:600; pointer-events:none; }
 #cv .nd-linkt { fill:var(--card-title); font-size:11px; pointer-events:none; }
 #cv .nd-link.nd-sel { stroke:var(--node-wire-hl); stroke-width:2.6; }
+/* v0.27.6 端口旁的「具体输入 / 输出」标签：显示相邻节点名（+ 边标签），画在卡片外侧 */
+#cv .io-tag { font-size:10px; fill:var(--muted); pointer-events:none; }
+#cv .io-in { fill:var(--card-port-line); }
+#cv .io-out { fill:var(--accent); }
   #cv .port:hover { stroke:var(--accent); }
   #cv .eg { fill:none; stroke:var(--node-wire); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   #cv .eg-sel { stroke:var(--accent); stroke-width:3; }
@@ -290,6 +305,16 @@
   aside label { display:block; font-size:12px; color:var(--muted); margin:8px 0 2px; }
   aside input[type=text], aside textarea, aside select { width:100%; font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:2px; background:var(--panel); color:var(--ink); }
   aside textarea { height:52px; resize:vertical; }
+  // v0.27.6 边属性：具体输入 / 输出明细（点击条目可选中该连线）
+  .iolist { list-style:none; margin:2px 0 4px; padding:0; }
+  .iolist li { display:flex; align-items:center; gap:5px; font-size:12px; padding:2px 6px; border:1px solid var(--line); border-radius:2px; margin-bottom:3px; cursor:pointer; background:var(--panel); }
+  .iolist li:hover { border-color:var(--accent); }
+  .iolist .iodir { color:var(--muted); }
+  .iolist li.ioin .iodir { color:var(--card-port-line); }
+  .iolist li.ioout .iodir { color:var(--accent); }
+  .iolist b { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px; }
+  .iolist u { text-decoration:none; color:var(--accent); font-size:11px; flex-shrink:0; }
+  .iolist .iodot { color:var(--muted); font-size:10.5px; font-style:normal; flex-shrink:0; }
   /* v0.27.5 边属性：判断词快捷胶囊（是/否、真/假、通过/不通过、成功/失败、有/无） */
   .bchips { display:flex; flex-wrap:wrap; gap:4px 6px; margin:2px 0 2px; align-items:center; }
   .bchips .bpair { display:inline-flex; gap:2px; padding:1px 2px; border-radius:10px; background:color-mix(in srgb, var(--canvas) 70%, transparent); }
@@ -541,6 +566,17 @@
     <button class="small" data-add="link-in" data-i18n="＋左连接" data-i18n-title="左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）" title="左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）">＋左连接</button>
     <button class="small" data-add="link-out" data-i18n="＋右连接" data-i18n-title="右连接符：贴到当前内容最右侧，并把所有出口节点自动接出（左右双连接点，用作下页续接 / 外部汇出）" title="右连接符：贴到当前内容最右侧，并把所有出口节点自动接出（左右双连接点，用作下页续接 / 外部汇出）">＋右连接</button>
     <button class="small" data-add="not" data-i18n="＋非门" data-i18n-title="非门（NOT 取反）：圆角节点自动带 NOT 门徽章，校验要求恰好 1 个输入" title="非门（NOT 取反）：圆角节点自动带 NOT 门徽章，校验要求恰好 1 个输入">＋非门</button>
+    <select id="gateSel" title="逻辑门" data-i18n-title="逻辑门：选中后点「＋门」直接把带该门的节点插到画布上（IF/AND/OR/NOT/NAND/NOR/XOR/XNOR）">
+      <option value="IF" data-i18n="IF/ELSE 分支">IF/ELSE 分支</option>
+      <option value="AND" data-i18n="AND 全部成立">AND 全部成立</option>
+      <option value="OR" data-i18n="OR 任一成立">OR 任一成立</option>
+      <option value="NOT" data-i18n="NOT 取反">NOT 取反</option>
+      <option value="NAND" data-i18n="NAND 与非">NAND 与非</option>
+      <option value="NOR" data-i18n="NOR 或非">NOR 或非</option>
+      <option value="XOR" data-i18n="XOR 奇真">XOR 奇真</option>
+      <option value="XNOR" data-i18n="XNOR 偶真">XNOR 偶真</option>
+    </select>
+    <button class="small" id="btnGate" data-i18n="＋门" data-i18n-title="按左侧选择插入一个带该逻辑门的节点（IF 用菱形，其余用圆角，并自动带门徽章）" title="按左侧选择插入一个带该逻辑门的节点（IF 用菱形，其余用圆角，并自动带门徽章）">＋门</button>
     <button id="btnTpl" data-i18n="＋框架" data-i18n-title="在当前画布插入 输入→Agent→条件→合并→输出 骨架（含反馈修正环），插入到现有内容右侧" title="在当前画布插入 输入→Agent→条件→合并→输出 骨架（含反馈修正环），插入到现有内容右侧">＋框架</button>
     <button id="btnLayout" data-i18n="自动重排">自动重排</button>
     <button id="btnTidy" data-i18n="✨ 一键整理" title="去重连线 + 自动排版">✨ 一键整理</button>
@@ -569,6 +605,11 @@
         <button class="sp small" id="btnCopyTab" data-i18n="复制当前">复制当前</button>
         <button class="small" id="btnDlTab" data-i18n="导出文件">导出文件</button>
         <button class="small" id="btnImportJson" data-i18n="导入 JSON">导入 JSON</button>
+        <select id="fileSel" title="正在改动中的文件" data-i18n-title="正在改动中的文件：由本地服务扫描服务目录，按最近改动时间排序；选中后点「🔗 连接选中文件」即可把画布连上它（AI 改文件 / 你改画布都会自动同步）" style="max-width:200px">
+          <option value="" data-i18n="🔌 正在改动中的文件…">🔌 正在改动中的文件…</option>
+        </select>
+        <button class="small" id="btnFileRefresh" data-i18n="⟳" data-i18n-title="重新检测最近改动的文件" title="重新检测最近改动的文件">⟳</button>
+        <button class="small" id="btnFileConn" data-i18n="🔗 连接选中文件" data-i18n-title="把画布连接到下拉里选中的文件（HTTP 双向同步，无需文件选择器）" title="把画布连接到下拉里选中的文件（HTTP 双向同步，无需文件选择器）">🔗 连接选中文件</button>
         <button class="small" id="btnSync" data-i18n="🔗 连接文件">🔗 连接文件</button>
         <span id="syncStat"></span>
         <button class="small" id="btnCodeToggle" data-i18n="收起">收起</button>
@@ -630,6 +671,9 @@
       <input id="distFollow" type="checkbox" checked style="width:auto">
       <span data-i18n="跟随当前">跟随当前</span>
     </label>
+    <button id="btnNewWf2" data-i18n="＋新建画布" data-i18n-title="新建一个空白画布并打开" title="新建一个空白画布并打开">＋新建画布</button>
+    <button id="btnNewProj" data-i18n="＋新建项目" data-i18n-title="新建一个项目分组框（可把卡片拖进去）" title="新建一个项目分组框（可把卡片拖进去）">＋新建项目</button>
+    <button id="btnNnAll" data-i18n="🧠 全部加入神经网络" data-i18n-title="把分布工作区里所有画布一键加入「🧠 智能体总结神经网络」视图" title="把分布工作区里所有画布一键加入「🧠 智能体总结神经网络」视图">🧠 全部加入神经网络</button>
     <button id="btnExpTree" data-i18n="⊞ 导出全部工作流" data-i18n-title="把整棵工作流树（含对话画布与小对话）导出为 JSON 备份" title="把整棵工作流树（含对话画布与小对话）导出为 JSON 备份">⊞ 导出全部工作流</button>
     <button id="btnImpTree" data-i18n="⊟ 导入工作流树" data-i18n-title="从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）" title="从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）">⊟ 导入工作流树</button>
     <button id="btnCtl2" data-i18n="🧭 总控流程" title="切到总控流程视图">🧭 总控流程</button>
@@ -2289,20 +2333,28 @@ function projectOf(cwd){
   return seg.length ? seg[seg.length - 1] : '未标注项目';
 }
 // 项目键：优先 cwd 归一化，其次显式 project 字段
+// v0.27.6：w.proj 是「显式项目」（拖动 / 新建项目写入），优先级最高——这样手工画布也能归到项目下
 function projectKeyOf(entry){
   if (!entry) return '未标注项目';
+  if (entry.proj) return String(entry.proj);
   const src = entry.src || {};
   return src.project || projectOf(src.cwd || '');
 }
 // 把画布列表按项目分组（对话画布按 src 项目归组；主流程/手工画布归入「流程框架」）
-function groupByProject(list){
+// explicit：显式项目列表 [{key}] —— 即使还没有画布也把项目框显示出来（v0.27.6）
+function groupByProject(list, explicit){
   const map = new Map();
   (list || []).forEach(w => {
     const isConv = !!(w.src && w.src.session);
-    const key = isConv ? projectKeyOf(w) : '流程框架';
-    if (!map.has(key)) map.set(key, { project: key, convs: [], others: [], frame: !isConv });
+    const key = isConv ? projectKeyOf(w) : (w.proj ? String(w.proj) : '流程框架');
+    if (!map.has(key)) map.set(key, { project: key, convs: [], others: [], frame: !isConv && !w.proj });
     const g = map.get(key);
     if (isConv) g.convs.push(w); else g.others.push(w);
+  });
+  (explicit || []).forEach(p => {
+    const key = String((p && p.key) || p || '').trim();
+    if (!key || map.has(key)) return;
+    map.set(key, { project: key, convs: [], others: [], frame: false, empty: true });
   });
   // 会话项目排在前面（按会话数），末位「流程框架」；新增项目按会话时间倒序
   return [...map.values()]
@@ -3272,6 +3324,70 @@ if (typeof document !== "undefined") var UI = function(){
     '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
     '问答画布': 'Q&A canvas',
     // ---- v0.27.0 文字树图神经网络 / 分布式卡片 / 画布卡片 ----
+    // ---- v0.27.6 正在改动中的文件：检测 + 下拉连接 ----
+    '🔌 正在改动中的文件…': '🔌 Files being edited…',
+    '⟳': '⟳',
+    '🔗 连接选中文件': '🔗 Connect selected file',
+    '正在改动中的文件：由本地服务扫描服务目录，按最近改动时间排序；选中后点「🔗 连接选中文件」即可把画布连上它（AI 改文件 / 你改画布都会自动同步）': 'Files being edited: the local service scans its root directory and sorts by most recent mtime; pick one and click "Connect selected file" to bind the canvas to it (AI edits the file / you edit the canvas — both sync automatically)',
+    '重新检测最近改动的文件': 'Re-scan recently modified files',
+    '把画布连接到下拉里选中的文件（HTTP 双向同步，无需文件选择器）': 'Bind the canvas to the file selected in the dropdown (HTTP two-way sync, no file picker needed)',
+    '<1 分钟前': '<1 min ago',
+    '{0} 分钟前': '{0} min ago',
+    '{0} 小时前': '{0} h ago',
+    '{0} 天前': '{0} d ago',
+    '检测到 {0} 个最近改动的文件（根目录：{1}）': 'Detected {0} recently modified file(s) (root: {1})',
+    '已连接文件：{0}（AI 改文件 / 你改画布都会自动同步）': 'File connected: {0} (AI edits the file / you edit the canvas — both sync automatically)',
+    '需要由 flow_serve.py 托管才能检测正在改动的文件': 'Serving via flow_serve.py is required to detect recently modified files',
+    '本地服务版本较旧：没有 /__flow_recent_files 端点，请用新版 flow_serve.py': 'The local service is too old: no /__flow_recent_files endpoint. Please use the new flow_serve.py',
+    '检测失败：': 'Detection failed: ',
+    '请先在下拉里选一个文件': 'Pick a file in the dropdown first',
+    '需要由 flow_serve.py 托管才能连接文件': 'Serving via flow_serve.py is required to connect a file',
+    '已切到主流程「{0}」：文件同步只作用于它': 'Switched to the main flow "{0}": file sync only applies to it',
+    // ---- v0.27.6 分布工作区：拖动调整 / 新建项目 / 一键加入神经网络 ----
+    '＋新建画布': '＋New canvas',
+    '＋新建项目': '＋New project',
+    '🧠 全部加入神经网络': '🧠 Add all to neural net',
+    '新建一个空白画布并打开': 'Create a blank canvas and open it',
+    '新建一个项目分组框（可把卡片拖进去）': 'Create a project group (drag cards into it)',
+    '把分布工作区里所有画布一键加入「🧠 智能体总结神经网络」视图': 'Add every canvas in the distributed workspace to the neural-network view in one click',
+    '可拖动：拖到别的项目框可改归属，拖到卡片上可调整顺序': 'Draggable: drop on another project frame to re-assign, or on a card to reorder',
+    '点击加入神经网络': 'Click to add to the neural network',
+    '已加入神经网络，点击移出': 'In the neural network — click to remove',
+    '加入': 'Add',
+    '已加入': 'Added',
+    '空项目': 'empty project',
+    '删除这个空项目': 'Delete this empty project',
+    '删除项目': 'Delete project',
+    '把画布卡片拖到这里即可归到这个项目': 'Drag a canvas card here to assign it to this project',
+    '新项目名称：': 'New project name:',
+    '新项目': 'New project',
+    '项目已存在': 'Project already exists',
+    '全部画布都已在神经网络里': 'Every canvas is already in the neural network',
+    '全部画布都已移出神经网络': 'Every canvas has been removed from the neural network',
+    '对话画布不能移到「流程框架」，请拖到某个项目下': 'A conversation canvas cannot move into "Flow framework" — drop it on a project instead',
+    '已加入神经网络：{0}': 'Added to the neural network: {0}',
+    '已移出神经网络：{0}': 'Removed from the neural network: {0}',
+    '已把 {0} 个画布加入神经网络': 'Added {0} canvas(es) to the neural network',
+    '已把 {0} 个画布移出神经网络': 'Removed {0} canvas(es) from the neural network',
+    '已新建项目：{0}（把卡片拖进去即可）': 'Project created: {0} (drag cards into it)',
+    '已删除空项目：{0}': 'Empty project deleted: {0}',
+    '已移动到「{0}」': 'Moved to "{0}"',
+    // ---- v0.27.6 画布：逻辑门快捷添加 + 具体输入输出 ----
+    'IF/ELSE 分支': 'IF/ELSE branch',
+    'AND 全部成立': 'AND (all true)',
+    'OR 任一成立': 'OR (any true)',
+    'NOT 取反': 'NOT (invert)',
+    'NAND 与非': 'NAND',
+    'NOR 或非': 'NOR',
+    'XOR 奇真': 'XOR (odd true)',
+    'XNOR 偶真': 'XNOR (even true)',
+    '＋门': '＋Gate',
+    '逻辑门：选中后点「＋门」直接把带该门的节点插到画布上（IF/AND/OR/NOT/NAND/NOR/XOR/XNOR）': 'Logic gate: pick one then click +Gate to insert a node carrying that gate (IF/AND/OR/NOT/NAND/NOR/XOR/XNOR)',
+    '按左侧选择插入一个带该逻辑门的节点（IF 用菱形，其余用圆角，并自动带门徽章）': 'Insert a node with the selected logic gate (IF uses a diamond, the rest use rounded cards, and the gate badge is added automatically)',
+    '已插入逻辑门节点：{0}': 'Logic-gate node inserted: {0}',
+    '具体输入（谁连进来）': 'Concrete inputs (what connects in)',
+    '具体输出（连到哪里）': 'Concrete outputs (where it connects to)',
+    '点击选中该连线': 'Click to select this edge',
     // ---- v0.27.5 画布：是否等判断（判断块 + 判断词预设 + 边标签胶囊）----
     '＋判断': '＋Decision',
     '是 / 否': 'Yes / No',
@@ -3586,14 +3702,21 @@ if (typeof document !== "undefined") var UI = function(){
   function saveAll(){ try { localStorage.setItem(WF_KEY, JSON.stringify(WF)); } catch(e){} scheduleWfBackup(); }
   // ---------- 工作流树服务端自动备份（flow_serve.py /__flow_wf_state；rev 重播种后自动恢复） ----------
   let wfBackupTimer = null, wfBackupBusy = false, wfBackupAt = '';
+  // v0.27.6 防覆盖竞态：服务端备份要等「恢复尝试」结束之后才允许写。
+  //   此前直接打开编辑器（无注入工作副本）时会先播种一个空/单画布树，
+  //   若此时 restoreWfBackup 还没把服务端备份合并回来，一次 markDirty 就会把
+  //   **只有 1~4 个画布的残缺树** POST 覆盖掉用户在服务端的完整备份（真的丢过数据）。
+  let wfRestoreTried = false;
   function scheduleWfBackup(){
     if (!httpCaps || !httpCaps.wfstate) return;
+    if (!wfRestoreTried) return;                 // 恢复还没尝试过：先别写，避免用残缺树覆盖
     clearTimeout(wfBackupTimer);
     wfBackupTimer = setTimeout(pushWfBackup, 2500);
   }
-  function wfTreeObj(){ return { type: 'cmflow-tree', v: 1, exportedAt: Date.now(), rev: (WF && WF.rev) || '', active: WF ? WF.active : '', list: (WF && WF.list) || [] }; }
+  function wfTreeObj(){ return { type: 'cmflow-tree', v: 1, exportedAt: Date.now(), rev: (WF && WF.rev) || '', active: WF ? WF.active : '', list: (WF && WF.list) || [], projects: (WF && WF.projects) || [] }; }
   async function pushWfBackup(){
     if (!httpCaps || !httpCaps.wfstate || !WF) return;
+    if (!wfRestoreTried) return;                 // 同上：恢复未尝试前一律不写
     if (wfBackupBusy){ scheduleWfBackup(); return; }
     wfBackupBusy = true;
     try {
@@ -3608,16 +3731,41 @@ if (typeof document !== "undefined") var UI = function(){
   async function restoreWfBackup(seedNames){
     if (!/^https?:$/.test(location.protocol) || !WF) return 0;
     let j = null;
-    try { j = await (await fetch('__flow_wf_state?_=' + Date.now(), { cache: 'no-store' })).json(); } catch(e){ return 0; }
-    if (!j || !j.ok || !j.exists || !j.tree) return 0;
-    const parsed = wfTreeParse(JSON.stringify(j.tree));
-    if (!parsed.ok || !parsed.entries.length) return 0;
-    const keep = parsed.entries.filter(e => (seedNames || []).indexOf(e.name) < 0);
-    if (!keep.length) return 0;
-    const m = wfMergeEntries(WF.list, keep);
-    WF.list = m.list;
-    return m.added + m.updated;
+    try {
+      // 整个恢复过程放进 try/finally：无论成功、失败还是提前 return，
+      // 都会把 wfRestoreTried 置真，让服务端备份重新开始工作（否则会永久不写）。
+      // v0.27.6：恢复期间禁止写回，避免用「只有 1~4 个画布的残缺树」覆盖用户在服务端的完整备份。
+      try { j = await (await fetch('__flow_wf_state?_=' + Date.now(), { cache: 'no-store' })).json(); } catch(e){ return 0; }
+      if (!j || !j.ok || !j.exists || !j.tree) return 0;
+      const parsed = wfTreeParse(JSON.stringify(j.tree));
+      if (!parsed.ok || !parsed.entries.length) return 0;
+      const keep = parsed.entries.filter(e => {
+        if ((seedNames || []).indexOf(e.name) < 0) return true;   // 名字不冲突：一律并回
+        // v0.27.6：同名条目要看本地是不是**空画布**。直接打开编辑器（无注入工作副本）时会
+        // 播种一个空的「主流程」，此时若因为重名丢掉备份里的同名画布，用户的主流程内容就没了
+        // （而且紧接着一次备份写回还会把它覆盖成空）。空 → 让位给备份里的真内容；有内容 → 工作副本优先。
+        const local = WF.list.find(w => w.name === e.name);
+        const localNodes = (local && local.data && local.data.nodes) || [];
+        return !localNodes.length;
+      });
+      if (!keep.length) return 0;
+      const m = wfMergeEntries(WF.list, keep);
+      WF.list = m.list;
+      // v0.27.6：显式项目（空项目框）也跟着备份并回来
+      const proj = (j.tree && Array.isArray(j.tree.projects)) ? j.tree.projects : [];
+      if (proj.length){
+        WF.projects = WF.projects || [];
+        const have = new Set(WF.projects.map(p => p && p.key));
+        proj.forEach(p => { const k = String((p && p.key) || '').trim().slice(0, 40); if (k && !have.has(k)){ have.add(k); WF.projects.push({ key: k, ts: Number(p.ts) || 0 }); } });
+      }
+      return m.added + m.updated;
+    } finally {
+      wfRestoreTried = true;
+      saveAllLocalOnly();
+    }
   }
+  // 只写 localStorage（不触发服务端备份）——恢复刚结束时不希望再弹一次备份
+  function saveAllLocalOnly(){ try { localStorage.setItem(WF_KEY, JSON.stringify(WF)); } catch(e){} }
   // 当前画布（对话画布）的小对话耗时：节点 id → 距下一次提问 ms（含挂在该提问下的子智能体节点）
   function activeDurs(){
     const e = WF.list.find(w => w.name === WF.active);
@@ -4152,6 +4300,29 @@ if (typeof document !== "undefined") var UI = function(){
         (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body + head + bodyTxt + fileTxt + durHtml + ports + '</g>';
     }).join('');
 
+    // v0.27.6 端口旁的「具体输入 / 输出」：显示相邻节点名（+ 边标签 / +N），画在卡片外侧，不占卡片高度
+    const ioHtml = (function(){
+      const byFrom = {}, byTo = {};
+      g.edges.forEach(e => { (byFrom[e.from] = byFrom[e.from] || []).push(e); (byTo[e.to] = byTo[e.to] || []).push(e); });
+      const nm = id => { const x = nodeById(id); return x ? String(x.label || x.id) : String(id); };
+      return g.nodes.map(n => {
+        const a = anchors(n);
+        const ins = byTo[n.id] || [], outs = byFrom[n.id] || [];
+        let out = '';
+        if (ins.length && !isLinkKind(n.kind)){
+          const e0 = ins[0];
+          const t = fitText(nm(e0.from) + (ins.length === 1 && e0.label ? '（' + e0.label + '）' : '') + (ins.length > 1 ? ' +' + (ins.length - 1) : ''), 96);
+          out += '<text class="io-tag io-in" x="' + (a.inn.x - 8) + '" y="' + (a.inn.y + 4) + '" text-anchor="end">⬅ ' + escXml(t) + '</text>';
+        }
+        if (outs.length && !isLinkKind(n.kind)){
+          const e0 = outs[0];
+          const t = fitText(nm(e0.to) + (outs.length === 1 && e0.label ? '（' + e0.label + '）' : '') + (outs.length > 1 ? ' +' + (outs.length - 1) : ''), 96);
+          out += '<text class="io-tag io-out" x="' + (a.out.x + 8) + '" y="' + (a.out.y + 4) + '">' + escXml(t) + ' ➡</text>';
+        }
+        return out;
+      }).join('');
+    })();
+
     let overlayHtml = '';
     if (mode && mode.kind==='connect' && mode.ghost){
       overlayHtml = '<path d="'+mode.ghost+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4,3"/>';
@@ -4167,7 +4338,7 @@ if (typeof document !== "undefined") var UI = function(){
     }
 
     world.innerHTML = (clipDefs.length ? '<defs>' + clipDefs.join('') + '</defs>' : '')
-      + subsHtml + edgesHtml + nodesHtml + overlayHtml;
+      + subsHtml + edgesHtml + nodesHtml + ioHtml + overlayHtml;
   }
 
   function applyView(){
@@ -4274,6 +4445,22 @@ if (typeof document !== "undefined") var UI = function(){
       const subSel = '<option value="">'+escXml(T('（无分组）'))+'</option>' + g.subs.map(s=>'<option value="'+escXml(s.id)+'"'+(n.sub===s.id?' selected':'')+'>'+escXml(T('成员 → '))+escXml(s.title)+'</option>').join('') +
         '<option value="__new__">'+escXml(T('＋ 新建分组…'))+'</option>';
       const wfSel2 = '<option value="">'+escXml(T('（不是子流程）'))+'</option>' + entryNames().map(nm=>'<option value="'+escXml(nm)+'"'+(n.subflow===nm?' selected':'')+'>▸ '+escXml(nm)+'</option>').join('');
+      // v0.27.6 具体输入 / 输出：把该节点收到什么、产出什么逐条列出来（点条目选中该连线）
+      const inE = g.edges.map((e, i) => ({ e:e, i:i })).filter(o => o.e.to === n.id);
+      const outE = g.edges.map((e, i) => ({ e:e, i:i })).filter(o => o.e.from === n.id);
+      const ioList = (arr, dir) => arr.length
+        ? '<ul class="iolist">' + arr.map(o => {
+            const otherId = dir === 'in' ? o.e.from : o.e.to;
+            const on = nodeById(otherId);
+            return '<li data-ei="' + o.i + '" class="' + (dir === 'in' ? 'ioin' : 'ioout') + '" title="' + escXml(T('点击选中该连线')) + '">' +
+              '<span class="iodir">' + (dir === 'in' ? '⬅' : '➡') + '</span>' +
+              '<b>' + escXml(on ? (on.label || on.id) : otherId) + '</b>' +
+              (o.e.label ? '<u>' + escXml(o.e.label) + '</u>' : '') +
+              (o.e.style === 'dotted' ? '<i class="iodot">' + escXml(T('虚线')) + '</i>' : '') + '</li>';
+          }).join('') + '</ul>'
+        : '<p class="hint">' + escXml(T('（无）')) + '</p>';
+      const ioBox = '<label>' + escXml(T('具体输入（谁连进来）')) + '</label>' + ioList(inE, 'in') +
+        '<label>' + escXml(T('具体输出（连到哪里）')) + '</label>' + ioList(outE, 'out');
       p.innerHTML = '<h4>'+escXml(T('节点属性'))+'</h4><label>ID</label><input type="text" value="'+escXml(n.id)+'" disabled>' +
         '<label>'+escXml(T('标签'))+'</label><textarea id="pLabel">'+escXml(n.label)+'</textarea>' +
         '<label>'+escXml(T('类型（输入 / Agent / Map Agent / 条件 / 合并 / 输出 / 左连接 / 右连接 / 非门）'))+'</label><select id="pKind">'+kindSel+'</select>' +
@@ -4282,6 +4469,7 @@ if (typeof document !== "undefined") var UI = function(){
         '<label>'+escXml(T('节点说明（STEP 文档，随 Markdown/JSON 导出）'))+'</label><textarea id="pDoc" style="height:80px">'+escXml(n.doc||'')+'</textarea>' +
         '<label>'+escXml(T('子流程（虚线节点，双击可跳转）'))+'</label><select id="pSubflow">'+wfSel2+'</select>' +
         '<label>'+escXml(T('所属分组'))+'</label><select id="pSub">'+subSel+'</select>' +
+        ioBox +
         (subBox ? '<label>'+escXml(T('子智能体'))+'</label>' + subBox : '') +
         '<p><button id="pDel">'+escXml(T('删除节点'))+'</button></p>';
       $('pLabel').addEventListener('focus', pushHistory);
@@ -4308,6 +4496,10 @@ if (typeof document !== "undefined") var UI = function(){
         render(); syncCode(); markDirty(); renderPanel();
       });
       if (subIt && $('pSubOut')) $('pSubOut').addEventListener('click', () => openSubDlg(subIt));
+      // v0.27.6 点「具体输入 / 输出」条目 → 选中那条连线（属性面板切到连线）
+      p.querySelectorAll('.iolist li[data-ei]').forEach(li => li.addEventListener('click', () => {
+        setSel({ type:'edge', id:+li.getAttribute('data-ei') });
+      }));
       $('pDel').addEventListener('click', () => deleteNode(n.id));
       if (renderPanel.focusLabel){ renderPanel.focusLabel = false; const pl = $('pLabel'); pl.focus(); pl.select(); }
     } else {
@@ -4735,6 +4927,24 @@ if (typeof document !== "undefined") var UI = function(){
     toast(tx('已插入判断块：判断?（{0} / {1}）', L[0], L[1]));
   }
   if ($('btnBranch')) $('btnBranch').addEventListener('click', addBranchBlock);
+
+  // v0.27.6 「＋门」：按 #gateSel 插入一个带该逻辑门的节点（IF 用菱形、其余圆角，自动带门徽章）
+  //   门徽章由 render 统一画；这里只写 n.gate，并记 _autoGate 便于属性面板切类型时归还。
+  function addGateNode(){
+    const gt = String(($('gateSel') && $('gateSel').value) || 'IF').toUpperCase();
+    if (GATES.indexOf(gt) < 0) return;
+    pushHistory();
+    const id = newNodeId(g);
+    const n = upsertNode(g, id, gt + (isEn() ? ' gate' : '门'), gt === 'IF' ? 'diamond' : 'round', null);
+    n.gate = gt; n._autoGate = gt;
+    if (gt === 'IF') n.kind = n.kind || 'cond';   // 与「＋条件」一致：IF 也是条件节点
+    const r = svg.getBoundingClientRect(), w = clientToWorld(r.left + r.width/2, r.top + r.height/2);
+    const k = g.nodes.length % 6;
+    n.x = Math.round(w.x - n.w/2 + k * 26); n.y = Math.round(w.y - n.h/2 + k * 20);
+    setSel({type:'node', id}); syncCode(); markDirty(); flashNodes([id]);
+    toast(tx('已插入逻辑门节点：{0}', gateLabel(gt)));
+  }
+  if ($('btnGate')) $('btnGate').addEventListener('click', addGateNode);
   function addTplToCanvas(){
     const tpl = normalize(JSON.parse(JSON.stringify(flowTemplate('', isEn()))));
     autoLayout(tpl, 'TD');
@@ -5095,6 +5305,10 @@ if (typeof document !== "undefined") var UI = function(){
     if (distFollowOn) distFollowCurrent(true);
     toast(distFollowOn ? T('已开启：自动跟随当前对话画布') : T('已关闭自动跟随'));
   });
+  // v0.27.6 分布工作区头部：＋新建画布 / ＋新建项目 / 🧠 全部加入神经网络
+  if ($('btnNewWf2')) $('btnNewWf2').addEventListener('click', () => $('btnNewWf').click());
+  if ($('btnNewProj')) $('btnNewProj').addEventListener('click', newProject);
+  if ($('btnNnAll')) $('btnNnAll').addEventListener('click', () => nnSetAll(true));
   if ($('agRefresh')) $('agRefresh').addEventListener('click', () => renderAgents(true));
 
   // ---------- 工作流操作（分布工作区卡片 / 总控表格共用） ----------
@@ -5170,6 +5384,15 @@ if (typeof document !== "undefined") var UI = function(){
     root.querySelectorAll('[data-ren]').forEach(b => b.addEventListener('click', () => { renameWf(b.dataset.ren); if (curView === 'dist') renderDist(); if (curView === 'ctl') renderCtl(); }));
     root.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { deleteWf(b.dataset.del); if (curView === 'dist') renderDist(); if (curView === 'ctl') renderCtl(); }));
     root.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', () => exportWf(b.dataset.exp)));
+    // v0.27.6 分布工作区：🧠 一键加入 / 移出神经网络；删除空项目
+    root.querySelectorAll('[data-nn]').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      toggleNnCard(b.getAttribute('data-nn'));
+    }));
+    root.querySelectorAll('[data-delproj]').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      removeProject(b.getAttribute('data-delproj'));
+    }));
     // v0.25.0 一键跳转对话：到「💬 问答」并按该会话过滤
     root.querySelectorAll('[data-qa]').forEach(b => b.addEventListener('click', () => {
       const p = String(b.dataset.qa).split('|');
@@ -5329,8 +5552,11 @@ if (typeof document !== "undefined") var UI = function(){
     const convMeta = isConv
       ? '<div class="meta">📁 ' + escXml(projectKeyOf(w)) + (w.src.parent ? ' · ' + T('挂在：') + escXml(w.src.parent) : '') + '</div>'
       : '';
-    return '<div class="wfcard' + (isActive ? ' wfcur' : '') + '" data-card="' + escXml(w.name) + '">' +
+    // v0.27.6：卡片可拖动（拖到别的项目框 = 归到那个项目；拖到某张卡片上 = 插到它前面）；🧠 一键加入/移出神经网络
+    const nnOff = w.nnOn === false;
+    return '<div class="wfcard' + (isActive ? ' wfcur' : '') + '" data-card="' + escXml(w.name) + '" draggable="true" title="' + escXml(T('可拖动：拖到别的项目框可改归属，拖到卡片上可调整顺序')) + '">' +
       '<h5><span title="' + escXml(title) + '">' + escXml(title) + '</span>' +
+      '<span class="nnbtn' + (nnOff ? ' off' : ' on') + '" data-nn="' + escXml(w.name) + '" title="' + escXml(nnOff ? T('点击加入神经网络') : T('已加入神经网络，点击移出')) + '">🧠 ' + escXml(nnOff ? T('加入') : T('已加入')) + '</span>' +
       (isActive ? '<span class="cur" title="' + T('当前对话画布（自动跟随）') + '">' + T('当前') + '</span>' : '') + '</h5>' +
       (isConv ? '' : '<div class="meta">' + escXml(w.name) + '</div>') +
       '<div class="meta">' + tx('节点 {0} · 连线 {1}', (d.nodes||[]).length, (d.edges||[]).length) + (gates.length ? ' · ' + T('门') + ' ' + escXml(gates.join(',')) : '') + (subs.length ? '<br>' + T('子流程 → ') + escXml(subs.join('、')) : '') + '</div>' + agentRow + convMeta +
@@ -5338,13 +5564,14 @@ if (typeof document !== "undefined") var UI = function(){
   }
   function renderDist(){
     const grid = $('wfGrid');
-    // 按项目分组：同一项目的多个智能体会话「框起来」共处一框
-    const groups = groupByProject(WF.list);
+    // 按项目分组：同一项目的多个智能体会话「框起来」共处一框（v0.27.6：把显式项目也带上）
+    const groups = groupByProject(WF.list, WF.projects);
     const parts = [];
     groups.forEach(grp => {
-      const convs = grp.convs.slice().sort((a, b) => ((b.src && b.src.ts) || 0) - ((a.src && a.src.ts) || 0));
+      // v0.27.6 排序：用户拖过（有 order）的按 order，其余按会话时间倒序
+      const convs = grp.convs.slice().sort(byOrderThenTsDown);
       const others = grp.others || [];
-      if (!convs.length && !others.length) return;
+      if (!convs.length && !others.length && !grp.empty) return;
       // 项目框头：项目名 + 智能体/会话计数 + 协作接力链
       const agents = agentsInProject(WF.list, grp.project);
       const collab = projectCollaboration(WF.list, grp.project);
@@ -5354,18 +5581,132 @@ if (typeof document !== "undefined") var UI = function(){
         .map(g => '<span class="pgchip" style="border-color:' + g.color + '"><i style="background:' + g.color + '"></i>' + escXml(g.label.replace(/ CLI$/, '')) + '</span>')
         .join('<span class="pgarr">→</span>');
       const isFramework = grp.frame;
-      parts.push('<section class="pfgroup' + (isFramework ? ' pfgroup-fw' : '') + '" data-proj="' + escXml(grp.project) + '">' +
+      const total = convs.length + others.length;
+      const isExplicit = !isFramework && (WF.projects || []).some(p => p && p.key === grp.project);
+      parts.push('<section class="pfgroup' + (isFramework ? ' pfgroup-fw' : '') + (grp.empty ? ' pfgroup-empty' : '') + '" data-proj="' + escXml(grp.project) + '">' +
         '<header class="pfhead">' +
           '<span class="pfname">' + (isFramework ? '🧩 ' : '📁 ') + escXml(grp.project) + '</span>' +
-          '<span class="pfstat">' + tx('{0} 智能体 · {1} 会话', agents.length || 1, convs.length) + (nSub ? ' · 🤖 ' + nSub : '') + '</span>' +
+          '<span class="pfstat">' + tx('{0} 智能体 · {1} 会话', agents.length || 1, convs.length) + (nSub ? ' · 🤖 ' + nSub : '') + (grp.empty ? ' · ' + T('空项目') : '') + '</span>' +
           (chain ? '<span class="pfchain" title="' + T('协作接力顺序') + '">' + chain + '</span>' : '') +
+          (isExplicit && !total ? '<button class="small pfx" data-delproj="' + escXml(grp.project) + '" title="' + T('删除这个空项目') + '">✕ ' + T('删除项目') + '</button>' : '') +
         '</header>' +
-        '<div class="pfbody">' + convs.concat(others).map(distCardHtml).join('') + '</div>' +
+        '<div class="pfbody">' + convs.concat(others).map(distCardHtml).join('') +
+          (total ? '' : '<p class="hint pfdrop">' + T('把画布卡片拖到这里即可归到这个项目') + '</p>') + '</div>' +
       '</section>');
     });
     grid.innerHTML = parts.join('') || '<p class="hint">' + T('暂无画布。先到「💬 问答」同步本地记录，再生成对话画布。') + '</p>';
     bindWfOps(grid);
+    bindDistDrag(grid);
     distFollowCurrent(true);
+  }
+  // 分布卡片排序：用户拖过的（有 order）优先按 order，其余按会话时间倒序
+  function byOrderThenTsDown(a, b){
+    const ao = a.order, bo = b.order;
+    const an = typeof ao === 'number', bn = typeof bo === 'number';
+    if (an && bn && ao !== bo) return ao - bo;
+    if (an && !bn) return -1;
+    if (!an && bn) return 1;
+    return (((b.src && b.src.ts) || 0) - ((a.src && a.src.ts) || 0));
+  }
+  // ---------- v0.27.6 分布工作区：拖动调整 / 新建项目 / 一键加入神经网络 ----------
+  function distCardByName(name){ return WF.list.find(w => w.name === name); }
+  function toggleNnCard(name){
+    const w = distCardByName(name); if (!w) return;
+    setNnCard(w, w.nnOn === false);
+  }
+  function setNnCard(w, on){
+    if (on) delete w.nnOn; else w.nnOn = false;
+    saveAll(); renderDist();
+    if (curView === 'nn') renderNn();
+    toast(on ? tx('已加入神经网络：{0}', w.name) : tx('已移出神经网络：{0}', w.name));
+  }
+  function nnSetAll(on){
+    let n = 0;
+    WF.list.forEach(w => {
+      const off = w.nnOn === false;
+      if (on && off){ delete w.nnOn; n++; }
+      else if (!on && !off){ w.nnOn = false; n++; }
+    });
+    saveAll(); renderDist();
+    if (curView === 'nn') renderNn();
+    if (!n) return toast(on ? T('全部画布都已在神经网络里') : T('全部画布都已移出神经网络'));
+    toast(on ? tx('已把 {0} 个画布加入神经网络', n) : tx('已把 {0} 个画布移出神经网络', n));
+  }
+  function newProject(){
+    const nm = prompt(T('新项目名称：'), T('新项目'));
+    if (nm == null) return;
+    const key = String(nm).trim().slice(0, 40);
+    if (!key) return;
+    WF.projects = WF.projects || [];
+    if (WF.projects.some(p => p && p.key === key)) return toast(T('项目已存在'));
+    WF.projects.push({ key: key, ts: Date.now() });
+    saveAll(); renderDist();
+    toast(tx('已新建项目：{0}（把卡片拖进去即可）', key));
+  }
+  function removeProject(key){
+    WF.projects = (WF.projects || []).filter(p => p && p.key !== key);
+    saveAll(); renderDist();
+    toast(tx('已删除空项目：{0}', key));
+  }
+  // 拖动落位：把 name 移到 projKey 项目下；beforeName 非空则插到它前面，否则追加到末尾
+  // 规则：w.proj 是显式项目覆盖（projectKeyOf 优先读它）；对话画布不允许拖到「流程框架」
+  function moveCard(name, projKey, beforeName){
+    const w = distCardByName(name); if (!w) return;
+    const isConv = !!(w.src && w.src.session);
+    if (!projKey) return;
+    if (projKey === '流程框架'){
+      if (isConv) return toast(T('对话画布不能移到「流程框架」，请拖到某个项目下'));
+      delete w.proj;
+    } else {
+      w.proj = projKey;
+      WF.projects = WF.projects || [];
+      if (!WF.projects.some(p => p && p.key === projKey)) WF.projects.push({ key: projKey, ts: Date.now() });
+    }
+    const groups = groupByProject(WF.list, WF.projects);
+    const g = groups.find(x => x.project === projKey);
+    const members = (g ? g.convs.concat(g.others) : []).filter(x => x.name !== name);
+    const at = beforeName ? members.findIndex(x => x.name === beforeName) : -1;
+    if (at >= 0) members.splice(at, 0, w); else members.push(w);
+    members.forEach((x, i) => { x.order = i; });
+    saveAll(); renderDist();
+    toast(tx('已移动到「{0}」', projKey));
+  }
+  // 卡片拖动：拖到别的项目框 = 改归属；拖到某张卡片上 = 插到它前面（并归到同一项目）
+  function bindDistDrag(grid){
+    if (!grid) return;
+    let dragName = '';
+    const clearMarks = () => grid.querySelectorAll('.dropover,.dropbefore').forEach(e => e.classList.remove('dropover', 'dropbefore'));
+    grid.querySelectorAll('.wfcard[data-card]').forEach(card => {
+      card.addEventListener('dragstart', ev => {
+        dragName = card.getAttribute('data-card');
+        try { ev.dataTransfer.setData('text/plain', dragName); ev.dataTransfer.effectAllowed = 'move'; } catch(e){}
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => { card.classList.remove('dragging'); clearMarks(); });
+      card.addEventListener('dragover', ev => { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch(e){} card.classList.add('dropbefore'); });
+      card.addEventListener('dragleave', () => card.classList.remove('dropbefore'));
+      card.addEventListener('drop', ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        card.classList.remove('dropbefore');
+        const from = dragName || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+        const sec = card.closest('.pfgroup');
+        const proj = sec ? sec.getAttribute('data-proj') : '';
+        const before = card.getAttribute('data-card');
+        dragName = '';
+        if (from && from !== before) moveCard(from, proj, before);
+      });
+    });
+    grid.querySelectorAll('.pfgroup').forEach(sec => {
+      sec.addEventListener('dragover', ev => { ev.preventDefault(); sec.classList.add('dropover'); });
+      sec.addEventListener('dragleave', ev => { if (!sec.contains(ev.relatedTarget)) sec.classList.remove('dropover'); });
+      sec.addEventListener('drop', ev => {
+        ev.preventDefault();
+        sec.classList.remove('dropover');
+        const from = dragName || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+        dragName = '';
+        if (from) moveCard(from, sec.getAttribute('data-proj'), '');
+      });
+    });
   }
   // 自动跟随当前对话画布：滚到可见 + 高亮（不是点哪个哪个才当前）
   function distFollowCurrent(force){
@@ -5963,6 +6304,16 @@ if (typeof document !== "undefined") var UI = function(){
     else syncStatus((httpWritable ? '🌐 ' : '👁 ') + httpWatch.name + (httpWritable ? T('（HTTP 自动连接 · 双向）') : T('（HTTP 只读：用 flow_serve.py 启动可写回）')));
   }
   function syncStatus(t){ $('syncStat').textContent = t; }
+  // v0.27.6：连接文件一律作用于「同步归属画布」（主流程根）。
+  //   此前若当前停在对话画布，连上文件后改动会被 pickSyncOwner 静默拦下，用户只会看到
+  //   「⏸ 文件同步仅作用于 主流程」——看起来像"连上了却没同步"。现在先切回归属画布再连。
+  function ensureSyncOwnerCanvas(){
+    const owner = pickSyncOwner();
+    if (WF.active === owner) return owner;
+    switchWorkflow(owner);
+    toast(tx('已切到主流程「{0}」：文件同步只作用于它', owner));
+    return owner;
+  }
   const FH_DB = 'cmflow-sync';
   function idbOpen(){
     return new Promise((res, rej) => {
@@ -6107,6 +6458,7 @@ if (typeof document !== "undefined") var UI = function(){
       loadHttpUsage(); loadHttpTokens(); loadHttpClientUsage(); loadHttpSettings();   // usage.jsonl / rollout / 多客户端用量 / 模型单价
       skillHint();                                          // 技能工坊能力提示随之刷新
       startQaSync();                                        // 问答视图：最新会话 + 全部子智能体自动同步（每 6s）
+      if (typeof refreshRecentFiles === 'function') refreshRecentFiles(true);   // v0.27.6：正在改动中的文件
     }
     if (!w){
       // 无同步文件（直接打开编辑器）：不做双向同步；服务未启动则提示并 4 秒后重试（服务稍后启动也能自动接上）
@@ -6188,7 +6540,9 @@ if (typeof document !== "undefined") var UI = function(){
           await w.write(out); await w.close();
           label = (fh.name || '');
         } else {
-          const r = await fetch(httpWatch.writeUrl, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ text:out }) });
+          // v0.27.6：连的是「正在改动中的文件」时按相对路径写回（/__flow_write_path）
+          const payload = httpWatch.writePath ? { path: httpWatch.writePath, text: out } : { text: out };
+          const r = await fetch(httpWatch.writeUrl, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
           const j = await r.json().catch(() => null);
           if (!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
           label = httpWatch.name;
@@ -6201,6 +6555,83 @@ if (typeof document !== "undefined") var UI = function(){
     }, 800);
   }
   $('btnSync').addEventListener('click', connectSyncFile);
+
+  // ---------- v0.27.6 「正在改动中的文件」检测 + 下拉一键连接 ----------
+  // 后台（flow_serve.py）扫描服务目录，按 mtime 倒序给出最近改动过的文件；
+  // 编辑器下拉选中 → 直接把画布连到它（HTTP 双向同步，绕开浏览器文件选择器）。
+  let lastFileScan = 0;
+  function agoText(sec){
+    sec = Math.max(0, Math.floor(sec || 0));
+    if (sec < 60) return T('<1 分钟前');
+    if (sec < 3600) return tx('{0} 分钟前', Math.round(sec / 60));
+    if (sec < 86400) return tx('{0} 小时前', Math.round(sec / 3600));
+    return tx('{0} 天前', Math.round(sec / 86400));
+  }
+  async function refreshRecentFiles(quiet){
+    const sel = $('fileSel');
+    if (!sel) return 0;
+    if (!/^https?:$/.test(location.protocol)){
+      if (!quiet) toast(T('需要由 flow_serve.py 托管才能检测正在改动的文件'));
+      return 0;
+    }
+    if (!(httpCaps && httpCaps.recent)){
+      if (!quiet) toast(T('本地服务版本较旧：没有 /__flow_recent_files 端点，请用新版 flow_serve.py'));
+      return 0;
+    }
+    lastFileScan = Date.now();
+    try {
+      const r = await fetch('__flow_recent_files?within=720&limit=40&_=' + Date.now(), { cache: 'no-store' });
+      const j = await r.json();
+      if (!j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+      const files = j.files || [];
+      const keep = sel.value;
+      const cur = (httpWatch && httpWatch.writePath) || '';
+      sel.innerHTML = '<option value="">' + escXml(T('🔌 正在改动中的文件…')) + '</option>' +
+        files.map(f => '<option value="' + escXml(f.rel) + '">' + escXml(agoText(f.ageSec) + ' · ' + f.rel) + '</option>').join('');
+      if (keep && files.some(f => f.rel === keep)) sel.value = keep;
+      else if (cur && files.some(f => f.rel === cur)) sel.value = cur;
+      sel.title = tx('检测到 {0} 个最近改动的文件（根目录：{1}）', files.length, j.root || '');
+      return files.length;
+    } catch(e){
+      if (!quiet) toast(T('检测失败：') + ((e && e.message) || e));
+      return 0;
+    }
+  }
+  // 连接下拉里选中的文件（HTTP 双向同步；与 showOpenFilePicker 句柄互斥）
+  async function connectHttpWatchFile(rel){
+    if (!rel) return toast(T('请先在下拉里选一个文件'));
+    if (!/^https?:$/.test(location.protocol)) return toast(T('需要由 flow_serve.py 托管才能连接文件'));
+    if (fh){ fh = null; }
+    if (httpTimer){ clearInterval(httpTimer); httpTimer = null; }
+    // 先摘掉旧同步目标（否则切画布时可能把旧内容写进新文件）
+    httpWatch = null; httpWritable = false;
+    ensureSyncOwnerCanvas();
+    try {
+      const r = await fetch(rel + '?_=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const txt = await r.text();
+      httpWatch = { name: rel, fileUrl: rel, writeUrl: '__flow_write_path', writePath: rel };
+      httpWritable = true;
+      httpFileText = lastFileText = txt;
+      lastWritten = '';
+      syncKind = guessKind(txt);
+      applyingFile = true;
+      try { setTab(syncKind); loadText(txt, true, ''); }
+      finally { applyingFile = false; }
+      if (!httpTimer) httpTimer = setInterval(pollHttpFile, 1500);
+      if (typeof refreshSyncHint === 'function') refreshSyncHint();
+      syncStatus('🔗 ' + rel + T('（HTTP 自动连接 · 双向）'));
+      toast(tx('已连接文件：{0}（AI 改文件 / 你改画布都会自动同步）', rel));
+    } catch(e){
+      toast(T('连接失败：') + ((e && e.message) || e));
+    }
+  }
+  if ($('btnFileRefresh')) $('btnFileRefresh').addEventListener('click', () => refreshRecentFiles(false));
+  if ($('btnFileConn')) $('btnFileConn').addEventListener('click', () => connectHttpWatchFile($('fileSel') && $('fileSel').value));
+  if ($('fileSel')){
+    $('fileSel').addEventListener('focus', () => { if (Date.now() - lastFileScan > 12000) refreshRecentFiles(true); });
+    $('fileSel').addEventListener('click', () => { if (Date.now() - lastFileScan > 12000) refreshRecentFiles(true); });
+  }
 
   // ---------- 🧩 Agent Skills / 📜 轨迹查询（独立视图，共用一份 usage 数据；HTTP 托管时自动载入） ----------
   let usageAgg = null, usageRecords = [], usageSrc = '', tokenAgg = null, tokenLoading = false, tokenFail = false;
@@ -7202,7 +7633,8 @@ if (typeof document !== "undefined") var UI = function(){
     // 面积权重模式（#nnLayout）：lines 按文字行数 / turns 按对话轮数 / even 等面积
     const wmode = ($('nnLayout') && $('nnLayout').value) || 'lines';
     // v0.27.3：按智能体过滤（图例点击）——只保留该客户端（cwd 客户端 id）的会话
-    const L = (list || []).filter(w => w && w.data && w.src && w.src.session
+    // v0.27.6：分布工作区里被「移出神经网络」的画布（nnOn === false）不参与
+    const L = (list || []).filter(w => w && w.data && w.src && w.src.session && w.nnOn !== false
       && (!nnFilterClient || (w.src.client || 'zcode') === nnFilterClient));
     const groups = groupByProject(L).filter(g => g.convs.length);
     const root = { id: 'root', kind: 'root', label: '全部项目', children: [], weight: 0,
@@ -8263,6 +8695,7 @@ if (typeof document !== "undefined") var UI = function(){
   if (stored && (!payRev || stored.rev === payRev)){
     // 无注入数据，或注入数据与上次一致 → 用本地存档（保留用户的手工修改）
     WF = stored;
+    wfRestoreTried = true;   // 本地存档已是完整树：不需要再从服务端恢复，直接允许备份写回
   } else {
     // 命令新生成的工作副本（rev 变了）→ 主流程以注入数据重新播种；
     // 但「会话/对话画布」（src.session 标记）是用户同步/导入的历史记录，必须保留——
@@ -8304,6 +8737,8 @@ if (typeof document !== "undefined") var UI = function(){
   applyLang();
   fillWfSel(); renderCrumb();
   const first = WF.list.find(w => w.name === WF.active) || WF.list[0];
+  // v0.27.6 显式项目列表（空项目框 / 拖动归属）；老存档没有这个字段，补空数组
+  if (!Array.isArray(WF.projects)) WF.projects = [];
   g = normalize(JSON.parse(JSON.stringify(first.data)));
   if (!g.errors) g.errors = [];
   if (!g.nodes.some(n => n.x || n.y)) autoLayout(g, g.dir); // 存档也没有坐标（首次注入）时先布局
@@ -8332,7 +8767,10 @@ if (typeof document !== "undefined") var UI = function(){
     isLinkKind, edgeDirFor, edgeDirOf, sideAnchors, KIND_GATE, KINDS: () => KINDS, KIND_CN: () => KIND_CN,
     // v0.27.5 测试钩子：判断块 / 判断词 / 属性面板
     addBranchBlock, BRANCH_PAIRS: () => BRANCH_PAIRS, branchLabels, isBranchPairLabels,
-    setSel, renderPanel, sel: () => sel };
+    setSel, renderPanel, sel: () => sel,
+    // v0.27.6 测试钩子：分布工作区（项目 / 拖动 / 神经网络开关）+ 逻辑门
+    addGateNode, newProject, removeProject, moveCard, toggleNnCard, nnSetAll,
+    projects: () => WF.projects, wfList: () => WF.list, distCardHtml, byOrderThenTsDown };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

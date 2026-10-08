@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const OUT = "C:/Users/35446/WorkBuddy/2026-10-08-01-51-18/nn-shots";
+const OUT = process.env.NN_SHOTS_OUT || join(process.env.TEMP || ".", "cmflow-live-shots");
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
 const root = join(process.env.LOCALAPPDATA, "ms-playwright");
@@ -22,6 +22,17 @@ page.on("pageerror", e => errs.push(String(e && e.message || e)));
 await page.goto(URL, { waitUntil: "load" });
 await page.waitForFunction(() => window.__flow && window.__flow.g(), null, { timeout: 20000 });
 console.log("页面加载 OK（实时服务）");
+
+// v0.27.6：本脚本会真的改动工作副本（连文件会切画布、写回会落盘），所以**先快照服务端工作流备份**，
+// 跑完原样还原——否则测试自己的临时画布会留在用户的 wf-backup.json 里。
+let wfSnapshot = null;
+try {
+  wfSnapshot = await page.evaluate(async () => {
+    const j = await (await fetch("__flow_wf_state?_=" + Date.now(), { cache: "no-store" })).json();
+    return (j && j.ok && j.exists) ? j.tree : null;
+  });
+} catch(e){}
+console.log(wfSnapshot ? ("已快照服务端工作副本：" + ((wfSnapshot.list || []).length) + " 个画布") : "未能快照服务端工作副本（跳过还原）");
 
 // 造一段「有真实问答」的会话画布，然后核对方框 / 连线 / 端口 / 神经网络
 const rep = await page.evaluate(() => {
@@ -96,10 +107,87 @@ ok(rep.nn.total >= 4, "神经网络正文有文字行（实际 " + rep.nn.total 
 ok(rep.nn.maxDupInSess === 0, "同一会话内无重复行（最大重复 " + rep.nn.maxDupInSess + "）");
 ok(/BCrypt|Sa-Token|LoginController/.test(rep.nn.joined), "神经网络写入具体问答（不是重复标题）");
 
+// ========== v0.27.6 后台文件检测 + 下拉选择连接正在改动的文件（全程用临时草稿文件，不碰真实文件）==========
+const SCRATCH = "_verify-live-scratch.mmd";
+const SCRATCH_MERMAID = ["flowchart LR", '  s1["草稿起点"]', '  s2["草稿终点"]', "  s1 --> s2"].join("\n");
+let liveFile = null;
+try {
+  // 1) 用「按路径写回」接口造一个草稿文件（同时也是对 /__flow_write_path 的验证）
+  const w0 = await page.evaluate(async ([rel, txt]) => {
+    const r = await fetch("__flow_write_path", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: rel, text: txt }) });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  }, [SCRATCH, SCRATCH_MERMAID]);
+  ok(w0.status === 200 && w0.body && w0.body.ok, "/__flow_write_path 可写服务根目录内的相对路径");
+
+  const guard = await page.evaluate(async () => {
+    const post = async path => (await fetch("__flow_write_path", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: path, text: "x" }) })).status;
+    return { up: await post("../../../evil.txt"), abs: await post("C:/Windows/win.ini") };
+  });
+  ok(guard.up === 400, "越界相对路径（../../../）被拒绝（HTTP " + guard.up + "）");
+  ok(guard.abs === 400, "白名单外绝对路径被拒绝（HTTP " + guard.abs + "）");
+
+  // 2) 重新检测 → 下拉里应出现这个刚改动过的文件
+  await page.evaluate(() => document.getElementById("btnFileRefresh").click());
+  await page.waitForTimeout(900);
+  const selState = await page.evaluate(rel => {
+    const sel = document.getElementById("fileSel");
+    if (!sel) return null;
+    const hit = [...sel.options].some(o => o.value === rel);
+    sel.value = rel;
+    return { n: sel.options.length - 1, hit: hit, title: sel.title, hasBtn: !!document.getElementById("btnFileConn") };
+  }, SCRATCH);
+  ok(selState && selState.hasBtn, "工具栏存在「🔗 连接选中文件」按钮");
+  ok(selState && selState.n >= 1, "「正在改动中的文件」下拉检测到文件（" + (selState ? selState.n : 0) + " 个）");
+  ok(selState && selState.hit, "刚写下的草稿文件出现在下拉里");
+  ok(selState && /最近改动的文件/.test(selState.title || ""), "下拉 title 显示检测结果与根目录");
+
+  // 3) 连接它 → 画布应载入草稿内容
+  await page.evaluate(() => document.getElementById("btnFileConn").click());
+  await page.waitForTimeout(1200);
+  const afterConn = await page.evaluate(() => ({
+    counts: window.__flow.counts(),
+    status: (document.getElementById("syncStat") || {}).textContent || "",
+    sync: window.__flow.sync(),
+  }));
+  ok(afterConn.counts.nodes === 2, "连接后画布载入草稿的 2 个节点（实际 " + afterConn.counts.nodes + "）");
+  ok(afterConn.sync && afterConn.sync.mode === "http-rw", "进入 HTTP 双向同步模式（mode=" + (afterConn.sync && afterConn.sync.mode) + "）");
+  ok(new RegExp(SCRATCH).test(afterConn.status) || new RegExp(SCRATCH).test((afterConn.sync && afterConn.sync.name) || ""), "状态栏显示已连接的草稿文件");
+
+  // 4) 改画布 → 应自动写回草稿文件
+  await page.evaluate(() => {
+    const F = window.__flow, gg = F.g();
+    gg.nodes.push({ id: "s3", label: "写回验证", shape: "rect", sub: null, gate: "", subflow: "", kind: "agent", doc: "", x: 300, y: 0, w: 0, h: 0 });
+    F.refresh(false);
+    F.saveAll ? F.saveAll() : null;
+  });
+  await page.evaluate(() => { const b = document.getElementById("btnAdd"); if (b) b.click(); });
+  await page.waitForTimeout(2200);
+  liveFile = await page.evaluate(async rel => (await (await fetch(rel + "?_=" + Date.now(), { cache: "no-store" })).text()), SCRATCH);
+  ok(/写回验证|新节点/.test(liveFile), "画布改动自动写回了正在改动的文件（HTTP 双向同步生效）");
+} catch(e){
+  ok(false, "文件检测/连接链路抛异常：" + ((e && e.message) || e));
+} finally {
+  // 清理草稿文件（内容清空成空串，等价于删除）
+  try { await page.evaluate(async rel => { await fetch("__flow_write_path", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: rel, text: "" }) }); }, SCRATCH); } catch(e){}
+}
+
 const fp = join(OUT, "live-verify.png");
 await page.waitForTimeout(600);
 await page.screenshot({ path: fp });
 console.log("shot:", fp);
+// 还原服务端工作副本快照（必须在关闭浏览器前做）
+if (wfSnapshot){
+  try {
+    const back = await page.evaluate(async tree => {
+      const r = await fetch("__flow_wf_state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tree: tree }) });
+      const j = await r.json().catch(() => null);
+      return { status: r.status, ok: !!(j && j.ok) };
+    }, wfSnapshot);
+    console.log("已还原服务端工作副本快照：", back.ok ? "ok" : ("失败 HTTP " + back.status));
+  } catch(e){ console.log("还原快照失败：", (e && e.message) || e); }
+}
 console.log("页面错误:", errs.length ? errs.slice(0, 4).join(" | ") : "none");
 console.log("\n" + pass + " passed, " + fail + " failed");
 await browser.close();
