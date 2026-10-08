@@ -239,6 +239,102 @@ const brIssues = await page.evaluate(async () => {
 ok(/一对判断词/.test(brIssues.bad), "校验能识别「是 / 真」不是一对并提示（" + brIssues.bad.replace(/\s+/g, " ").slice(0, 70) + "）");
 ok(!/一对判断词/.test(brIssues.good), "改回「是 / 否」后不再提示");
 
+// ---------- 5c) v0.27.7 连线去重叠（共走廊的交叉连线必须错开） ----------
+const lanes = await page.evaluate(async () => {
+  const F = window.__flow, gg = F.g();
+  gg.nodes.length = 0; gg.edges.length = 0; gg.subs.length = 0;
+  // 经典重叠场景：左上→右下 与 左下→右上 两条交叉连线，LR 下中间通道会完全重合
+  const mk = (id, x, y, label) => ({ id, label, shape: "rect", sub: null, gate: "", subflow: "", kind: "agent", doc: "", x, y, w: 236, h: 60 });
+  gg.nodes.push(mk("A", 0, 0, "A 左上"), mk("B", 0, 260, "B 左下"),
+                mk("C", 520, 0, "C 右上"), mk("D", 520, 260, "D 右下"));
+  gg.edges.push({ from: "A", to: "D", label: "", style: "solid" });
+  gg.edges.push({ from: "B", to: "C", label: "", style: "solid" });
+  gg.dir = "LR";
+  if (document.getElementById("dirSel")) document.getElementById("dirSel").value = "LR";
+  F.refresh(true);
+  await new Promise(r => setTimeout(r, 300));
+  const ds = [...document.querySelectorAll("#cv path.eg")].map(pl => pl.getAttribute("d"));
+  // 直接从 d 解析「在曲线上的顶点」（M/L 各一点，Q 取终点、跳过控制点）
+  const vertsOf = d => {
+    const nums = String(d).match(/-?\d+(?:\.\d+)?/g).map(Number);
+    const out = [];
+    let i = 0;
+    // M/L 各 1 对；Q 有 2 对（控制点 + 终点），只收终点
+    const cmds = String(d).match(/[MLQ]/g) || [];
+    cmds.forEach(c => {
+      if (c === 'Q'){ i += 2; out.push([nums[i], nums[i + 1]]); i += 2; }
+      else { out.push([nums[i], nums[i + 1]]); i += 2; }
+    });
+    return out;
+  };
+  const segsOf = vs => { const o = []; for (let i = 1; i < vs.length; i++) o.push({ x1: vs[i-1][0], y1: vs[i-1][1], x2: vs[i][0], y2: vs[i][1] }); return o; };
+  // 两条线段若同向且共线（横向共 y / 纵向共 x，容差 1.5px），返回它们重叠的长度
+  const overlapLen = (a, b) => {
+    const ah = Math.abs(a.y1 - a.y2) < 1, bh = Math.abs(b.y1 - b.y2) < 1;
+    if (ah && bh){
+      if (Math.abs(a.y1 - b.y1) > 1.5) return 0;
+      return Math.max(0, Math.min(Math.max(a.x1, a.x2), Math.max(b.x1, b.x2)) - Math.max(Math.min(a.x1, a.x2), Math.min(b.x1, b.x2)));
+    }
+    const av = Math.abs(a.x1 - a.x2) < 1, bv = Math.abs(b.x1 - b.x2) < 1;
+    if (av && bv){
+      if (Math.abs(a.x1 - b.x1) > 1.5) return 0;
+      return Math.max(0, Math.min(Math.max(a.y1, a.y2), Math.max(b.y1, b.y2)) - Math.max(Math.min(a.y1, a.y2), Math.min(b.y1, b.y2)));
+    }
+    return 0;
+  };
+  const S0 = segsOf(vertsOf(ds[0])), S1 = segsOf(vertsOf(ds[1]));
+  let overlaps = 0, worst = 0;
+  for (const a of S0) for (const b of S1){ const L = overlapLen(a, b); if (L > 1){ overlaps++; worst = Math.max(worst, L); } }
+  const paths = [...document.querySelectorAll("#cv path.eg")];
+  const channelX = i => {
+    const vs = vertsOf(ds[i]).filter((v, k, arr) => k > 0 && Math.abs(v[0] - arr[k-1][0]) < 1);
+    if (!vs.length) return null;
+    vs.sort((x, y) => x[0] - y[0]);
+    return Math.round(vs[vs.length >> 1][0] * 10) / 10;
+  };
+  const chans = [channelX(0), channelX(1)];
+  return {
+    nEdges: ds.length, overlaps: overlaps, worst: Math.round(worst * 10) / 10, chans: chans,
+    gap: (chans[0] != null && chans[1] != null) ? Math.abs(chans[0] - chans[1]) : null,
+    plan: F.planLanes([{ i: 0, dir: "LR", ch: 378, lo: 30, hi: 230 }, { i: 1, dir: "LR", ch: 378, lo: 30, hi: 230 }], 26, 8),
+  };
+});
+ok(lanes.nEdges === 2, "两条交叉连线都画出来了（实际 " + lanes.nEdges + "）");
+ok(lanes.gap != null && lanes.gap >= 12, "共走廊的交叉连线各走各的竖向通道（间距 " + (lanes.gap == null ? "未测到" : lanes.gap.toFixed(1) + "px") + "）");
+ok(lanes.overlaps === 0, "两条连线没有任何一段共线压在一起（重叠线段 " + lanes.overlaps + " 对，最长 " + lanes.worst + "px）");
+ok(lanes.plan && lanes.plan[0] && lanes.plan[1] && lanes.plan[0].laneIdx !== lanes.plan[1].laneIdx && lanes.plan[0].laneCnt === 2,
+  "planLanes 把共走廊的两条线分到不同分道（" + JSON.stringify(lanes.plan) + "）");
+
+// —— 输入输出胶囊：点击跳转 + 选中 + 居中 + 高亮 ——
+const jump = await page.evaluate(async () => {
+  const F = window.__flow;
+  const before = { x: F.view().x, y: F.view().y, sel: F.sel() };
+  const pills = [...document.querySelectorAll("#cv .io-tag-g[data-jump]")];
+  const target = pills.find(p => p.getAttribute("data-jump") === "C") || pills[0];
+  const jumpId = target ? target.getAttribute("data-jump") : null;
+  const act = target ? target.getAttribute("class") : "";
+  const bg = target ? !!target.querySelector("rect.io-bg") : false;
+  if (target) target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await new Promise(r => setTimeout(r, 420));
+  const node = F.g().nodes.find(n => n.id === jumpId);
+  const el = document.querySelector('#cv [data-node="' + jumpId + '"]');
+  const r = document.getElementById("cv").getBoundingClientRect();
+  const cx = F.view().x + (node.x + node.w / 2) * F.view().z;
+  const cy = F.view().y + (node.y + node.h / 2) * F.view().z;
+  return {
+    n: pills.length, jumpId: jumpId, act: act, bg: bg,
+    sel: F.sel(), moved: (F.view().x !== before.x || F.view().y !== before.y),
+    centeredX: Math.abs(cx - r.width / 2) < 24, centeredY: Math.abs(cy - r.height * 0.42) < 24,
+    flashed: el ? el.classList.contains("nd-flash") : false,
+  };
+});
+ok(jump.n >= 3, "每个节点都有可点击的输入/输出胶囊（实际 " + jump.n + " 个）");
+ok(jump.bg && /io-tag-g/.test(jump.act), "胶囊是带底板的可点击元素（不是纯文字）");
+ok(jump.jumpId === "C", "点「指向 C」的胶囊拿到正确的跳转目标");
+ok(jump.sel && jump.sel.type === "node" && jump.sel.id === "C", "跳转后选中了目标节点（属性面板同步）");
+ok(jump.moved && jump.centeredX && jump.centeredY, "跳转把目标节点移到视口中央（偏移已校正）");
+ok(jump.flashed, "跳转后目标节点高亮闪烁（nd-flash）");
+
 // ---------- 6) 神经网络新增：层级显隐 / 角色分布 / 导出按钮 ----------
 const nnNew = await page.evaluate(async () => {
   const F = window.__flow, WF = F.wf(), NOW = Date.now(), H = 3600000;

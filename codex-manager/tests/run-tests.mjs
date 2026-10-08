@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf, isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN, BRANCH_PAIRS, branchPairOf, branchLabels, branchWords, isBranchPairLabels, branchLabelIssue };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf, isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN, planLanes, BRANCH_PAIRS, branchPairOf, branchLabels, branchWords, isBranchPairLabels, branchLabelIssue };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -34,7 +34,7 @@ const core = await import(pathToFileURL(corePath).href);
   nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText,
   ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows,
   ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf,
-  isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN,
+  isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN, planLanes,
   BRANCH_PAIRS, branchPairOf, branchLabels, branchWords, isBranchPairLabels, branchLabelIssue,
 } = core;
 
@@ -1377,6 +1377,48 @@ t("groupByProject：显式项目即使没有画布也要出现，且不算「流
   // 「流程框架」永远排最后
   const frameIdx = g2.findIndex(x => x.frame);
   eq(frameIdx, g2.length - 1, "「流程框架」排在末位");
+});
+
+t("planLanes：共走廊且跨度重叠的连线被分到不同分道（连线去重叠）", () => {
+  // 经典交叉：A→D 与 B→C 在 LR 下中间通道完全重合（ch 相同、跨度完全重叠）
+  const cross = [{ i: 0, dir: "LR", ch: 378, lo: 17.5, hi: 277.5 }, { i: 1, dir: "LR", ch: 378, lo: 17.5, hi: 277.5 }];
+  const p1 = planLanes(cross, 26, 8);
+  eq(p1[0].laneCnt, 2); eq(p1[1].laneCnt, 2);
+  okTest(p1[0].laneIdx !== p1[1].laneIdx, "两条分到不同分道：" + JSON.stringify(p1));
+  eq([p1[0].laneIdx, p1[1].laneIdx].sort().join(","), "0,1", "分道号是 0/1");
+});
+
+t("planLanes：只是通道相近、纵向不重叠 → 不分道（不制造无谓拐弯）", () => {
+  const p = planLanes([{ i: 0, dir: "LR", ch: 380, lo: 0, hi: 60 }, { i: 1, dir: "LR", ch: 382, lo: 200, hi: 260 }], 26, 8);
+  eq(Object.keys(p).length, 0);
+});
+
+t("planLanes：跨度重叠但通道离得远 → 不分道；不同方向互不干扰", () => {
+  eq(Object.keys(planLanes([{ i: 0, dir: "LR", ch: 200, lo: 0, hi: 300 }, { i: 1, dir: "LR", ch: 400, lo: 0, hi: 300 }], 26, 8)).length, 0,
+    "通道相差 200 > 26 → 不同簇");
+  eq(Object.keys(planLanes([{ i: 0, dir: "LR", ch: 378, lo: 0, hi: 200 }, { i: 1, dir: "TD", ch: 378, lo: 0, hi: 200 }], 26, 8)).length, 0,
+    "LR 与 TD 不互相分道");
+});
+
+t("planLanes：三条成簇 → laneCnt=3，slot 按跨度中点排序", () => {
+  // 三条跨度两两都真重叠（只共端点不算重叠）
+  const items = [
+    { i: 0, dir: "LR", ch: 378, lo: 30, hi: 230 },   // 中点 130
+    { i: 1, dir: "LR", ch: 378, lo: 30, hi: 200 },   // 中点 115
+    { i: 2, dir: "LR", ch: 378, lo: 60, hi: 230 },   // 中点 145
+  ];
+  const p = planLanes(items, 26, 8);
+  eq(p[0].laneCnt, 3); eq(p[1].laneCnt, 3); eq(p[2].laneCnt, 3);
+  eq(p[1].laneIdx, 0, "中点最小的排 0（上）");
+  eq(p[0].laneIdx, 1, "中间跨度居中");
+  eq(p[2].laneIdx, 2, "中点最大的排 2（下）");
+});
+
+t("planLanes：空数组 / 单条 / 非法输入都安全", () => {
+  eq(Object.keys(planLanes([], 26, 8)).length, 0);
+  eq(Object.keys(planLanes([{ i: 0, dir: "LR", ch: 1, lo: 0, hi: 9 }], 26, 8)).length, 0, "单条不分道");
+  eq(Object.keys(planLanes(null, 26, 8)).length, 0);
+  eq(Object.keys(planLanes([null, undefined, { i: 1 }], 26, 8)).length, 0, "缺 ch 的条目被跳过");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

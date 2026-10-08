@@ -44,6 +44,28 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
 - **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
 
+**v0.27.7 关键行为**（画布 UI 优化：连线去重叠 + 输入输出胶囊可点击跳转；用户诉求原文「画布ui优化，连线不要有重叠，方框上下的由谁指向的加一个点击跳转，跳转那个高亮显示，为了理清工作流程」）：
+
+- **连线去重叠 `planLanes`（`__CORE` 纯函数，可单测）**：输入 `[{i, dir, ch, lo, hi}]`
+  （`ch` = LR 的中间通道 x / TD 的中间通道 y；`[lo,hi]` = 交叉轴跨度），用**并查集**把
+  「|Δch| ≤ nearGap(26) **且** 跨度重叠 > minOverlap(8)」的线聚簇，簇内按跨度中点排序给 `0..k-1`。
+  **只相近不重叠 → 不分道**（不制造无谓拐弯）；不同 `dir` 不互相干扰。
+- **接线**：`render()` 里 `laneOf(i)` 把 planLanes 的分道与 `edgeMeta` 的平行边分道**相乘合并**
+  （`laneIdx = plan.laneIdx * meta.laneCnt + meta.laneIdx`），再交给 `routeOrtho`。
+- **⚠️ 分道间距保持 14px（`laneOff` in `routeOrtho`），别随手调大**：两条同 y 的收尾段分别停在
+  `channel ± 圆角(8)`，14px 恰好留 ~2px 缝（互不压住）；调到 22px 会让两段**真正交叠** 6px。
+  外绕路径同侧多条线再按 `Math.floor(laneIdx/2)*16` 错开。
+- **输入输出胶囊可点击跳转**：`.io-tag-g`（`rect.io-bg` + `text`，宽度用 `cjkWidth` 算）+ `data-jump=对方节点id`；
+  `jumpToNode(id)` = `setSel` → `centerOnNode`（`animateViewTo` rAF 补间 220ms ease-in-out）
+  → `flashNodes`（`.nd-flash`）→ toast 回显输入/输出条数。
+  `pointerdown` / `wheel` 开头都调 `stopPanTween()`，动画不抢操作。
+- **`applyView()` 里 `svg.classList.toggle('io-compact', view.z < 0.55)`**：缩小时自动隐藏胶囊（`#cv.io-compact .io-tag-g{display:none}`）。
+- **⚠️ e2e 判「连线重叠」要用共线线段重叠长度，不要用采样点距**：
+  点距 3px 会把「刻意留出的 2px 缝」误判成重叠（假阳性）。做法：解析 path 的 `d` 顶点
+  （M/L 各一对、Q 跳控制点取终点），同向且共线（容差 1.5px）的线段算 1D 区间重叠长度，断言为 0。
+- **测试**：单测 **121/121**、`e2e-canvas-nodes` **51/51**、`e2e-nn` 105/105、`verify-live` 21/21、
+  i18n missing 0、守卫 4/4 + 4/4。
+
 **v0.27.6 关键行为**（画布逻辑门 / 具体输入输出 / 后台文件检测与一键连接 + 分布工作区拖动增删建项目；用户诉求原文「画布添加逻辑门，添加输入输出，体现具体输入输出了什么，画布支持后台程序文件检测，下拉列表选择连接正在改动中的文件，分布式工作区支持拖动调整，添加或者删除，添加按键，分布式可以一键添加到神经网络，创建项目等」）：
 
 - **逻辑门快捷添加**：工具栏 `#gateSel`（8 个门）+ `#btnGate`；`addGateNode()` 用 `gt==='IF' ? 'diamond' : 'round'`，

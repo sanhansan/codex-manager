@@ -281,9 +281,15 @@
 #cv .nd-linkt { fill:var(--card-title); font-size:11px; pointer-events:none; }
 #cv .nd-link.nd-sel { stroke:var(--node-wire-hl); stroke-width:2.6; }
 /* v0.27.6 端口旁的「具体输入 / 输出」标签：显示相邻节点名（+ 边标签），画在卡片外侧 */
+/* v0.27.7：改成可点击胶囊 —— 点一下跳到「谁指向我 / 我指向谁」那个节点并高亮，用来顺着流程走 */
+#cv .io-tag-g { cursor:pointer; }
+#cv .io-bg { fill:var(--panel); stroke:var(--line); stroke-width:.8; opacity:.9; }
 #cv .io-tag { font-size:10px; fill:var(--muted); pointer-events:none; }
-#cv .io-in { fill:var(--card-port-line); }
-#cv .io-out { fill:var(--accent); }
+#cv .io-tag-g.io-in .io-tag { fill:var(--card-port-line); }
+#cv .io-tag-g.io-out .io-tag { fill:var(--accent); }
+#cv .io-tag-g:hover .io-bg { stroke:var(--accent); fill:color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+#cv .io-tag-g:hover .io-tag { fill:var(--accent); }
+#cv.io-compact .io-tag-g { display:none; }   /* 缩得太小（z<0.55）时隐藏，避免一片噪声 */
   #cv .port:hover { stroke:var(--accent); }
   #cv .eg { fill:none; stroke:var(--node-wire); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   #cv .eg-sel { stroke:var(--accent); stroke-width:3; }
@@ -2820,8 +2826,45 @@ function polylineFree(pts, obs, skip, pad){
 //   ① 首段沿端口法线方向离开、末段沿法线方向进入（LR 水平 / TD 垂直）；
 //   ② 通道落在不穿过任何卡片的空档里（逐档扫描），找不到才外绕；
 //   ③ 不会折返。
-function routeOrtho(p1, p2, opt){
-  opt = opt || {};
+// ---------- v0.27.7 连线去重叠：分道规划（纯函数，可单测） ----------
+// 输入每条边的「通道位置」与「跨度」：
+//   { i, dir:'LR'|'TD', ch, lo, hi }   ch = 折线的中间通道坐标（LR 是 x，TD 是 y）
+//                                      [lo,hi] = 该边在交叉轴上的覆盖范围
+// 输出 { i: {laneIdx, laneCnt} }：
+//   把「通道位置相近（≤ nearGap）且跨度真的重叠（> minOverlap）」的连线聚成一簇，
+//   簇内按跨度中点排序分配 0..k-1 的分道号 —— 这样同一走廊里的多条线会各自错开，
+//   而不是全部挤在同一个中间通道上叠在一起。
+// 注意：只有跨度**真的重叠**才算冲突；只是通道相近但一上一下的线保持原样（不制造无谓的拐弯）。
+function planLanes(items, nearGap, minOverlap){
+  const gap = nearGap == null ? 26 : nearGap;
+  const minOv = minOverlap == null ? 8 : minOverlap;
+  const arr = (Array.isArray(items) ? items : []).filter(x => x && typeof x.ch === 'number');
+  const out = {};
+  if (arr.length < 2) return out;
+  const parent = arr.map((x, k) => k);
+  const find = x => { while (parent[x] !== x){ parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const uni = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[rb] = ra; };
+  const order = arr.map((x, k) => k).sort((a, b) => arr[a].ch - arr[b].ch);
+  for (let s = 0; s < order.length; s++){
+    const A = arr[order[s]];
+    for (let t = s + 1; t < order.length; t++){
+      const B = arr[order[t]];
+      if (B.dir !== A.dir) continue;
+      if (B.ch - A.ch > gap) break;                       // 已按 ch 升序，后面的只会更远
+      if (Math.min(A.hi, B.hi) - Math.max(A.lo, B.lo) > minOv) uni(order[s], order[t]);
+    }
+  }
+  const groups = new Map();
+  arr.forEach((x, k) => { const r = find(k); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(k); });
+  groups.forEach(ks => {
+    if (ks.length < 2) return;                            // 单条不成簇：保持 laneIdx=0/laneCnt=1（不加偏移）
+    ks.sort((a, b) => ((arr[a].lo + arr[a].hi) - (arr[b].lo + arr[b].hi)) || (a - b));
+    ks.forEach((k, slot) => { out[arr[k].i] = { laneIdx: slot, laneCnt: ks.length }; });
+  });
+  return out;
+}
+
+function routeOrtho(p1, p2, opt){  opt = opt || {};
   const dir = opt.dir === 'TD' ? 'TD' : 'LR';
   const obs = opt.obstacles || [];
   const lanes = Math.max(1, opt.laneCnt || 1);
@@ -2829,6 +2872,9 @@ function routeOrtho(p1, p2, opt){
   const STUB = 16, GAP = 10, STEP = 10, SPAN = 520;
   const skip = { a: opt.a || null, b: opt.b || null };
   const free = pts => polylineFree(pts, obs, skip, 4);   // 留 4px 间隙，线不贴着卡片边走
+  // v0.27.7 分道间距 14：这是「同高水平段不互相压住」的最优值 ——
+  //   两段同 y 的收尾段分别停在 channel±圆角(8)，间距 14 时正好留出约 2px 空隙（各自独立、不叠），
+  //   间距加大到 22 反而会让两段互相**真正交叠** 6px（看起来像接成一条线）。
   const laneOff = lanes > 1 ? (laneIdx - (lanes - 1) / 2) * 14 : 0;
   if (dir === 'LR'){
     const span = p2.x - p1.x;
@@ -2844,18 +2890,20 @@ function routeOrtho(p1, p2, opt){
       }
     }
     // 外绕：走卡片上方 / 下方的横向通道（反馈边、或正走通道全被占）
+    // v0.27.7：同侧多条外绕线按 laneIdx 再错开，避免"绕出去还是叠在一起"
     const above = opt.feedback ? (laneIdx % 2 === 0) : (laneIdx % 2 === 0);
     const sgn = above ? -1 : 1;
+    const extra = Math.floor(laneIdx / 2) * 16;
     const y0 = above ? Math.min(p1.y, p2.y) : Math.max(p1.y, p2.y);
     const sx = p1.x + STUB, ex = p2.x - STUB;
     for (let d = GAP + STEP; d <= SPAN; d += STEP){
-      const ch = y0 + sgn * d;
+      const ch = y0 + sgn * (d + extra);
       if (Math.abs(ch - p1.y) < 4 || Math.abs(ch - p2.y) < 4) continue;
       const pts = [p1, { x: sx, y: p1.y }, { x: sx, y: ch }, { x: ex, y: ch }, { x: ex, y: p2.y }, p2];
       if (free(pts)) return pts;
     }
-    return [p1, { x: sx, y: p1.y }, { x: sx, y: y0 + sgn * (GAP + STEP) },
-            { x: ex, y: y0 + sgn * (GAP + STEP) }, { x: ex, y: p2.y }, p2];
+    return [p1, { x: sx, y: p1.y }, { x: sx, y: y0 + sgn * (GAP + STEP + extra) },
+            { x: ex, y: y0 + sgn * (GAP + STEP + extra) }, { x: ex, y: p2.y }, p2];
   }
   // TD
   const spanV = p2.y - p1.y;
@@ -2872,15 +2920,16 @@ function routeOrtho(p1, p2, opt){
   }
   const left = laneIdx % 2 === 0;
   const sgn2 = left ? -1 : 1;
+  const extra2 = Math.floor(laneIdx / 2) * 16;   // v0.27.7：同侧多条外绕线再错开
   const x0 = left ? Math.min(p1.x, p2.x) : Math.max(p1.x, p2.x);
   const sy = p1.y + STUB, ey = p2.y - STUB;
   for (let d = GAP + STEP; d <= SPAN; d += STEP){
-    const ch = x0 + sgn2 * d;
+    const ch = x0 + sgn2 * (d + extra2);
     if (Math.abs(ch - p1.x) < 4 || Math.abs(ch - p2.x) < 4) continue;
     const pts = [p1, { x: p1.x, y: sy }, { x: ch, y: sy }, { x: ch, y: ey }, { x: p2.x, y: ey }, p2];
     if (free(pts)) return pts;
   }
-  return [p1, { x: p1.x, y: sy }, { x: x0 + sgn2 * (GAP + STEP), y: sy },
+  return [p1, { x: p1.x, y: sy }, { x: x0 + sgn2 * (GAP + STEP + extra2), y: sy },
           { x: x0 + sgn2 * (GAP + STEP), y: ey }, { x: p2.x, y: ey }, p2];
 }
 // 密排行：把真实内容按顺序铺开，**绝不循环复读**。
@@ -3372,6 +3421,8 @@ if (typeof document !== "undefined") var UI = function(){
     '已新建项目：{0}（把卡片拖进去即可）': 'Project created: {0} (drag cards into it)',
     '已删除空项目：{0}': 'Empty project deleted: {0}',
     '已移动到「{0}」': 'Moved to "{0}"',
+    // ---- v0.27.7 画布 UI：连线去重叠 + 输入输出胶囊可跳转 ----
+    '已跳到「{0}」（{1} 个输入 · {2} 个输出）': 'Jumped to "{0}" ({1} in · {2} out)',
     // ---- v0.27.6 画布：逻辑门快捷添加 + 具体输入输出 ----
     'IF/ELSE 分支': 'IF/ELSE branch',
     'AND 全部成立': 'AND (all true)',
@@ -3898,8 +3949,42 @@ if (typeof document !== "undefined") var UI = function(){
       switchWorkflow(cand[0].name);
     }));
   }
-  function flashNodes(ids){
-    (ids || []).forEach(id => {
+  // ---------- v0.27.7 顺着流程跳转：点「谁指向我 / 我指向谁」胶囊 → 选中 + 居中 + 高亮 ----------
+  let panTween = 0;
+  function animateViewTo(tx, ty, tz, ms){
+    if (panTween){ cancelAnimationFrame(panTween); panTween = 0; }
+    const sx = view.x, sy = view.y, sz = view.z;
+    const z = (tz == null || !isFinite(tz)) ? sz : tz;
+    const t0 = performance.now(), dur = Math.max(1, ms || 220);
+    const step = now => {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;   // ease-in-out
+      view.x = sx + (tx - sx) * e;
+      view.y = sy + (ty - sy) * e;
+      view.z = sz + (z - sz) * e;
+      applyView();
+      panTween = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    panTween = requestAnimationFrame(step);
+  }
+  function stopPanTween(){ if (panTween){ cancelAnimationFrame(panTween); panTween = 0; } }
+  // 把某个节点移到视口中央（缩放保持不变）
+  function centerOnNode(id, ms){
+    const n = nodeById(id); if (!n) return;
+    const r = svg.getBoundingClientRect();
+    animateViewTo(r.width / 2 - (n.x + n.w / 2) * view.z,
+                  r.height * 0.42 - (n.y + n.h / 2) * view.z, null, ms == null ? 220 : ms);
+  }
+  // 点胶囊：选中该节点（属性面板随之切换）+ 居中 + 闪一下；toast 回显方便连续跳
+  function jumpToNode(id){
+    const n = nodeById(id); if (!n) return;
+    setSel({ type:'node', id:id });
+    centerOnNode(id);
+    flashNodes([id]);
+    toast(tx('已跳到「{0}」（{1} 个输入 · {2} 个输出）', n.label || id,
+      g.edges.filter(e => e.to === id).length, g.edges.filter(e => e.from === id).length));
+  }
+  function flashNodes(ids){    (ids || []).forEach(id => {
       const el = world.querySelector('[data-node="' + id + '"]');
       if (!el) return;
       el.classList.remove('nd-flash');
@@ -4169,10 +4254,34 @@ if (typeof document !== "undefined") var UI = function(){
     }).join('');
 
     const metas = edgeMeta(g);
+    // v0.27.7 连线去重叠：先按「通道位置相近 + 跨度真的重叠」把线聚簇，簇内分配不同分道号，
+    //   再与「同一对节点的平行边」分道（metas）相乘合并 —— 保证同一条走廊里的线各走各的，不叠在一起。
+    const lanePlan = (function(){
+      const items = [];
+      g.edges.forEach((e, i) => {
+        const a = nodeById(e.from), b = nodeById(e.to);
+        if (!a || !b) return;
+        const dir = edgeDirOf(a, b);
+        const p1 = anchors(a, dir).out, p2 = anchors(b, dir).inn;
+        items.push({ i: i, dir: dir,
+          ch: dir === 'LR' ? (p1.x + p2.x) / 2 : (p1.y + p2.y) / 2,
+          lo: dir === 'LR' ? Math.min(p1.y, p2.y) : Math.min(p1.x, p2.x),
+          hi: dir === 'LR' ? Math.max(p1.y, p2.y) : Math.max(p1.x, p2.x) });
+      });
+      return planLanes(items, 26, 8);
+    })();
+    const laneOf = i => {
+      const m = metas[i] || { laneIdx: 0, laneCnt: 1 };
+      const p = lanePlan[i];
+      if (!p) return m;
+      const mc = m.laneCnt || 1;
+      return { laneIdx: p.laneIdx * mc + (m.laneIdx || 0), laneCnt: p.laneCnt * mc, feedback: m.feedback, key: m.key };
+    };
     const edgesHtml = g.edges.map((e, i) => {
-      const ep = edgePath(e, metas[i]); if (!ep) return '';
+      const mt = laneOf(i);
+      const ep = edgePath(e, mt); if (!ep) return '';
       const selCls = sel && sel.type==='edge' && sel.id===i ? ' eg-sel' : '';
-      const fb = metas[i].feedback;
+      const fb = mt.feedback;
       const fbCls = fb && !selCls ? ' eg-fb' : '';
       const dotted = e.style==='dotted' ? ' stroke-dasharray="5,4"' : '';
       const marker = fb ? 'url(#arrFb)' : 'url(#arr)';
@@ -4301,23 +4410,32 @@ if (typeof document !== "undefined") var UI = function(){
     }).join('');
 
     // v0.27.6 端口旁的「具体输入 / 输出」：显示相邻节点名（+ 边标签 / +N），画在卡片外侧，不占卡片高度
+    // v0.27.7：改成**可点击胶囊**（data-jump = 对方节点 id），点一下选中并跳到那个节点、闪一下高亮
     const ioHtml = (function(){
       const byFrom = {}, byTo = {};
       g.edges.forEach(e => { (byFrom[e.from] = byFrom[e.from] || []).push(e); (byTo[e.to] = byTo[e.to] || []).push(e); });
       const nm = id => { const x = nodeById(id); return x ? String(x.label || x.id) : String(id); };
+      const pill = (anchorX, anchorY, txt, dir, jumpId) => {
+        const w = cjkWidth(txt) + 14, h = 15;
+        const rx = dir === 'in' ? anchorX - w : anchorX;
+        return '<g class="io-tag-g io-' + dir + '" data-jump="' + escXml(jumpId) + '" transform="translate(' + Math.round(rx) + ',' + Math.round(anchorY - h / 2) + ')">' +
+          '<rect class="io-bg" x="0" y="0" width="' + Math.round(w) + '" height="' + h + '" rx="7"/>' +
+          '<text class="io-tag" x="' + Math.round(w / 2) + '" y="' + (h / 2 + 3.5) + '" text-anchor="middle">' + escXml(txt) + '</text></g>';
+      };
       return g.nodes.map(n => {
+        if (isLinkKind(n.kind)) return '';
         const a = anchors(n);
         const ins = byTo[n.id] || [], outs = byFrom[n.id] || [];
         let out = '';
-        if (ins.length && !isLinkKind(n.kind)){
+        if (ins.length){
           const e0 = ins[0];
-          const t = fitText(nm(e0.from) + (ins.length === 1 && e0.label ? '（' + e0.label + '）' : '') + (ins.length > 1 ? ' +' + (ins.length - 1) : ''), 96);
-          out += '<text class="io-tag io-in" x="' + (a.inn.x - 8) + '" y="' + (a.inn.y + 4) + '" text-anchor="end">⬅ ' + escXml(t) + '</text>';
+          const t = '⬅ ' + fitText(nm(e0.from) + (ins.length === 1 && e0.label ? '（' + e0.label + '）' : '') + (ins.length > 1 ? ' +' + (ins.length - 1) : ''), 92);
+          out += pill(a.inn.x - 8, a.inn.y, t, 'in', e0.from);
         }
-        if (outs.length && !isLinkKind(n.kind)){
+        if (outs.length){
           const e0 = outs[0];
-          const t = fitText(nm(e0.to) + (outs.length === 1 && e0.label ? '（' + e0.label + '）' : '') + (outs.length > 1 ? ' +' + (outs.length - 1) : ''), 96);
-          out += '<text class="io-tag io-out" x="' + (a.out.x + 8) + '" y="' + (a.out.y + 4) + '">' + escXml(t) + ' ➡</text>';
+          const t = fitText(nm(e0.to) + (outs.length === 1 && e0.label ? '（' + e0.label + '）' : '') + (outs.length > 1 ? ' +' + (outs.length - 1) : ''), 92) + ' ➡';
+          out += pill(a.out.x + 8, a.out.y, t, 'out', e0.to);
         }
         return out;
       }).join('');
@@ -4339,6 +4457,13 @@ if (typeof document !== "undefined") var UI = function(){
 
     world.innerHTML = (clipDefs.length ? '<defs>' + clipDefs.join('') + '</defs>' : '')
       + subsHtml + edgesHtml + nodesHtml + ioHtml + overlayHtml;
+    // v0.27.7 点输入/输出胶囊 → 跳到对方节点（选中 + 居中 + 闪烁高亮），方便顺着流程一路看下去
+    world.querySelectorAll('.io-tag-g[data-jump]').forEach(el => {
+      el.addEventListener('click', ev => {
+        ev.stopPropagation();
+        jumpToNode(el.getAttribute('data-jump'));
+      });
+    });
   }
 
   function applyView(){
@@ -4346,6 +4471,8 @@ if (typeof document !== "undefined") var UI = function(){
     const s = (24 * view.z) + 'px ' + (24 * view.z) + 'px';
     cvwrap.style.backgroundSize = s;
     cvwrap.style.backgroundPosition = view.x + 'px ' + view.y + 'px';
+    // v0.27.7：缩得太小时隐藏「输入/输出」胶囊，减少视觉噪声（放大回来自动恢复）
+    svg.classList.toggle('io-compact', view.z < 0.55);
   }
   function fit(){
     if (!g.nodes.length) return;
@@ -4600,6 +4727,7 @@ if (typeof document !== "undefined") var UI = function(){
 
   // ---------- 指针交互 ----------
   svg.addEventListener('pointerdown', ev => {
+    stopPanTween();                                   // v0.27.7：用户一动就停下跳转动画，别抢操作
     const portEl = ev.target.closest('[data-port]');
     const nodeEl = ev.target.closest('[data-node]');
     const edgeEl = ev.target.closest('[data-edge]');
@@ -4764,6 +4892,7 @@ if (typeof document !== "undefined") var UI = function(){
   });
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
+    stopPanTween();                                   // v0.27.7：滚轮接管后立刻停动画
     const r = svg.getBoundingClientRect();
     const cx = ev.clientX - r.left, cy = ev.clientY - r.top;
     if (ev.ctrlKey || ev.metaKey){
@@ -8770,7 +8899,9 @@ if (typeof document !== "undefined") var UI = function(){
     setSel, renderPanel, sel: () => sel,
     // v0.27.6 测试钩子：分布工作区（项目 / 拖动 / 神经网络开关）+ 逻辑门
     addGateNode, newProject, removeProject, moveCard, toggleNnCard, nnSetAll,
-    projects: () => WF.projects, wfList: () => WF.list, distCardHtml, byOrderThenTsDown };
+    projects: () => WF.projects, wfList: () => WF.list, distCardHtml, byOrderThenTsDown,
+    // v0.27.7 测试钩子：连线去重叠 / 跳转
+    planLanes, jumpToNode, centerOnNode, animateViewTo, stopPanTween, view: () => view };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>
