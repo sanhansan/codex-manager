@@ -231,12 +231,20 @@
   #cv .nd-sel { stroke:var(--node-wire-hl); stroke-width:2.2; }
   #cv .nd-t { fill:var(--card-title); font-weight:600; }
   #cv .nd-b { fill:var(--card-body); font-size:11px; }
+/* 代码型正文用等宽字体（v0.27.2） */
+#cv .nd-bcode { font-family:Consolas,Menlo,monospace; font-size:10px; }
   #cv .nd-file { fill:var(--card-file); font-size:9.5px; font-family:Consolas,Menlo,monospace; }
   #cv .nd-head { fill:var(--card-head); }
   #cv .nd-headline { stroke:var(--card-line); stroke-width:.8; }
   #cv .badge-r { fill:var(--accent); opacity:.92; }
   #cv .badge-t { fill:#fff; font-size:10.5px; }
   #cv .port { fill:var(--card-port); stroke:var(--card-port-line); stroke-width:1.5; }
+/* v0.27.2 端口点：输入=空心、输出=实心（一眼看出方向）；另加大热区便于抓取 */
+#cv .port-in { fill:var(--card-bg); stroke:var(--card-port-line); }
+#cv .port-out { fill:var(--card-port-line); stroke:var(--card-port-line); }
+#cv .port-hit { fill:transparent; stroke:none; }
+#cv g[data-node]:hover .port-in, #cv g[data-node]:hover .port-out { r:6; stroke:var(--accent); }
+#cv g[data-node]:hover .port-out { fill:var(--accent); }
   #cv .port:hover { stroke:var(--accent); }
   #cv .eg { fill:none; stroke:var(--node-wire); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   #cv .eg-sel { stroke:var(--accent); stroke-width:3; }
@@ -785,12 +793,24 @@ const CARD_HEAD = 26;        // 标题区高（含类型徽章）
 const CARD_LINE = 15;        // 正文本行行高
 const CARD_PAD = 9;          // 内边距
 const CARD_FILE = 16;        // 底部文件名条高
-const CARD_MIN_BODY = 3;     // 正文最少行数
+const CARD_MIN_BODY = 2;     // 正文最少行数（无内容时卡片收成紧凑卡）
+const CARD_MAX_BODY = 14;    // 正文最多行数（防止超长 doc 把方框撑成巨框）
+// 卡片正文内容：**优先节点自带说明**；没有时由调用方回退到真实问答（nodeTurnText），
+// 绝不回退到 label —— 那会让正文把标题重复一遍（v0.27.1 的「方框显示问题」）。
+function cardBodyText(n){
+  if (!n) return '';
+  return String(n.doc || n.body || '');
+}
 function cardBodyLines(n){
-  const txt = String((n && n.doc) || (n && n.body) || '');
-  if (txt) return txt.length;
-  const label = String((n && n.label) || '');
-  return Math.max(CARD_MIN_BODY, Math.min(6, Math.ceil(cjkWidth(label) / (CARD_W - CARD_PAD * 2)) + 2));
+  const txt = cardBodyText(n);
+  if (txt){
+    // 关键修复：此前 `return txt.length` 把**字符数**当行数用，
+    // 300 字的 doc 会算成 300 行 → 卡片高 4500px+，方框直接失控。
+    // 现在按真实折行结果（保留换行）取行数。
+    const rows = ntCardRows(txt, CARD_W - CARD_PAD * 2, CARD_MAX_BODY);
+    return Math.max(CARD_MIN_BODY, rows.length);
+  }
+  return CARD_MIN_BODY;
 }
 function nodeW(label){ return CARD_W; }
 const NODE_H = 40;
@@ -835,11 +855,25 @@ function sanitizeLabel(s){ return String(s == null ? '' : s).replace(/\\n|\\t|[\
 function sizeNode(n){
   if (typeof n.label === 'string') n.label = sanitizeLabel(n.label);
   n.w = nodeW(n.label);
-  // v0.27.0 卡片高度 = 标题区 + 正文（按内容行数）+ 文件名条（图3 三段式）
-  const lines = cardBodyLines(n);
-  n.bodyLines = lines;
-  n.h = CARD_HEAD + CARD_PAD + lines * CARD_LINE + CARD_PAD + CARD_FILE;
+  // v0.27.0 卡片高度 = 标题区 + 正文（按真实折行行数）+ 文件名条（图3 三段式）
+  // v0.27.2：正文行数组在这里算好存下来，渲染直接复用 —— 保证「框高」与「画出来的文字」永远一致，
+  // 不会出现框里一大片空白（行数算多了）或文字溢出框（行数算少了）。
+  // 文件名条的高度也只按「有没有文件名」决定（此前两侧条件不一致，会压到最后一行正文上）。
+  n.bodyRows = cardBodyRows(n);
+  n.bodyLines = n.bodyRows.length;
+  n.fileLabel = String(n.file || n.subflow || '').trim();
+  const bodyH = n.bodyLines ? CARD_PAD + n.bodyLines * CARD_LINE + CARD_PAD : CARD_PAD;
+  n.h = CARD_HEAD + bodyH + (n.fileLabel ? CARD_FILE : 0);
   return n;
+}
+// 卡片正文行（供 sizeNode 与 render 共用；外部可在 doc 缺失时先补 n.doc 再调用）
+function cardBodyRows(n){
+  const txt = cardBodyText(n);
+  if (txt){
+    const rows = ntCardRows(txt, CARD_W - CARD_PAD * 2, CARD_MAX_BODY);
+    if (rows.length) return rows;
+  }
+  return [];
 }
 function normalize(g){ (g.nodes||[]).forEach(sizeNode); return g; }
 
@@ -2330,6 +2364,9 @@ function wfTreeParse(text){
         project: String(s.project || '').slice(0, 120),
         turns: (Array.isArray(s.turns) ? s.turns : []).slice(0, 500).map(t => ({
           q: String((t && t.q) || '').slice(0, 400),
+          // v0.27.2：回答正文随画布一起保存（截断到 400 字）——神经网络与卡片要写「具体问答」，
+          // 只有问题的话就只剩标题，一放大满屏都是同一句话。
+          a: String((t && t.a) || '').slice(0, 400),
           ts: +(t && t.ts) || 0,
           node: String((t && t.node) || '').slice(0, 40),
           subs: Array.isArray(t && t.subs) ? t.subs.slice(0, 40).map(x => String(x).slice(0, 40)) : []
@@ -2513,6 +2550,165 @@ function ntWrapText(t, maxW, maxLines, fs){
   if (truncated){ out[out.length - 1] = out[out.length - 1].replace(/.$/, '') + '…'; }
   else if (cur) out.push(cur);
   return out;
+}
+// 卡片正文折行：**保留显式换行**（代码类 doc 不能被 \s+ 压成一行），再按像素宽度折行并限总行数。
+// 返回「真实要显示的行数组」——卡片高度必须用它的 length 算，绝不能拿字符数当行数。
+function ntCardRows(t, maxW, maxLines){
+  const lim = Math.max(1, maxLines || 6);
+  const raw = String(t == null ? '' : t).replace(/\r\n?/g, '\n');
+  const out = [];
+  let truncated = false;
+  for (const seg of raw.split('\n')){
+    if (out.length >= lim){ truncated = true; break; }
+    const s = seg.replace(/\s+$/, '');
+    if (!s){ out.push(''); continue; }
+    const rows = ntWrapText(s, maxW, lim - out.length, 11);
+    for (const r of rows){ if (out.length < lim) out.push(r); }
+    if (rows.length && /…$/.test(rows[rows.length - 1]) && out.length >= lim) truncated = true;
+  }
+  const res = out.slice(0, lim);
+  // 内容被截断时给最后一行补省略号（ntWrapText 只处理单段溢出，多段截断要在这里补）
+  if (truncated && res.length){
+    const i = res.length - 1, last = res[i];
+    if (last && !/…$/.test(last)) res[i] = last.replace(/.$/, '') + '…';
+  }
+  return res;
+}
+// 问答正文 → 可显示的文本行（去 ``` 围栏标记、压掉连续空行、限行限量）。
+// 供神经网络「文字树图」与卡片正文使用 —— 要的是**具体问答内容**，不是重复的标题。
+function qaTextLines(t, maxLines, maxChars){
+  const lim = Math.max(1, maxLines || 12);
+  const cap = Math.max(20, maxChars || 200);
+  let s = String(t == null ? '' : t).replace(/\r\n?/g, '\n');
+  if (!s.trim()) return [];
+  s = s.replace(/^\s*```[^\n]*$/gm, '').replace(/\n{3,}/g, '\n\n');
+  const out = [];
+  for (const raw of s.split('\n')){
+    const ln = raw.replace(/\s+$/, '');
+    if (!ln.trim()) continue;
+    out.push(ln.length > cap ? ln.slice(0, cap) + '…' : ln);
+    if (out.length >= lim) break;
+  }
+  return out;
+}
+// 轴线线段是否与矩形相交（pad 为额外膨胀量）——正交连线路由的基础判定
+function segHitsRect(x1, y1, x2, y2, r, pad){
+  if (!r) return false;
+  const p = pad || 0;
+  const rx1 = r.x - p, ry1 = r.y - p, rx2 = r.x + (r.w || 0) + p, ry2 = r.y + (r.h || 0) + p;
+  if (Math.abs(y1 - y2) < 0.01){
+    if (y1 < ry1 || y1 > ry2) return false;
+    return Math.max(Math.min(x1, x2), rx1) <= Math.min(Math.max(x1, x2), rx2);
+  }
+  if (Math.abs(x1 - x2) < 0.01){
+    if (x1 < rx1 || x1 > rx2) return false;
+    return Math.max(Math.min(y1, y2), ry1) <= Math.min(Math.max(y1, y2), ry2);
+  }
+  return false;
+}
+function polylineFree(pts, obs, skip, pad){
+  const skipSet = skip || null;
+  const p = pad || 0;
+  for (let i = 0; i + 1 < pts.length; i++){
+    const a = pts[i], b = pts[i + 1];
+    for (const r of (obs || [])){
+      if (!r) continue;
+      if (skipSet && (r === skipSet.a || r === skipSet.b)) continue;
+      if (segHitsRect(a.x, a.y, b.x, b.y, r, p)) return false;
+    }
+  }
+  return true;
+}
+// 正交连线路由（纯函数，可单测）。
+// 输入：起点 p1 / 终点 p2（端口坐标）、dir('LR'|'TD')、obstacles（卡片矩形）、
+//       laneIdx/laneCnt（平行边分道）、feedback（反馈边）、a/b（端点卡片，路由时忽略）。
+// 输出：折点数组（首点 = p1，末点 = p2），保证
+//   ① 首段沿端口法线方向离开、末段沿法线方向进入（LR 水平 / TD 垂直）；
+//   ② 通道落在不穿过任何卡片的空档里（逐档扫描），找不到才外绕；
+//   ③ 不会折返。
+function routeOrtho(p1, p2, opt){
+  opt = opt || {};
+  const dir = opt.dir === 'TD' ? 'TD' : 'LR';
+  const obs = opt.obstacles || [];
+  const lanes = Math.max(1, opt.laneCnt || 1);
+  const laneIdx = Math.max(0, Math.min(lanes - 1, opt.laneIdx || 0));
+  const STUB = 16, GAP = 10, STEP = 10, SPAN = 520;
+  const skip = { a: opt.a || null, b: opt.b || null };
+  const free = pts => polylineFree(pts, obs, skip, 4);   // 留 4px 间隙，线不贴着卡片边走
+  const laneOff = lanes > 1 ? (laneIdx - (lanes - 1) / 2) * 14 : 0;
+  if (dir === 'LR'){
+    const span = p2.x - p1.x;
+    if (!opt.feedback && span > STUB * 2 + GAP){
+      const lo = p1.x + STUB, hi = p2.x - STUB;
+      const base = Math.min(hi, Math.max(lo, (lo + hi) / 2 + laneOff));
+      const cands = [base];
+      for (let d = STEP; d <= (hi - lo) / 2 + STEP; d += STEP) cands.push(base + d, base - d);
+      for (const mx of cands){
+        if (mx < lo || mx > hi) continue;
+        const pts = [p1, { x: mx, y: p1.y }, { x: mx, y: p2.y }, p2];
+        if (free(pts)) return pts;
+      }
+    }
+    // 外绕：走卡片上方 / 下方的横向通道（反馈边、或正走通道全被占）
+    const above = opt.feedback ? (laneIdx % 2 === 0) : (laneIdx % 2 === 0);
+    const sgn = above ? -1 : 1;
+    const y0 = above ? Math.min(p1.y, p2.y) : Math.max(p1.y, p2.y);
+    const sx = p1.x + STUB, ex = p2.x - STUB;
+    for (let d = GAP + STEP; d <= SPAN; d += STEP){
+      const ch = y0 + sgn * d;
+      if (Math.abs(ch - p1.y) < 4 || Math.abs(ch - p2.y) < 4) continue;
+      const pts = [p1, { x: sx, y: p1.y }, { x: sx, y: ch }, { x: ex, y: ch }, { x: ex, y: p2.y }, p2];
+      if (free(pts)) return pts;
+    }
+    return [p1, { x: sx, y: p1.y }, { x: sx, y: y0 + sgn * (GAP + STEP) },
+            { x: ex, y: y0 + sgn * (GAP + STEP) }, { x: ex, y: p2.y }, p2];
+  }
+  // TD
+  const spanV = p2.y - p1.y;
+  if (!opt.feedback && spanV > STUB * 2 + GAP){
+    const lo = p1.y + STUB, hi = p2.y - STUB;
+    const base = Math.min(hi, Math.max(lo, (lo + hi) / 2 + laneOff));
+    const cands = [base];
+    for (let d = STEP; d <= (hi - lo) / 2 + STEP; d += STEP) cands.push(base + d, base - d);
+    for (const my of cands){
+      if (my < lo || my > hi) continue;
+      const pts = [p1, { x: p1.x, y: my }, { x: p2.x, y: my }, p2];
+      if (free(pts)) return pts;
+    }
+  }
+  const left = laneIdx % 2 === 0;
+  const sgn2 = left ? -1 : 1;
+  const x0 = left ? Math.min(p1.x, p2.x) : Math.max(p1.x, p2.x);
+  const sy = p1.y + STUB, ey = p2.y - STUB;
+  for (let d = GAP + STEP; d <= SPAN; d += STEP){
+    const ch = x0 + sgn2 * d;
+    if (Math.abs(ch - p1.x) < 4 || Math.abs(ch - p2.x) < 4) continue;
+    const pts = [p1, { x: p1.x, y: sy }, { x: ch, y: sy }, { x: ch, y: ey }, { x: p2.x, y: ey }, p2];
+    if (free(pts)) return pts;
+  }
+  return [p1, { x: p1.x, y: sy }, { x: x0 + sgn2 * (GAP + STEP), y: sy },
+          { x: x0 + sgn2 * (GAP + STEP), y: ey }, { x: p2.x, y: ey }, p2];
+}
+// 密排行：把真实内容按顺序铺开，**绝不循环复读**。
+// v0.27.2 修复：此前 `pool[i % pool.length]` 会把同一句复制 N 遍填满整块 ——
+// 这正是「神经网络一直在重复标题、重复一句话」的直接原因。
+// 现在：内容不足就返回实际拥有的行数（布局端按实际行数分配并允许尾部留白），
+// 重复是数据问题，不该由渲染层复制出来。
+function ntPackRows(rawLines, want){
+  const src = (rawLines || []).map(s => String(s == null ? '' : s).replace(/\s+$/, '')).filter(s => s.trim());
+  const seen = new Set(), uniq = [];
+  src.forEach(s => { if (!seen.has(s)){ seen.add(s); uniq.push(s); } });
+  return uniq;
+}
+// 是否偏代码：决定卡片正文用等宽字体（代码/命令/路径）还是普通字体（一句话说明）
+function looksLikeCode(t){
+  const s = String(t == null ? '' : t);
+  if (!s.trim()) return false;
+  if (/[{};]\s*$/m.test(s)) return true;
+  if (/^\s*(const|let|var|function|import|export|class|def|public|private|async|await|SELECT|INSERT|UPDATE|CREATE|FROM|curl|npm|git|cd|python|node|pip|mvn|docker)\b/im.test(s)) return true;
+  if (/\/\/|\/\*|<!--|-->|::|=>|\$\{|\.(js|ts|vue|java|py|sql|json|yml|xml)\b/.test(s)) return true;
+  const marks = (s.match(/[{}()\[\]=<>_$;:|/\\]/g) || []).length;
+  return marks / Math.max(1, s.length) > 0.13;
 }
 // 聚焦集合：悬停某矩形时返回应保持高亮的 id 集合（其余压暗到 NT_DIM）
 // 纯逻辑版：输入 rects 数组 + 目标 rect，输出 Set<id>
@@ -2968,6 +3164,8 @@ if (typeof document !== "undefined") var UI = function(){
     '把整棵工作流树（含对话画布与小对话）导出为 JSON 备份': 'Export the whole workflow tree (conversation canvases + chats) as a JSON backup',
     '从 JSON 恢复/合并整棵工作流树（兼容单画布 JSON）': 'Restore/merge the workflow tree from JSON (single-canvas JSON also accepted)',
     '距下一次提问': 'until next prompt',
+    '拖到另一节点的端口即可连线': 'Drag to another node\'s port to connect',
+    '从圆点拖到另一节点 = 连线': 'Drag from the dot to another node = connect',
     '📄 查看输出': '📄 View output',
     '子智能体输出': 'Sub-agent output',
     '未找到该子智能体的输出数据': 'No output data found for this sub-agent',
@@ -3461,58 +3659,38 @@ if (typeof document !== "undefined") var UI = function(){
       : { out:{x:n.x+n.w/2, y:n.y+n.h}, inn:{x:n.x+n.w/2, y:n.y} };
   }
   // v0.27.0 正交折线（图3）：端口之间走「横—竖—横」直角折线，圆角拐弯，不用曲线
+  // v0.27.2：改用 routeOrtho 做**带障碍避让**的通道选择——
+  //   此前 midX 固定取两端中点 + 分道偏移，会从中间卡片身上穿过去、或在卡片贴近时折返；
+  //   现在逐档扫描空档，正走找不到就外绕，且保证首末段沿端口法线进出。
   function edgePath(e, mt){
     const a = nodeById(e.from), b = nodeById(e.to);
     if (!a || !b) return '';
     const p1 = anchors(a).out, p2 = anchors(b).inn;
     const R = 8;                        // 拐角圆角半径
-    const pts = [];
-    const off = mt && mt.laneCnt > 1 ? (mt.laneIdx - (mt.laneCnt - 1) / 2) * 16 : 0;
-    const fb = !!(mt && mt.feedback);
-    if (g.dir === 'LR'){
-      const reverse = p2.x < p1.x;
-      const midX = reverse ? Math.min(p1.x, p2.x) - 40 - (fb ? 34 : 0)
-                           : (p1.x + p2.x) / 2 + off;
-      pts.push({ x:p1.x, y:p1.y });
-      pts.push({ x:midX, y:p1.y });
-      pts.push({ x:midX, y:p2.y });
-      pts.push({ x:p2.x, y:p2.y });
-      if (reverse){
-        // 反馈边：从上/下绕行（走卡片外侧）
-        const lift = Math.max(70, Math.abs(p2.y - p1.y) * 0.2 + 60) * (fb ? 1.25 : 1);
-        const top = Math.min(p1.y, p2.y) - lift;
-        pts.length = 0;
-        pts.push({ x:p1.x, y:p1.y });
-        pts.push({ x:p1.x + 26, y:p1.y });
-        pts.push({ x:p1.x + 26, y:top });
-        pts.push({ x:p2.x - 26, y:top });
-        pts.push({ x:p2.x - 26, y:p2.y });
-        pts.push({ x:p2.x, y:p2.y });
-      }
-    } else {
-      const reverse = p2.y < p1.y;
-      const midY = reverse ? Math.min(p1.y, p2.y) - 40 - (fb ? 34 : 0)
-                           : (p1.y + p2.y) / 2 + off;
-      pts.push({ x:p1.x, y:p1.y });
-      pts.push({ x:p1.x, y:midY });
-      pts.push({ x:p2.x, y:midY });
-      pts.push({ x:p2.x, y:p2.y });
-      if (reverse){
-        const side = Math.max(70, Math.abs(p2.x - p1.x) * 0.2 + 60) * (fb ? 1.25 : 1);
-        const left = Math.min(p1.x, p2.x) - side;
-        pts.length = 0;
-        pts.push({ x:p1.x, y:p1.y });
-        pts.push({ x:p1.x, y:p1.y - 26 });
-        pts.push({ x:left, y:p1.y - 26 });
-        pts.push({ x:left, y:p2.y + 26 });
-        pts.push({ x:p2.x, y:p2.y + 26 });
-        pts.push({ x:p2.x, y:p2.y });
+    const raw = routeOrtho(p1, p2, {
+      dir: g.dir,
+      obstacles: g.nodes,
+      a: a, b: b,
+      laneIdx: (mt && mt.laneIdx) || 0,
+      laneCnt: (mt && mt.laneCnt) || 1,
+      feedback: !!(mt && mt.feedback),
+    });
+    const pts = raw || [];
+    // 箭头避让端口：末段沿方向回退 8px，让箭头尖停在端口圆点外侧（否则箭头会整个盖住端口）
+    if (pts.length >= 2){
+      const END_TRIM = 8;
+      const a1 = pts[pts.length - 2], b1 = pts[pts.length - 1];
+      const L = Math.hypot(b1.x - a1.x, b1.y - a1.y);
+      if (L > END_TRIM + 1){
+        const k = (L - END_TRIM) / L;
+        pts[pts.length - 1] = { x: a1.x + (b1.x - a1.x) * k, y: a1.y + (b1.y - a1.y) * k };
       }
     }
     // 去重共线点
     const p = [pts[0]];
     for (let i = 1; i < pts.length; i++){
       const q = pts[i], r = p[p.length - 1];
+      if (!q) continue;
       if (Math.abs(q.x - r.x) < 0.5 && Math.abs(q.y - r.y) < 0.5) continue;
       p.push(q);
     }
@@ -3522,7 +3700,7 @@ if (typeof document !== "undefined") var UI = function(){
       const a1 = p[i - 1], c = p[i], b1 = p[i + 1];
       const l1 = Math.hypot(c.x - a1.x, c.y - a1.y), l2 = Math.hypot(b1.x - c.x, b1.y - c.y);
       const r = Math.min(R, l1 / 2, l2 / 2);
-      if (r < 0.6){ d += ' L' + c.x + ',' + c.y; continue; }
+      if (r < 0.6 || !isFinite(r)){ d += ' L' + c.x + ',' + c.y; continue; }
       const u1 = { x:(c.x - a1.x) / l1, y:(c.y - a1.y) / l1 };
       const u2 = { x:(b1.x - c.x) / l2, y:(b1.y - c.y) / l2 };
       d += ' L' + (c.x - u1.x * r) + ',' + (c.y - u1.y * r);
@@ -3531,13 +3709,8 @@ if (typeof document !== "undefined") var UI = function(){
     d += ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
     // 中点（标签锚点）：优先取中间那条竖/横边的中点
     let m;
-    if (p.length >= 4){
-      const k = Math.floor((p.length - 1) / 2);
-      m = { x:(p[k].x + p[k + 1].x) / 2, y:(p[k].y + p[k + 1].y) / 2 };
-    } else {
-      const k = Math.floor((p.length - 1) / 2);
-      m = { x:(p[k].x + p[k + 1].x) / 2, y:(p[k].y + p[k + 1].y) / 2 };
-    }
+    const li = p.length - 1, k = Math.max(0, Math.min(p.length - 2, Math.floor(li / 2)));
+    m = { x:(p[k].x + p[k + 1].x) / 2, y:(p[k].y + p[k + 1].y) / 2 };
     return { d:d, mid:m };
   }
 
@@ -3581,9 +3754,18 @@ if (typeof document !== "undefined") var UI = function(){
         body = '<polygon class="'+cls+'" points="'+cx+','+(n.y-4)+' '+(n.x+n.w+6)+','+cy+' '+cx+','+(n.y+n.h+4)+' '+(n.x-6)+','+cy+'"/>';
       } else {
         // 卡片主体 + 标题区分隔线（图3：标题区 / 多行正文 / 底部文件名）
+        // v0.27.2 修复：标题区路径此前走成 (x+w,y) → (x+w-R,y-R) → (x+R,y-R) → (x,y)，
+        // 顶边落在 y-R 上，导致色块**高出卡片上边框 8px**（方框显示问题）。
+        // 现在两侧圆角严格落在卡片顶边 y 上，与 body 的 rx=R 完全吻合。
         const headH = Math.min(CARD_HEAD, n.h);
         body = '<rect class="'+cls+'" x="'+n.x+'" y="'+n.y+'" width="'+n.w+'" height="'+n.h+'" rx="'+R+'"/>' +
-          '<path class="nd-head" d="M'+n.x+','+(n.y+headH)+' h'+n.w+' v'+(-headH)+' a'+R+','+R+' 0 0 0 '+(-R)+','+(-R)+' h'+(2*R-n.w)+' a'+R+','+R+' 0 0 0 '+(-R)+','+R+' z"/>' +
+          '<path class="nd-head" d="M'+n.x+','+(n.y+headH)+
+            ' L'+(n.x+n.w)+','+(n.y+headH)+
+            ' L'+(n.x+n.w)+','+(n.y+R)+
+            ' A'+R+','+R+' 0 0 0 '+(-R)+','+(-R)+
+            ' L'+(n.x+R)+','+n.y+
+            ' A'+R+','+R+' 0 0 0 '+(-R)+','+R+
+            ' Z"/>' +
           '<line class="nd-headline" x1="'+n.x+'" y1="'+(n.y+headH)+'" x2="'+(n.x+n.w)+'" y2="'+(n.y+headH)+'"/>';
       }
       // 标题区：色点 + 类型/门徽章 + 标题（图3 的顶部小标题）
@@ -3604,31 +3786,37 @@ if (typeof document !== "undefined") var UI = function(){
           '<text class="badge-t" x="'+(n.x+n.w-CARD_PAD-gw/2)+'" y="'+(titleY)+'" text-anchor="middle">'+escXml(gT)+'</text>';
       }
       // 正文区：多行说明（图3 的卡片中段文字）
+      // v0.27.2：直接用 sizeNode 算好的 n.bodyRows —— 框高与文字行数同源，不会再出现
+      //   「框里一大片空白」或「文字溢出框」；也不再在正文里回退重复标题。
       let bodyTxt = '';
-      if (n.shape !== 'diamond' && n.h > CARD_HEAD + CARD_FILE){
-        const raw = String(n.doc || n.body || n.label || '');
-        const lines = ntWrapText(raw, n.w - CARD_PAD * 2, Math.max(CARD_MIN_BODY, n.bodyLines || CARD_MIN_BODY), 11);
+      if (n.shape !== 'diamond' && (n.bodyRows || []).length){
+        const rows = n.bodyRows;
         const y0 = n.y + Math.min(CARD_HEAD, n.h) + CARD_PAD;
-        lines.forEach((ln, i) => {
-          bodyTxt += '<text class="nd-b" x="'+(n.x+CARD_PAD)+'" y="'+(y0 + i * CARD_LINE + 10)+'">'+escXml(ln)+'</text>';
+        const isCode = looksLikeCode(rows.join('\n'));
+        rows.forEach((ln, i) => {
+          bodyTxt += '<text class="nd-b'+(isCode?' nd-bcode':'')+'" x="'+(n.x+CARD_PAD)+'" y="'+(y0 + i * CARD_LINE + 10)+'">'+escXml(ln)+'</text>';
         });
       }
-      // 底部文件名条（图3 的 "05-预检通过/STEP.md"）
+      // 底部文件名条（图3 的 "05-预检通过/STEP.md"）——高度已在 sizeNode 里留好
       let fileTxt = '';
-      const fileName = n.file || (n.subflow ? n.subflow : '');
-      if (fileName && n.h > CARD_HEAD + CARD_FILE){
-        fileTxt = '<text class="nd-file" x="'+(n.x+CARD_PAD)+'" y="'+(n.y+n.h-5)+'">'+escXml(fitText(fileName, n.w - CARD_PAD*2))+'</text>';
+      if (n.fileLabel){
+        fileTxt = '<text class="nd-file" x="'+(n.x+CARD_PAD)+'" y="'+(n.y+n.h-5)+'">'+escXml(fitText(n.fileLabel, n.w - CARD_PAD*2))+'</text>';
       }
       const durMs = durs.get(n.id) || 0;
       const durTxt = fmtDurMs(durMs, LANG);
       const durHtml = durTxt ? '<text class="nd-dur" x="'+(n.x+n.w/2)+'" y="'+(n.y+n.h+12)+'" text-anchor="middle">⏱ '+escXml(durTxt)+'</text>' : '';
       // v0.27.0 端口：左右各一空心圆（图3 的 ◯ 端口）
+      // v0.27.2：输入/输出分开样式（空心 / 实心），并加透明大热区（r=10）——
+      //   此前两个圆完全一样、半径只有 4.5，既看不出方向也几乎点不中（「点问题」）。
       const a = anchors(n);
       const pi = a.inn, po = a.out;
+      const portTip = T('拖到另一节点的端口即可连线');
       return '<g data-node="'+escXml(n.id)+'">' +
         (durTxt ? '<title>'+escXml(T('距下一次提问')+' · '+durTxt)+'</title>' : '') + body + head + bodyTxt + fileTxt + durHtml +
-        '<circle class="port" cx="'+pi.x+'" cy="'+pi.y+'" r="4.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/>' +
-        '<circle class="port" cx="'+po.x+'" cy="'+po.y+'" r="4.5" data-port="'+escXml(n.id)+'" style="cursor:crosshair"/></g>';
+        '<circle class="port port-in" cx="'+pi.x+'" cy="'+pi.y+'" r="4" pointer-events="none"/>' +
+        '<circle class="port port-out" cx="'+po.x+'" cy="'+po.y+'" r="4" pointer-events="none"/>' +
+        '<circle class="port-hit" cx="'+pi.x+'" cy="'+pi.y+'" r="10" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(portTip)+'</title></circle>' +
+        '<circle class="port-hit" cx="'+po.x+'" cy="'+po.y+'" r="10" data-port="'+escXml(n.id)+'" style="cursor:crosshair"><title>'+escXml(portTip)+'</title></circle></g>';
     }).join('');
 
     let overlayHtml = '';
@@ -3669,7 +3857,40 @@ if (typeof document !== "undefined") var UI = function(){
     applyView();
   }
 
+  // 节点正文兜底：没有自带说明的节点，用它在会话里对应的**真实问答内容**（问 + 答）当正文。
+  // 目的：卡片正文写「具体问答」，而不是把标题重复一遍（v0.27.2 的「方框显示问题」）。
+  // 只在节点没有 doc/body 时补，不覆盖用户手写或导入的说明；每个图只补一次（g._docsFilled）。
+  function enrichNodeDocs(){
+    if (!g || g._docsFilled) return g;
+    const entry = WF.list.find(w => w.name === WF.active);
+    const src = (entry && entry.src) || null;
+    const turns = (src && src.turns) || [];
+    if (!turns.length || !turns.some(t => t && t.node)){ g._docsFilled = true; return g; }
+    const bare = qaBare((src && src.session) || '');
+    const byNode = {};
+    turns.forEach(t => { if (t && t.node && !byNode[t.node]) byNode[t.node] = t; });
+    g.nodes.forEach(n => {
+      if (String(n.doc || n.body || '').trim()) return;
+      const t = byNode[n.id];
+      if (!t) return;
+      const q = String(t.q || '').replace(/\s+/g, ' ').trim();
+      let a = String(t.a || '');
+      if (!a && bare){
+        const it = qaItems.find(x => x.who !== 'sub' && qaBare(x.sessionId) === bare
+          && String(x.q || '').replace(/\s+/g, ' ').trim().slice(0, 24) === q.slice(0, 24));
+        a = String((it && it.a) || '');
+      }
+      const lines = [];
+      if (q && !isQaContinuation(q)) lines.push('问：' + q);
+      qaTextLines(a, 12, 200).forEach(l => lines.push(l));
+      if (lines.length) n.doc = lines.join('\n');
+    });
+    g._docsFilled = true;
+    return g;
+  }
   function refresh(fitNow){
+    enrichNodeDocs();                 // 补真实问答内容（只补缺 doc 的节点）
+    normalize(g);                     // 内容变了要重算卡片高度，保证框高与正文一致
     render(); syncCode(); if (fitNow) fit(); else applyView();
   }
 
@@ -6460,26 +6681,64 @@ if (typeof document !== "undefined") var UI = function(){
   const NT_AGENT_HEAD_H = 1.15;     // 智能体标题条（以行高为单位）
   const NT_PROJ_HEAD_H = 1.6;       // 项目标题栏（以行高为单位）
 
-  // 会话「对话正文行」：优先取该会话的问答问题，组成可供 treemap 逐行铺展的文本。
+  // 会话「对话正文行」：把该会话的**真实问答内容**（问 + 答 + 子智能体输出）逐行铺成 treemap 文本行。
+  // v0.27.2 修复三处「一直在重复」的根因：
+  //   ① 此前只取 t.q（问题），回答正文完全没进正文 → 放大后只有标题；
+  //   ② 子智能体一律写死同一句 '  🤖 子智能体执行' → 同句复读；
+  //   ③ ntPackRows 会把内容循环续写填满 → 同一句被复制 N 遍。
+  // 现在：问题 + 回答 + 子智能体真实描述都进正文；内容不够就少几行，绝不复读。
   function ntSessionLines(canvasName, list, qaArr){
     const w = list.find(x => x.name === canvasName);
     const bare = w && w.src && w.src.session ? qaBare(w.src.session) : '';
-    const lines = [];
-    if (w && w.src){
+    const qaArr2 = qaArr || [];
+    const ofSess = it => bare && qaBare(it.sessionId) === bare;
+    const out = [];
+    const push = (txt, lim, cap) => { qaTextLines(txt, lim || 12, cap || 200).forEach(l => out.push(l)); };
+    const wNodes = (w && w.data && w.data.nodes) || [];
+    if (w && w.src && (w.src.turns || []).length){
       (w.src.turns || []).forEach(t => {
         const q = String((t && t.q) || '').replace(/\s+/g, ' ').trim();
-        if (q) lines.push(q);
-        ((t && t.subs) || []).forEach(() => lines.push('  🤖 子智能体执行'));
+        if (q && !isQaContinuation(q)) push('问：' + q, 3, 160);
+        // 回答：优先 src.turns[].a（已随画布保存），回退到问答数据里同会话的对应条目
+        let a = String((t && t.a) || '');
+        if (!a){
+          const it = qaArr2.filter(ofSess).find(x => x.who !== 'sub'
+            && String(x.q || '').replace(/\s+/g, ' ').trim().slice(0, 24) === q.slice(0, 24));
+          a = String((it && it.a) || '');
+        }
+        if (a) push(a, 12, 200);
+        // 子智能体：写它的真实输出/描述，而不是写死一句话
+        ((t && t.subs) || []).forEach(sid => {
+          const sn = wNodes.find(x => x.id === sid);
+          const it = sn ? subItemForNode(sn) : null;
+          const txt = (it && (it.a || it.description || it.q)) || (sn && sn.label) || '';
+          const label = (it && it.description) ? ('🤖 ' + it.description + '：') : '🤖 ';
+          push(label + String(txt || '').replace(/\s+/g, ' ').trim(), 6, 160);
+        });
       });
     }
-    if (!lines.length && bare){
-      qaArr.filter(it => qaBare(it.sessionId) === bare).slice(0, 60).forEach(it => {
+    // 兜底：画布没有 src.turns 时，用问答数据里该会话的全部条目（问 + 答）
+    if (!out.length && bare){
+      qaArr2.filter(ofSess).slice(0, 60).forEach(it => {
+        if (it.who === 'sub'){
+          push('🤖 ' + String(it.description || '').trim(), 3, 120);
+          if (it.a) push(it.a, 8, 180);
+          return;
+        }
         const q = qaLabel(it).replace(/\s+/g, ' ').trim();
-        if (q && q !== '(无提问)') lines.push(q);
+        if (q && q !== '(无提问)') push('问：' + q, 3, 160);
+        if (it.a) push(it.a, 10, 180);
       });
     }
-    if (!lines.length && w) lines.push(String((w.src && w.src.task) || w.name));
-    return lines;
+    // 最后兜底：确实没有任何问答内容时，只写一次任务名（不再循环复读）
+    if (!out.length && w){
+      const t0 = String((w.src && w.src.task) || w.name || '').trim();
+      if (t0) push(t0, 2, 160);
+    }
+    // 去重（同一句只保留一次），保持原始顺序
+    const seen = new Set(), uniq = [];
+    out.forEach(l => { const k = l.trim(); if (!k || seen.has(k)) return; seen.add(k); uniq.push(l); });
+    return uniq;
   }
 
   // 建树：把「项目 → 智能体 → 会话 → 对话轮」组织成可 treemap 的层级（每层带 weight）。
@@ -6516,8 +6775,10 @@ if (typeof document !== "undefined") var UI = function(){
         // 关键：轮的权重 = 它的代码行数，布局时按行数分配高度，
         // 这样「一行」在世界坐标里始终 ≈ 1 个行高，放大后才是可读的多行代码（图2）。
         // NT_CODE_COLS 是「列数」，换算成 ntWrapText 需要的像素宽度（半角 7.5px/列）。
+        // v0.27.2：正文来源改为**真实问答内容**（问 + 答 + 子智能体输出），
+        // 上限提到 240 行，权重（codeLines）与真正会画出来的行数保持一致。
         const wrapPx = NT_CODE_COLS * 7.5;
-        const turnTexts = lines.slice(0, 40);
+        const turnTexts = lines.slice(0, 240);
         turnTexts.forEach((q, i) => {
           const wrapped = ntWrapText(String(q || ''), wrapPx, NT_MAX_LINES, 10);
           const nL = Math.max(1, wrapped.length);
@@ -6564,6 +6825,23 @@ if (typeof document !== "undefined") var UI = function(){
     const world = { x: 8, y: 8, w: W - 16, h: H - 16 };
     const byW = (a, b) => b.weight - a.weight;
     if (!root || !root.children.length){ root.rects = rects; return rects; }
+    // v0.27.2：**内容自适应世界尺寸**——treemap 大小按「总行数 × 行高 + 各层抬头」缩放，
+    // 不再把少量文字拉伸到整个画布。此前会话体被拉高到几十行，而真实内容只有十几行，
+    // 于是要么出现大片空白，要么（v0.27.1 的做法）循环复读同一句把空白填满 —— 两者都不对。
+    let contentRows = 0, heads = 0;
+    root.children.forEach(p => {
+      heads += 22;
+      (p.children || []).forEach(a => {
+        heads += 18;
+        (a.children || []).forEach(s => { heads += 13; contentRows += Math.max(1, s.weight || 1); });
+      });
+    });
+    const needH = contentRows * NT_ROW_H * 1.2 + heads;
+    const kScale = Math.max(0.16, Math.min(1, needH / Math.max(60, world.h)));
+    if (kScale < 1){
+      world.w = Math.max(300, world.w * kScale);
+      world.h = Math.max(180, world.h * kScale);
+    }
     // 第一层：项目。项目高度 ∝ 其内部总行数，宽度按行数占比切开（行宽守恒）。
     const totalLines = root.children.reduce((a, c) => a + Math.max(1, c.weight), 0);
     nnSquarify(root.children.map(c => ({ id: c.id, w: Math.max(1, c.weight), node: c })).sort(byW), world)
@@ -6590,29 +6868,29 @@ if (typeof document !== "undefined") var UI = function(){
             const sinner = { x: src2.x + 1, y: src2.y + sh + 1, w: src2.w - 2, h: src2.h - sh - 2 };
             if (sinner.w <= 3 || sinner.h <= 3) return;
             // 第四层：对话轮 = 多行代码块。
-            // 目标观感（图1/图2）：整个会话体被「密排代码行」铺满，行高在整个会话内均匀。
-            // 做法：先按可用高算出「能放多少行」，再把每一轮的逻辑行按此容量切开；
-            // 若轮数/行数不足以铺满，就把内容按行循环续写补足（dense packing），
-            // 而不是把少量文字拉伸到大块空白里。
+            // 目标观感（图1/图2）：会话体被「密排代码行」铺满，行高在整个会话内均匀。
+            // v0.27.2：**不再循环复读**——只铺真实内容（问 + 答 + 子智能体输出），
+            // 内容不足时尾部留白（像文件末尾），行高不变量「一行 ≈ NT_ROW_H」保持不变。
             snode.lineRects = [];
             const kids = snode.children;
-            const capRows = Math.max(1, Math.round(sinner.h / NT_ROW_H));   // 这个会话体目标行数
+            const capRows = Math.max(1, Math.round(sinner.h / NT_ROW_H));   // 这个会话体最多能放多少行
             const rawLines = [];
             kids.forEach(t => { const L = (t.lines && t.lines.length) ? t.lines : [String(t.label || '')]; L.forEach(s => rawLines.push(String(s || ''))); });
-            const packed = ntPackRows(rawLines, capRows);                   // 恰好 capRows 行
-            // 把 packed 按 kids 的原始 nLines 比例回填到每个 turn
+            const packed = ntPackRows(rawLines, capRows);                   // 去重后的真实行（可能少于 capRows）
+            const rowBudget = Math.max(1, Math.min(capRows, packed.length));
+            // 把 packed 按 kids 的原始 nLines 比例分给每个 turn
             const totW = kids.reduce((a, t) => a + Math.max(1, t.nLines || 1), 0) || 1;
-            const rowH = sinner.h / capRows;
+            const rowH = sinner.h / capRows;    // 恒定世界行高（不做拉伸）
             let pi = 0;
             let cy = sinner.y;
-            kids.forEach((t, i) => {
-              // 该轮分到的行数（至少 1，且不超过剩余）
-              let n = Math.max(1, Math.round((Math.max(1, t.nLines || 1) / totW) * capRows));
-              if (i === kids.length - 1) n = Math.max(1, capRows - pi);
-              n = Math.min(n, Math.max(1, capRows - pi));
+            kids.forEach(t => {
+              if (pi >= rowBudget) return;      // 内容已铺完：后面的轮不再占位
+              let n = Math.max(1, Math.round((Math.max(1, t.nLines || 1) / totW) * rowBudget));
+              n = Math.min(n, Math.max(0, rowBudget - pi));
+              if (n <= 0) return;
               const seg = packed.slice(pi, pi + n);
               pi += n;
-              const th = (i === kids.length - 1) ? (sinner.y + sinner.h - cy) : (rowH * n);
+              const th = rowH * n;
               const lr = { x: sinner.x, y: cy, w: sinner.w, h: Math.max(0.8, th) };
               t.lineRect = lr;
               t.rowH = rowH;
@@ -7090,23 +7368,9 @@ if (typeof document !== "undefined") var UI = function(){
   }
   // 把若干逻辑行铺满成恰好 want 行的「密排代码块」。
   // 内容不足时循环续写（按源行顺序轮转 → 视觉上更像真实代码块），超出则截断。
-  function ntPackRows(rawLines, want){
-    const want2 = Math.max(1, want || 1);
-    const src = (rawLines || []).map(s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim()).filter(Boolean);
-    if (!src.length) return new Array(want2).fill('');
-    // 去重后仍不足时，用「去重前的原始序列」循环，保证纹理有变化
-    const uniq = [];
-    const seen = new Set();
-    src.forEach(s => { if (!seen.has(s)){ seen.add(s); uniq.push(s); } });
-    const pool = uniq.length ? uniq : src;
-    const out = [];
-    for (let i = 0; i < want2; i++){
-      const t = pool[i % pool.length];
-      // 第 2 轮起的行加缩进，读起来像代码续写
-      out.push(i < pool.length ? t : ('  ' + t));
-    }
-    return out;
-  }
+  // 密排行：把真实内容按顺序铺开，**绝不循环复读**（v0.27.2 移到 __CORE 以便单测）。
+  // 定义见 __CORE 区 ntPackRows。
+
   // 会话体：标题条 + 内部行（行由 turn 矩形单独绘制，这里只补「会话抬头」与底色）
   // 会话体：底色 + 抬头条 + 左侧智能体色条（x/y/w/h 均为屏幕坐标）
   function ntDrawSessionBody(ctx, st, v, th, r, x, y, w, h){
@@ -7364,7 +7628,11 @@ if (typeof document !== "undefined") var UI = function(){
   window.__flow = { applyText, loadText, g: () => g, setTab, showView, renderDist, renderCtl, renderCtlUsage, renderSkills, renderTrace, renderQa, renderQaKw, genQaSummary, keywordDigest, promptSummary, skillDraftFromPrompts, loadQaText, loadHttpQa, startQaSync, qaItems: () => qaItems, qaSync: () => qaSync, addQaNode, addKindNode, loadUsageText, afterUsageLoad, skillSummary, pluginUsageRows, ctlLayout, loadHttpUsage, loadHttpTokens, usageAgg: () => usageAgg, tokenAgg: () => tokenAgg, skillGenDraft, skillGenFromQa, skillSave, skillRefresh, skillWs: () => skillWs, addTplToCanvas, ensureQaSession, importSessionToCanvas, openSetDlg, renderSetDlg, setLang, isEn: () => isEn(), t: T, sync: () => ({ mode: fh ? 'fs' : (httpWatch ? (httpWritable ? 'http-rw' : 'http-ro') : null), name: fh ? (fh.name || '') : (httpWatch ? httpWatch.name : null), caps: httpCaps, status: $('syncStat').textContent }), counts: () => ({ nodes: g.nodes.length, edges: g.edges.length }),
     wf: () => WF, exportWfTree, importWfTreeText, pushWfBackup, restoreWfBackup, wfTreeObj, fillWfSel, renderCrumb, activeDurs, openSubDlg, subItemForNode,
     fmtDurMs, wfDurOfTurns, wfTreeParse, wfMergeEntries, subNodeLabel, costOfModel, priceFor, fmtCost, priceCfg: () => priceCfg, loadHttpSettings,
-    projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, ntBuildTree, ntLayoutTree, ntSquarifyChildren, ntLinePx, ntVisibleChars, ntTokenize, ntFocusSet, renderNn, nnTextState: () => nnTextState, nnTextView: () => nnTextView, ntFitView, ntFlyTo, ntFlyToRect, ntZoomBy, ntRowPx, ntUpdateLod, nnHitTest, ntRunSearch, ntFlyToNextMatch, nnTextMatches: () => nnTextMatches, nnTextSearchOn: () => nnTextSearchOn, ntStartLoop, ntStopLoop, drawNn, switchWorkflow, distFollowCurrent, distFollow: () => distFollowOn, openQuickSwitch, paintQuick };
+    projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, ntBuildTree, ntLayoutTree, ntSquarifyChildren, ntLinePx, ntVisibleChars, ntTokenize, ntFocusSet, renderNn, nnTextState: () => nnTextState, nnTextView: () => nnTextView, ntFitView, ntFlyTo, ntFlyToRect, ntZoomBy, ntRowPx, ntUpdateLod, nnHitTest, ntRunSearch, ntFlyToNextMatch, nnTextMatches: () => nnTextMatches, nnTextSearchOn: () => nnTextSearchOn, ntStartLoop, ntStopLoop, drawNn, switchWorkflow, distFollowCurrent, distFollow: () => distFollowOn, openQuickSwitch, paintQuick,
+    // v0.27.2 测试钩子：卡片几何 / 连线路由 / 神经网络正文（供 tests/*.mjs 断言）
+    sizeNode, normalize: gg => normalize(gg), cardBodyRows, cardBodyText, ntCardRows, qaTextLines, looksLikeCode,
+    routeOrtho, segHitsRect, polylineFree, anchors, edgePath, edgeMeta, refresh: fn => refresh(fn),
+    ntPackRows, ntSessionLines, ntBuildTree2: (l, q) => ntBuildTree(l, q), enrichNodeDocs: () => enrichNodeDocs() };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

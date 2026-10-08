@@ -76,11 +76,17 @@ await page.evaluate(() => {
   });
   WF.list.push(
     mk("画布-项目甲-主", "zcode", "C:/work/项目甲", 1000, [
-      { node: "n1", q: "实现登录接口", ts: 1000, subs: ["sub1", "sub2"] },
-      { node: "n2", q: "补充单元测试", ts: 4000, subs: ["sub3"] },
+      { node: "n1", q: "实现登录接口", ts: 1000, subs: ["sub1", "sub2"],
+        a: "LoginController 接 /api/login，校验用户名密码后签发 Sa-Token，失败返回 401。" },
+      { node: "n2", q: "补充单元测试", ts: 4000, subs: ["sub3"],
+        a: "用 JUnit5 + MockMvc 覆盖登录成功/密码错/账号锁定三条路径，断言 token 非空。" },
     ]),
-    mk("画布-项目甲-协作", "codex", "C:/work/项目甲", 2000, [{ node: "n3", q: "评审登录实现", ts: 2000, subs: [] }]),
-    mk("画布-项目乙-主", "gemini", "C:/work/项目乙", 3000, [{ node: "n4", q: "统计报表设计", ts: 3000, subs: ["sub4"] }]),
+    mk("画布-项目甲-协作", "codex", "C:/work/项目甲", 2000, [
+      { node: "n3", q: "评审登录实现", ts: 2000, subs: [], a: "评审意见：密码未加盐，建议改 BCrypt；接口需限流防爆破。" },
+    ]),
+    mk("画布-项目乙-主", "gemini", "C:/work/项目乙", 3000, [
+      { node: "n4", q: "统计报表设计", ts: 3000, subs: ["sub4"], a: "报表按年级/性别双维度聚合，ECharts 柱状图 + 折线图组合展示。" },
+    ]),
   );
   // 真实生产路径下卡片标题取 sessionTaskName()（优先 src.task，其次问答首问句）。
   // 这里把 src.task 清掉、注入问答记录，验证「标题真的来自对话内容」这一分支。
@@ -301,6 +307,103 @@ ok(/命中/.test(srch.hud), "HUD 显示搜索命中数");
 await page.keyboard.press("Enter");
 await page.waitForTimeout(250);
 await page.evaluate(() => { const s = document.getElementById("nnSearch"); s.value = ""; s.dispatchEvent(new Event("input")); });
+
+// v0.27.2 神经网络写入「具体问答」：不再是重复标题 / 重复同一句
+await page.evaluate(() => { window.__flow.showView("nn"); });
+await page.waitForTimeout(300);
+const nnText = await page.evaluate(() => {
+  const st = window.__flow.nnTextState();
+  const turns = st.rects.filter(r => r.kind === "turn" && Array.isArray(r.lines));
+  const all = [];
+  turns.forEach(r => r.lines.forEach(l => all.push(String(l))));
+  // 每个会话内是否有重复行
+  const bySess = {};
+  turns.forEach(r => {
+    const k = r.sessId || "?";
+    (bySess[k] = bySess[k] || []).push(...r.lines.map(String));
+  });
+  const dupInSess = Object.keys(bySess).map(k => {
+    const arr = bySess[k];
+    return arr.length - new Set(arr).size;
+  });
+  // 会话正文里的行（按会话聚合）
+  const sessLines = {};
+  turns.forEach(r => { const k = r.sessId || "?"; (sessLines[k] = sessLines[k] || []).push(...r.lines.map(String)); });
+  return {
+    total: all.length,
+    dupInSessMax: dupInSess.length ? Math.max.apply(null, dupInSess) : 0,
+    joined: all.join("\n"),
+    sessKeys: Object.keys(sessLines),
+    sessJoined: Object.keys(sessLines).map(k => sessLines[k].join("\n")),
+  };
+});
+ok(nnText.total >= 6, "神经网络会话正文有实际文字行（实际 " + nnText.total + "）");
+ok(nnText.dupInSessMax === 0, "同一会话内无重复行（最大重复 " + nnText.dupInSessMax + "）——不再复读同一句");
+ok(/LoginController|Sa-Token|BCrypt|ECharts|JUnit5/.test(nnText.joined), "正文含回答里的具体内容（代码/库名/结论）");
+ok(nnText.sessJoined.filter(s => /LoginController|LoginController|Sa-Token/.test(s)).length >= 1, "回答落在对应会话的正文里");
+const qCount = (nnText.joined.match(/问：/g) || []).length;
+ok(qCount >= 3, "提问以「问：」前缀写入正文（实际 " + qCount + " 条）");
+// 不能只有标题复读：正文行里「问：xxx」这类纯标题行占比不能过高
+ok(nnText.total > qCount, "正文内容多于提问条数（说明回答也写进去了）");
+
+// v0.27.2 卡片方框：高度与正文行数一致、正文不重复标题
+const cardRep = await page.evaluate(() => {
+  const F = window.__flow, WF = F.wf();
+  // 切到带 src.turns 的会话画布，卡片正文才会从真实问答里补内容
+  F.switchWorkflow("画布-项目甲-主");
+  const gg = F.g();
+  gg.nodes.forEach(n => { n.doc = ""; n.body = ""; });
+  gg._docsFilled = false;
+  F.enrichNodeDocs();
+  gg.nodes.forEach(F.sizeNode);
+  F.refresh(true);
+  return gg.nodes.map(n => {
+    const rows = n.bodyRows || [];
+    const el = document.querySelector('g[data-node="' + n.id + '"]');
+    let maxW = 0;
+    if (el) el.querySelectorAll("text.nd-b").forEach(t => { try { maxW = Math.max(maxW, t.getBBox().width); } catch(e){} });
+    return { id: n.id, h: n.h, rows: rows.length, maxW: Math.round(maxW), label: n.label, joined: rows.join(" ") };
+  });
+});
+const card0 = cardRep[0];
+ok(!!card0, "取到卡片用于核对");
+ok(card0.h < 600, "卡片高度在合理范围（未因字符数当行数而爆高）：" + card0.h + "px");
+ok(card0.rows <= 14, "正文行数被 CARD_MAX_BODY 夹住（实际 " + card0.rows + "）");
+ok(card0.maxW <= 236 - 18 + 1, "正文未横向溢出卡片（最宽 " + card0.maxW + "px / 可用 218px）");
+ok(card0.joined.indexOf("问：") >= 0 || /LoginController|JUnit5/.test(card0.joined), "卡片正文来自真实问答内容");
+ok(card0.joined.indexOf(String(card0.label)) < 0 || card0.joined.length > String(card0.label).length + 4,
+   "卡片正文不只是把标题重复一遍");
+const badH = cardRep.filter(c => c.h > 400);
+ok(badH.length === 0, "没有异常高的方框（实际 " + badH.length + " 个）");
+
+// v0.27.2 连线：不穿过其它卡片、箭头停在端口外
+const edgeRep = await page.evaluate(() => {
+  const F = window.__flow, gg = F.g();
+  // 造一个「中间有卡片挡路」的三点布局
+  gg.dir = "LR";
+  gg.nodes = [
+    { id: "e1", x: 0, y: 0, w: 236, h: 90, label: "起", kind: "input", doc: "start" },
+    { id: "e2", x: 320, y: 0, w: 236, h: 300, label: "挡", kind: "agent", doc: "blocker" },
+    { id: "e3", x: 640, y: 220, w: 236, h: 90, label: "终", kind: "output", doc: "end" },
+  ];
+  gg.edges = [{ from: "e1", to: "e3", label: "" }];
+  gg.subs = [];
+  gg.nodes.forEach(F.sizeNode);
+  F.refresh(true);
+  const metas = F.edgeMeta(gg);
+  const ep = F.edgePath(gg.edges[0], metas[0]);
+  const nums = String(ep.d).match(/-?\d+(\.\d+)?/g) || [];
+  const pts = [];
+  for (let k = 0; k + 1 < nums.length; k += 2) pts.push({ x: +nums[k], y: +nums[k + 1] });
+  const mid = gg.nodes[1];
+  const inside = pts.filter(p => p.x > mid.x + 2 && p.x < mid.x + mid.w - 2 && p.y > mid.y + 2 && p.y < mid.y + mid.h - 2);
+  const anchors = F.anchors(gg.nodes[2]);
+  const tip = pts[pts.length - 1];
+  const tipDist = Math.hypot(tip.x - anchors.inn.x, tip.y - anchors.inn.y);
+  return { d: ep.d, insideMid: inside.length, tipDist: Math.round(tipDist * 10) / 10, ptCount: pts.length };
+});
+ok(edgeRep.insideMid === 0, "连线折点不落在挡路卡片内部（实际 " + edgeRep.insideMid + "）");
+ok(edgeRep.tipDist >= 6, "箭头尖停在端口外侧（距端口 " + edgeRep.tipDist + "px）");
 
 // 三种面积权重模式（按文字行数 / 按对话轮数 / 等面积）均能重建且面积变化
 const modes = {};

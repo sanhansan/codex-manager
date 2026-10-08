@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -32,6 +32,7 @@ const core = await import(pathToFileURL(corePath).href);
   priceFor, costOfModel, fmtCost,
   projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration,
   nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText,
+  ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows,
 } = core;
 
 let pass = 0, fail = 0;
@@ -1037,6 +1038,113 @@ t("ntWrapText：按显示宽度折行、限行数并补省略号", () => {
   const clipped = ntWrapText("一二三四五六七八九十".repeat(10), 60, 2, 11);
   okTest(clipped.length <= 2, "硬限 2 行");
   okTest(clipped[clipped.length - 1].indexOf("…") >= 0, "溢出末行补省略号");
+});
+
+// ---------- v0.27.2：卡片方框 / 连线路由 / 真实问答正文 ----------
+
+t("ntCardRows：保留显式换行（代码不被压成一行）并按宽度折行", () => {
+  const code = ["// 注释行", "const a = 1;", "export default a;"].join("\n");
+  const rows = ntCardRows(code, 200, 14);
+  okTest(rows.length >= 3, "三行代码至少产生三行（换行被保留）");
+  eq(rows[0], "// 注释行", "首行原文");
+  eq(rows[1], "const a = 1;", "次行原文");
+  // 关键回归：不能像 ntWrapText 那样把 \n 折成空格压成一行
+  okTest(rows.join("\n").indexOf("\n") >= 0, "换行没有丢失");
+  okTest(ntCardRows(code, 200, 14).join("|").indexOf("// 注释行 const a") < 0, "未被压成一行");
+});
+
+t("ntCardRows：超长内容被限行并补省略号", () => {
+  const long = Array.from({ length: 40 }, (_, i) => "第 " + i + " 行内容").join("\n");
+  const rows = ntCardRows(long, 200, 6);
+  eq(rows.length, 6, "硬限 6 行");
+  okTest(/…$/.test(rows[5]), "末行补省略号");
+});
+
+t("cardBodyLines/ntCardRows：行数按折行结果算，不是字符数（防巨框）", () => {
+  // 347 字 doc 在旧实现里会被当成 347 行 → 卡片高 ≈ 5200px
+  const doc = "x".repeat(347);
+  const rows = ntCardRows(doc, 218, 14);
+  okTest(rows.length <= 14, "行数被硬上限夹住（不会变成 347）");
+  const lineCount = rows.length;
+  okTest(lineCount < 60, "行数是折行结果而非字符数");
+});
+
+t("ntPackRows：只返回真实行，绝不循环复读", () => {
+  const src = ["问：甲", "答：A", "问：乙"];
+  const out = ntPackRows(src, 50);
+  eq(new Set(out).size, out.length, "输出内无重复行");
+  eq(out.length, 3, "行数 = 真实内容数（不补齐到 want）");
+  const dup = ntPackRows(["同", "同", "同"], 10);
+  eq(dup.length, 1, "同一句即使重复输入也只留一次");
+  eq(ntPackRows([], 5).length, 0, "无内容返回空（不再填占位）");
+});
+
+t("qaTextLines：去 ``` 围栏、压空行、限行限量", () => {
+  const a = "```js\nconst a = 1;\n```\n\n\n\n第二段内容\n" + "长".repeat(300);
+  const rows = qaTextLines(a, 5, 50);
+  okTest(rows.every(r => r.indexOf("```") < 0), "围栏行被去掉");
+  okTest(rows.length <= 5, "限行");
+  okTest(rows.every(r => r.length <= 51), "单行限长（含省略号）");
+  eq(qaTextLines("   \n\n  ", 5, 50).length, 0, "空白返回空数组");
+});
+
+t("looksLikeCode：代码用等宽字体、说明用普通字体", () => {
+  okTest(looksLikeCode("const a = 1;"), "const 语句判为代码");
+  okTest(looksLikeCode("SELECT * FROM t"), "SQL 判为代码");
+  okTest(looksLikeCode("// 注释"), "注释判为代码");
+  okTest(!looksLikeCode("这是一句普通的中文说明"), "中文说明不判为代码");
+});
+
+t("segHitsRect：轴线线段与矩形相交判定", () => {
+  const r = { x: 10, y: 10, w: 20, h: 20 };
+  okTest(segHitsRect(0, 20, 40, 20, r), "水平线穿过矩形");
+  okTest(segHitsRect(20, 0, 20, 40, r), "垂直线穿过矩形");
+  okTest(!segHitsRect(0, 5, 40, 5, r), "水平线在矩形上方不穿过");
+  okTest(!segHitsRect(5, 0, 5, 40, r), "垂直线在矩形左侧不穿过");
+  okTest(segHitsRect(0, 20, 40, 20, r, 4), "膨胀后仍相交");
+});
+
+t("routeOrtho：LR 前向连接首末段沿端口法线，且不穿其它卡片", () => {
+  const a = { x: 0, y: 0, w: 100, h: 60, id: "a" };
+  const b = { x: 300, y: 200, w: 100, h: 60, id: "b" };
+  const mid = { x: 160, y: 0, w: 60, h: 260, id: "m" };   // 挡在中间的卡片
+  const p1 = { x: 100, y: 30 }, p2 = { x: 300, y: 230 };
+  const pts = routeOrtho(p1, p2, { dir: "LR", obstacles: [a, b, mid], a, b });
+  eq(pts[0].x, p1.x); eq(pts[0].y, p1.y);
+  eq(pts[pts.length - 1].x, p2.x); eq(pts[pts.length - 1].y, p2.y);
+  // 首段水平、末段水平（LR）
+  eq(pts[1].y, p1.y, "首段沿法线（水平）离开");
+  eq(pts[pts.length - 2].y, p2.y, "末段沿法线（水平）进入");
+  okTest(polylineFree(pts, [a, b, mid], { a, b }, 0), "绕开中间卡片");
+});
+
+t("routeOrtho：反馈边（末点在前方左侧）走外绕且不穿卡片", () => {
+  const a = { x: 0, y: 0, w: 100, h: 60, id: "a" };
+  const b = { x: 300, y: 0, w: 100, h: 60, id: "b" };
+  const p1 = { x: 400, y: 30 }, p2 = { x: 300, y: 30 };    // 从 b 右侧回到 b 左侧
+  const pts = routeOrtho(p1, p2, { dir: "LR", obstacles: [a, b], a: b, b: a, feedback: true });
+  eq(pts[0].x, p1.x); eq(pts[pts.length - 1].x, p2.x);
+  okTest(polylineFree(pts, [a, b], { a: b, b: a }, 0), "外绕不穿 a/b");
+  const ys = pts.map(p => p.y);
+  okTest(Math.min.apply(null, ys) < 30, "确实绕到了上方通道");
+});
+
+t("routeOrtho：TD 方向首末段沿垂直法线", () => {
+  const a = { x: 0, y: 0, w: 100, h: 60, id: "a" };
+  const b = { x: 40, y: 300, w: 100, h: 60, id: "b" };
+  const p1 = { x: 50, y: 60 }, p2 = { x: 90, y: 300 };
+  const pts = routeOrtho(p1, p2, { dir: "TD", obstacles: [a, b], a, b });
+  eq(pts[1].x, p1.x, "首段垂直离开");
+  eq(pts[pts.length - 2].x, p2.x, "末段垂直进入");
+});
+
+t("routeOrtho：平行边分道产生不同通道", () => {
+  const a = { x: 0, y: 0, w: 100, h: 60, id: "a" };
+  const b = { x: 400, y: 0, w: 100, h: 60, id: "b" };
+  const p1 = { x: 100, y: 30 }, p2 = { x: 400, y: 30 };
+  const g1 = routeOrtho(p1, p2, { dir: "LR", obstacles: [a, b], a, b, laneIdx: 0, laneCnt: 3 });
+  const g2 = routeOrtho(p1, p2, { dir: "LR", obstacles: [a, b], a, b, laneIdx: 1, laneCnt: 3 });
+  okTest(g1[1].x !== g2[1].x, "不同道次的通道位置不同");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

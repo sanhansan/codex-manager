@@ -65,39 +65,45 @@ await page.goto(pathToFileURL(tmp).href, { waitUntil: "load" });
 await page.waitForFunction(() => window.__flow && window.__flow.g(), null, { timeout: 15000 });
 
 // 补齐卡片正文/文件名 + 加第二个会话（同项目），构造分布工作区分框
+// v0.27.2：直接写进**正在渲染的图** g（此前写持久化副本 cur.data.nodes，画布渲染的是 g 的深拷贝，doc 根本没生效）
 await page.evaluate(([d1, d2, d3]) => {
   const F = window.__flow, WF = F.wf();
+  const gg = F.g();
   const cur = WF.list.find(w => w.name === WF.active);
   const docs = [d1, d2, d3], files = ["evaluate.js", "chart.js", "01-预检/STEP.md"];
-  cur.data.nodes.forEach((n, i) => { n.doc = docs[i] || n.doc; n.file = files[i] || ""; if (!n.kind) n.kind = i === 2 ? "cond" : "agent"; });
-  cur.data.dir = "LR";
+  gg.nodes.forEach((n, i) => { n.doc = docs[i] || ""; n.file = files[i] || ""; if (!n.kind) n.kind = i === 2 ? "cond" : "agent"; });
+  gg.dir = "LR";
+  gg.nodes.forEach(F.sizeNode);
   cur.src = { parent: "主流程", client: "qoder", session: "sess_自动评测引擎", task: "",
     ts: 1000, cwd: "C:/work/体测成绩系统", project: "体测成绩系统",
     turns: [
-      { node: "n1", q: "按国家学生体质健康标准实现自动评测规则库", ts: 1000, subs: [] },
-      { node: "n2", q: "ECharts 统计图表与雷达图对接", ts: 5000, subs: [] },
-      { node: "n3", q: "校验评分阈值与等级边界", ts: 9000, subs: [] },
+      { node: "n1", q: "按国家学生体质健康标准实现自动评测规则库", ts: 1000, subs: [], a: "已按《国家学生体质健康标准(2014)》落地规则库：RULES 表按项目 code 索引，piecewise 按性别/年级取分段阈值，返回 {score, level}。" },
+      { node: "n2", q: "ECharts 统计图表与雷达图对接", ts: 5000, subs: [], a: "用 ECharts 5 的 radar 系列对接：indicator 取五项素质，data 按班级聚合，chart.setOption 一次绘入。" },
+      { node: "n3", q: "校验评分阈值与等级边界", ts: 9000, subs: [], a: "边界用例通过：59.9→不及格、60→及格、79.9→及格、80→良好。" },
     ] };
   // 同项目第二个智能体会话
   WF.list.push({
     name: "成绩导入",
     data: { name: "成绩导入", dir: "LR", nodes: [
-      { id: "m1", x: 30, y: 30, w: 236, h: 105, label: "EasyExcel 解析", kind: "agent",
+      { id: "m1", x: 30, y: 380, w: 236, h: 105, label: "EasyExcel 解析", kind: "agent",
         doc: '@ExcelProperty("学号")\nprivate String studentNo;\n@ExcelProperty("成绩")\nprivate Double score;', file: "ScoreImportDTO.java" },
-      { id: "m2", x: 326, y: 30, w: 236, h: 105, label: "批量入库", kind: "agent",
+      { id: "m2", x: 326, y: 380, w: 236, h: 105, label: "批量入库", kind: "agent",
         doc: "insertBatch(list) // 每批 1000 条，事务包裹，失败整批回滚。", file: "ScoreService.java" },
     ], edges: [{ from: "m1", to: "m2", label: "" }], subs: [] },
     src: { parent: "主流程", client: "zcode", session: "sess_成绩导入", task: "",
       ts: 3000, cwd: "C:/work/体测成绩系统", project: "体测成绩系统",
       turns: [
-        { node: "m1", q: "实现成绩批量导入与 EasyExcel 解析", ts: 3000, subs: [] },
-        { node: "m2", q: "优化批量入库性能与事务边界", ts: 6000, subs: [] },
+        { node: "m1", q: "实现成绩批量导入与 EasyExcel 解析", ts: 3000, subs: [], a: "EasyExcel 读表头映射 DTO，边读边校验，空值跳过并计入错误行。" },
+        { node: "m2", q: "优化批量入库性能与事务边界", ts: 6000, subs: [], a: "每批 1000 条 + 单事务，失败整批回滚；实测 5 万行 3.2 秒。" },
       ] },
   });
   const qa = F.qaItems();
-  qa.push({ who: "master", client: "qoder", sessionId: "sess_自动评测引擎", q: "按国家学生体质健康标准实现自动评测规则库", a: "", tools: [], ts: 1000, cwd: "C:/work/体测成绩系统", kw: ["评测"] });
-  qa.push({ who: "master", client: "zcode", sessionId: "sess_成绩导入", q: "实现成绩批量导入与 EasyExcel 解析", a: "", tools: [], ts: 3000, cwd: "C:/work/体测成绩系统", kw: ["导入"] });
+  qa.push({ who: "master", client: "qoder", sessionId: "sess_自动评测引擎", q: "按国家学生体质健康标准实现自动评测规则库", a: "已按《国家学生体质健康标准(2014)》落地规则库：RULES 表按项目 code 索引。", tools: [], ts: 1000, cwd: "C:/work/体测成绩系统", kw: ["评测"] });
+  qa.push({ who: "master", client: "zcode", sessionId: "sess_成绩导入", q: "实现成绩批量导入与 EasyExcel 解析", a: "EasyExcel 读表头映射 DTO，边读边校验。", tools: [], ts: 3000, cwd: "C:/work/体测成绩系统", kw: ["导入"] });
   F.fillWfSel();
+  // 加一条反馈边（n3 → n1）验证外绕路由不穿卡片
+  gg.edges.push({ from: "n3", to: "n1", label: "复核不通过", style: "dotted" });
+  F.refresh(true);
 }, [DOC1, DOC2, DOC3]);
 
 const shots = [];
@@ -115,7 +121,7 @@ await shot("canvas-3-cards", () => {
   window.__flow.showView("canvas");
   setTimeout(() => document.getElementById("fitBtn") && document.getElementById("fitBtn").click(), 60);
 }, 1500);
-await page.screenshot({ path: join(OUT, "canvas-3-nodes.png"), clip: { x: 200, y: 96, width: 1000, height: 260 } });
+await page.screenshot({ path: join(OUT, "canvas-3-nodes.png"), clip: { x: 260, y: 300, width: 900, height: 340 } });
 shots.push(join(OUT, "canvas-3-nodes.png"));
 console.log("shot:", join(OUT, "canvas-3-nodes.png"));
 

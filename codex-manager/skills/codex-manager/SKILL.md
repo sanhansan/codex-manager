@@ -44,6 +44,29 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
 - **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
 
+**v0.27.2 关键行为**（画布 UI 四项修复 + 神经网络写入**具体问答**；这一版解决的是「一直在重复标题、重复一句话」以及线条/方框/端口四类手感问题）：
+
+- **神经网络复读的三个根因（叠加起来才显得那么糟，缺一不可）**
+  1. **正文只取问题、回答没进去**：`ntSessionLines` 旧实现只 `lines.push(t.q)`，回答正文完全没进正文 → 放大后满屏都是标题。现在 `问：` + `qaTextLines(t.a, …)` + 子智能体输出一起进正文；回答来源 `src.turns[].a`（**v0.27.2 起随画布持久化，`w.src.turns[].a` 截断 400 字**，见 `wfTreeParse` 白名单），回退到问答数据里同会话条目（按 `q.slice(0,24)` 匹配）。
+  2. **子智能体写死同一句**：旧实现 `((t.subs)||[]).forEach(() => lines.push('  🤖 子智能体执行'))` → 10 个子智能体复读 10 遍。现在用 `subItemForNode(sn)` 反查真实条目，写它的 `a || description || q`；最后对整段正文**全文去重**（同一句只留一次）。
+  3. **`ntPackRows` 循环填充**：旧实现 `pool[i % pool.length]` + `i < pool.length ? t : '  ' + t`，**把同一句复制 N 遍直到铺满整块** —— 这才是「重复一句话」最直接的来源。现在只返回**去重按序的真实行**，内容不足就返回实际行数（布局端尾部留白），绝不复读。`ntPackRows` 已下沉到 `__CORE` 以便单测。
+- **配套布局改动**：`ntBuildTree` 正文上限 40 → **240 行**，`snode.codeLines` 与真正会画出来的行数对齐；`ntLayoutTree` 的第四层改为 `rowBudget = min(capRows, packed.length)`，`rowH = sinner.h / capRows`（**行高不变量保持不变，不做拉伸**），`pi >= rowBudget` 的轮直接跳过 → 不再强制占位。新增**内容自适应世界尺寸**：按 `contentRows * NT_ROW_H * 1.2 + heads` 算出 `kScale` 缩放 world，不再把十几行内容拉伸到整个画布。
+- **方框显示（4 处）**
+  1. **字符数当行数（最严重）**：`cardBodyLines` 旧实现 `if (txt) return txt.length` → 347 字的 doc 算成 347 行 → `n.h = 26+9+347*15+9+16 ≈ 5200px` 的巨框。现在按 `ntCardRows(txt, CARD_W-2*CARD_PAD, CARD_MAX_BODY)` 的**真实折行结果**取行数，并加 `CARD_MAX_BODY = 14` 硬上限。
+  2. **正文回退重复标题**：旧回退链 `n.doc || n.body || n.label` 会把标题又写一遍。现在 `cardBodyText(n)` 只认 `doc || body`；没有就收成紧凑卡（`CARD_MIN_BODY = 2`），并在 **`enrichNodeDocs()`** 里用该节点对应的真实问答（`src.turns` 按 `t.node === n.id` 匹配）补齐 `n.doc`。只在缺 doc 时补、不覆盖用户手写，`g._docsFilled` 保证每图只补一次，`refresh()` 里调用。
+  3. **标题区色块高出卡片上边框 8px**：旧抬头路径 `M x,(y+headH) h w v -headH a R,R 0 0 0 -R,-R …` 的顶边落在 **`y-R`** 上。现在显式走 `(x+w, y+R) →arc→ (x+w-R, y) →L→ (x+R, y) →arc→ (x, y+R) →Z`，圆角严格落在顶边 `y`，与卡片 `rx=R` 吻合。
+  4. **正文压到文件名条**：尺寸侧 `n.file`、渲染侧 `n.file || n.subflow` 判定不一致。现在 `sizeNode` 预算 `n.fileLabel` 与 `n.bodyRows`，渲染**直接复用** → 框高与画出来的文字永远同源（不会再出现大片空白或文字溢出）。
+  另：`looksLikeCode(t)` 判定代码型正文，用 `.nd-bcode` 等宽字体。
+- **线条规划 / 线条连接**：新增纯函数 **`routeOrtho(p1, p2, {dir, obstacles, a, b, laneIdx, laneCnt, feedback})`**（在 `__CORE`，可单测）：
+  - 正走：在两端端口之间**逐档扫描**竖向（LR）/ 横向（TD）通道，用 `polylineFree(pts, obs, skip, 4)` 选**不穿过任何卡片**（留 4px 间隙）的那一条；
+  - 受阻或反馈边：**外绕** —— 在 `min/max` 侧逐档外移（LR 走上/下方横向通道，TD 走左/右侧纵向通道），取第一条干净通道；找不到再用兜底通道；
+  - **首末段严格沿端口法线**进出（LR 水平、TD 垂直），保证箭头方向正确。
+  - 旧实现的两个硬伤：`midX = (p1.x+p2.x)/2 + off` 在两端贴近时 `midX` 落在区间外 → **折返**；平行边分道偏移 `off` 会把通道推过卡片 → **直接穿过中间的方框**。
+  - **箭头避让端口**：`edgePath` 里末段沿方向回退 8px（`END_TRIM`），箭头尖停在端口圆点外侧 —— 旧实现箭头整个盖住端口。
+- **点（端口）**：`anchors(n)` 给的 `inn/out` 之前渲染成**两个完全相同的圆**（`class="port"`），既看不出方向、`r=4.5` 又几乎点不中。现在可视圆分 `port-in`（空心）/ `port-out`（实心）且 `pointer-events:none`，另加 **r=10 的透明热区 `port-hit`**（`data-port` 挂在热区上，`closest('[data-port]')` 逻辑不变），`g[data-node]:hover .port-*` 放大并变强调色。
+- **测试钩子**：`__flow` 新增 `sizeNode / normalize / cardBodyRows / cardBodyText / ntCardRows / qaTextLines / looksLikeCode / routeOrtho / segHitsRect / polylineFree / anchors / edgePath / edgeMeta / refresh / ntPackRows / ntSessionLines / enrichNodeDocs`。
+- **诊断脚本**：`tests/diag-canvas.mjs`（导出节点/连线几何）、`tests/diag-card.mjs`（卡片近景 + 数值校验：框高 vs 正文行数、`getBBox` 是否横向溢出、正文底 vs 文件名条顶、箭头尖与端口距离）。
+
 **v0.27.1 关键行为**（神经网络「文字树图」落地修复 + 视觉验收；v0.27.0 只是骨架，实际渲染有 5 个真 bug）：
 - **行高语义（最重要）**：一个「对话轮」= **一段多行代码块**（不是一行）。`ntBuildTree` 里 `snode.children[i] = { lines: ntWrapText(q, NT_CODE_COLS*7.5, NT_MAX_LINES, 10), nLines, weight: nLines }`；会话权重 = `codeLines`（各轮 `nLines` 之和）。布局按行数分配高度，使**「一行」在世界坐标里恒为 `NT_ROW_H`(=10)**，对齐 code-map 的 `line_px = line_h × scale`。旧实现一个 rect 占满会话体（35px+）、`fs = h*0.68` 画出巨型单行 → 永远读不到多行代码。
 - **LOD 阈值可达性**：`ntRowPx()` 取**所有 turn 的 `h / lines.length` 中位数** × 缩放，作为 `ntUpdateLod` 的「每行像素」。旧实现按 rect 高度算 → 必须缩放到 ~10× 才进文字档；现在 **1.08×** 即可。
