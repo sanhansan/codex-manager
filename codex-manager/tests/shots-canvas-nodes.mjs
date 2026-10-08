@@ -90,6 +90,23 @@ await shot("canvas-3-linknot-dark", () => {
   document.getElementById("btnTheme").click();
   document.getElementById("btnFit").click();
 }, 1200);
+
+// D) v0.27.5 判断块：是/否 + 通过/不通过（回到浅色）
+await shot("canvas-4-branch", () => {
+  document.getElementById("btnTheme").click();     // 回浅色
+  const sel = document.getElementById("branchSel");
+  sel.value = "yn";  document.getElementById("btnBranch").click();
+  sel.value = "pass"; document.getElementById("btnBranch").click();
+  document.getElementById("btnFit").click();
+}, 1400);
+// E) 选中一条判断分支 → 右侧属性面板露出判断词快捷胶囊
+await shot("canvas-5-branch-chips", () => {
+  const F = window.__flow, gg = F.g();
+  document.getElementById("tabProps").click();
+  const i = gg.edges.findIndex(e => e.label === "是");
+  F.setSel({ type: "edge", id: i >= 0 ? i : 0 });
+}, 1000);
+
 console.log("nodes:", JSON.stringify(info.nodes));
 console.log("edges:", info.edges.join("  "));
 console.log("页面错误:", errs.length ? errs.slice(0, 4).join(" | ") : "none");

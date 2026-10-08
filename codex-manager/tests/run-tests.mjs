@@ -14,7 +14,7 @@ const html = readFileSync(htmlPath, "utf8");
 const m = html.match(/\/\/__CORE_START__([\s\S]*?)\/\/__CORE_END__/);
 if (!m) { console.error("FAIL: flow-editor.html 中找不到 __CORE_START__/__CORE_END__"); process.exit(1); }
 const corePath = join(here, "core.extracted.mjs");
-writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf, isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN };");
+writeFileSync(corePath, m[1] + "\nexport { parseMermaid, toMermaid, graphToJSON, jsonToGraph, graphToMarkdown, markdownToGraph, guessKind, aggregateUsage, skillSummary, pluginUsageRows, habitCandidates, ctlLayout, autoLayout, findCycle, validateGraph, newNodeId, sizeNode, upsertNode, splitLabel, joinLabel, flowTemplate, topoOrder, edgeMeta, parseUsageRecords, traceQuery, cleanLabel, fitText, extractKeywords, parseQaTurns, parseCodexTurns, parseQoderTurns, parseWbTurns, parseGeminiTurns, parseQwenTurns, parseAnyTurns, keyPoints, highlightSummary, flowFromQa, parseAgentRecords, qaFilter, qaLabel, suggestSlug, skillDraft, keywordDigest, promptSummary, skillDraftFromPrompts, fmtWfWhen, taskCanvasName, wfTree, isQaContinuation, fmtDurMs, wfDurOfTurns, subNodeLabel, wfTreeParse, wfMergeEntries, priceFor, costOfModel, fmtCost, projectOf, projectKeyOf, groupByProject, agentsInProject, projectCollaboration, nnSquarify, ntLinePx, ntVisibleChars, ntTokenize, ntHash, ntFocusSetIn, ntWrapText, ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows, ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf, isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN, BRANCH_PAIRS, branchPairOf, branchLabels, branchWords, isBranchPairLabels, branchLabelIssue };");
 
 const core = await import(pathToFileURL(corePath).href);
   const {
@@ -35,6 +35,7 @@ const core = await import(pathToFileURL(corePath).href);
   ntCardRows, qaTextLines, looksLikeCode, segHitsRect, polylineFree, routeOrtho, ntPackRows,
   ntRoleOf, ntRoleColor, nnStats, ntShadeOf, ntSpanOf,
   isLinkKind, edgeDirFor, KIND_GATE, KINDS, KIND_CN,
+  BRANCH_PAIRS, branchPairOf, branchLabels, branchWords, isBranchPairLabels, branchLabelIssue,
 } = core;
 
 let pass = 0, fail = 0;
@@ -1275,6 +1276,79 @@ t("splitLabel/joinLabel：新增类型能往返，未知 ◈文本不被误剥",
   eq(splitLabel("说明文字 ◈未知类型").kind, "", "未知后缀不当作 kind");
   eq(splitLabel("说明文字 ◈未知类型").label, "说明文字 ◈未知类型", "未知后缀原样留在标签里");
   eq(splitLabel("需求 ◈input").kind, "input", "旧的六种类型仍正常");
+});
+
+// ---------- v0.27.5 画布：是否等判断（判断词预设 / 判断块 / 分支标签体检） ----------
+t("BRANCH_PAIRS：五组常用判断词，id 唯一、中英各一对", () => {
+  eq(BRANCH_PAIRS.length, 5);
+  const ids = BRANCH_PAIRS.map(p => p.id);
+  eq(new Set(ids).size, 5, "id 不重复");
+  BRANCH_PAIRS.forEach(p => {
+    eq(p.zhLabels.length, 2, p.id + " 有中文一对");
+    eq(p.enLabels.length, 2, p.id + " 有英文一对");
+    okTest(!!p.zh && !!p.en, p.id + " 有双语显示名");
+  });
+  eq(BRANCH_PAIRS[0].id, "yn", "默认第一组是 是/否");
+});
+
+t("branchPairOf / branchLabels：取词对，未知 id 退回第一组", () => {
+  eq(branchPairOf("tf").id, "tf");
+  eq(branchPairOf("不存在").id, "yn", "未知 id 退回第一组");
+  eq(branchPairOf(null).id, "yn");
+  eq(branchLabels("yn", false).join("|"), "是|否");
+  eq(branchLabels("yn", true).join("|"), "yes|no");
+  eq(branchLabels("pass", false).join("|"), "通过|不通过");
+  eq(branchLabels("tf", true).join("|"), "true|false");
+  // 返回的是副本，外部改动不应污染预设表
+  const a = branchLabels("yn", false); a[0] = "X";
+  eq(branchLabels("yn", false)[0], "是", "返回副本，不被外部篡改");
+});
+
+t("branchWords：中英词全部去重收集（供边属性胶囊）", () => {
+  const w = branchWords();
+  ["是", "否", "真", "假", "通过", "不通过", "成功", "失败", "有", "无", "yes", "no", "true", "false"].forEach(k => {
+    okTest(w.indexOf(k) >= 0, "含「" + k + "」");
+  });
+  eq(new Set(w).size, w.length, "无重复");
+});
+
+t("isBranchPairLabels：顺序无关、大小写与空白无关、只认同一对", () => {
+  eq(isBranchPairLabels("是", "否"), true);
+  eq(isBranchPairLabels("否", "是"), true, "顺序无关");
+  eq(isBranchPairLabels(" true ", "FALSE"), true, "英文大小写与空白无关");
+  eq(isBranchPairLabels("通过", "不通过"), true);
+  eq(isBranchPairLabels("是", "真"), false, "跨组不算一对");
+  eq(isBranchPairLabels("好了", "否"), false);
+  eq(isBranchPairLabels("", "否"), false);
+  eq(isBranchPairLabels(null, undefined), false);
+});
+
+t("branchLabelIssue：没标 → 提示标注；标了但不是一对 → 提示用一对；是/否 → 通过", () => {
+  const n = { id: "c1", gate: "IF", kind: "cond" };
+  const G = labels => ({ nodes: [n], edges: labels.map(l => ({ from: "c1", to: "x", label: l })) });
+  eq(branchLabelIssue(n, { nodes: [n], edges: [] }, "条件节点"), null, "没有分支不报");
+  const miss = branchLabelIssue(n, G(["是", ""]), "条件节点");
+  okTest(miss && /标注判断词/.test(miss.msg) && miss.nodeId === "c1", "有一条没标注 → 提示标注判断词");
+  eq(branchLabelIssue(n, G(["是", "否"]), "条件节点"), null, "标准 是/否 → 通过");
+  eq(branchLabelIssue(n, G(["true", "false"]), "条件节点"), null, "真/假（英文）→ 通过");
+  const pair = branchLabelIssue(n, G(["是", "真"]), "条件节点");
+  okTest(pair && /一对判断词/.test(pair.msg) && /是 \/ 真/.test(pair.msg), "两条不是一对 → 提示用一对并回显当前值");
+  eq(branchLabelIssue(n, G(["是", "否", "其它"]), "条件节点"), null, "三条且都标了 → 不做成对检查（只查空）");
+});
+
+t("newNodeId：跳过已占用 id，且能通过第二参预留尚未插入的 id", () => {
+  const g = { nodes: [{ id: "n1" }, { id: "n2" }], edges: [] };
+  eq(newNodeId(g), "n3");
+  eq(newNodeId({ nodes: [] }), "n1");
+  // 坑位回归：连写两次、中间不插入会撞 id；传预留后必须错开
+  const a = newNodeId(g);                 // n3
+  const bBad = newNodeId(g);              // 也是 n3（未预留）
+  eq(a, bBad, "不传预留时确实会撞（说明必须传第二参）");
+  const c = newNodeId(g, [a]);            // n4
+  okTest(c !== a, "传预留后错开：" + a + " → " + c);
+  eq(newNodeId(g, [a, c]), "n5", "多个预留一起生效");
+  eq(newNodeId(g, [null, undefined, ""]), "n3", "预留里的空值被忽略");
+  eq(newNodeId({ nodes: [{ id: "n1" }, { id: "n3" }] }), "n2", "从空缺处补位");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

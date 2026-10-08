@@ -44,6 +44,28 @@ description: Use when the user asks about plugin/skill/MCP usage statistics (插
 - **点击切换与展现重做**：画布顶部面包屑 `#cvCrumb`（📁 项目 › 🤖 智能体 › 🧩 画布，点击展开下拉 `openCrumbMenu`）；全局快速切换 `openQuickSwitch`（`#wfQuickBtn` → 关键字过滤、回车跳转）；`switchWorkflow` 加 `cv-flip` 淡入动效。
 - **🧠 智能体总结神经网络视图**（`viewNn`）：v0.27.0 起为 Canvas「文字树图」渲染器（详见下方 v0.27.0 关键行为）；建树 `ntBuildTree(list, qaArr)` → 布局 `ntLayoutTree(root, W, H)` 四层嵌套 squarified treemap（项目 → 智能体 → 会话 → 对话轮）。**v0.27.1 修掉 5 处落地缺陷，详见下方 v0.27.1 关键行为**。
 
+**v0.27.5 关键行为**（画布**是否等判断**；用户诉求原文「画布加入是否等判断」）：
+
+- **判断词预设 `BRANCH_PAIRS`**（`__CORE`，可单测）：五组常用判断词，每组中英各一对
+  —— `yn` 是/否、`tf` 真/假、`pass` 通过/不通过、`ok` 成功/失败、`has` 有/无。
+  标签是**写进图里的数据**，所以按界面语言取（与 `flowTemplate(name, en)` 的 yes/no 同款做法）。
+  配套纯函数：`branchPairOf(id)`（未知 id 退回第一组）、`branchLabels(id, en)`（**返回副本**，外部改动不污染预设表）、
+  `branchWords()`（中英去重，供边属性胶囊）、`isBranchPairLabels(a,b)`（顺序无关 / 大小写与空白无关）。
+- **「＋判断」`#btnBranch` + 判断词下拉 `#branchSel`**（工具栏，位于「＋条件」右侧）：
+  一次插入**判断块** = 菱形 `cond` 节点（自动 `IF` 门，标签「判断?」）+ 2 个分支占位节点（「是分支」/「否分支」）
+  + **2 条已标注好的分支连线**；落位在当前内容**下方居中**，三节点呈「上一下二」的 V 形（空画布落画布中心）。
+- **边属性的判断词快捷胶囊** `.bchip`：选中连线后，`renderPanel` 在「标签」下渲染五组词对 + 「清空」，
+  点击即把边标签设为该词并重渲染（`.on` 高亮当前值）。实现是 `BRANCH_PAIRS.map(pr => chip(pr.zhLabels[0]) + chip(pr.zhLabels[1]))`。
+- **校验 `branchLabelIssue(n, g, who)`**（`__CORE` 纯函数，取代原先写死的「建议标注 是/否」）：
+  ① 有分支没标注 → 提示标注判断词；② 两条都标了但**不构成一对**（如 是/真）→ 提示改用一对并回显当前两个值；
+  ③ 恰是一对（顺序无关、中英皆可）→ 不报。`IF` 门与 `cond` 节点两处共用，避免重复报错。
+- **⚠️ 修复 `newNodeId` 批量插入坑位（重要）**：`newNodeId(g)` 只看 `g.nodes`；**连写两次而中间没插入**会返回同一个 id，
+  随后两次 `upsertNode` 会**静默合并成一个节点**（「＋判断」第一版因此少了一个分支节点，且标签被覆盖）。
+  现在签名为 `newNodeId(g, reserved)`，第二参可**预留尚未插入的 id**：`const b = newNodeId(g, [a])`。
+  批量插入时务必用第二参，单测里有专项回归（含「不传预留确实会撞」的说明性断言）。
+- **测试**：单测 **114/114**（+6）、`e2e-canvas-nodes` **41/41**（+15）、`e2e-nn` 90/90、i18n missing 0、守卫 4/4 + 4/4；
+  视觉验收补 2 张（判断块 / 边属性胶囊面板）。
+
 **v0.27.4 关键行为**（画布**左右连接节点** + **非门** + 神经网络继续增强；用户诉求原文「继续丰富神经网络，画布添加左右连接节点，非门也添加」）：
 
 - **三种新节点类型**（都进 `KINDS`，因此 `◈` 后缀、JSON、Markdown 全链路可往返）：

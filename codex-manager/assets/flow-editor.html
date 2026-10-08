@@ -290,6 +290,12 @@
   aside label { display:block; font-size:12px; color:var(--muted); margin:8px 0 2px; }
   aside input[type=text], aside textarea, aside select { width:100%; font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:2px; background:var(--panel); color:var(--ink); }
   aside textarea { height:52px; resize:vertical; }
+  /* v0.27.5 边属性：判断词快捷胶囊（是/否、真/假、通过/不通过、成功/失败、有/无） */
+  .bchips { display:flex; flex-wrap:wrap; gap:4px 6px; margin:2px 0 2px; align-items:center; }
+  .bchips .bpair { display:inline-flex; gap:2px; padding:1px 2px; border-radius:10px; background:color-mix(in srgb, var(--canvas) 70%, transparent); }
+  .bchips .bchip { font-size:11.5px; padding:1px 7px; border-radius:9px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; line-height:1.5; }
+  .bchips .bchip:hover { border-color:var(--accent); color:var(--accent); }
+  .bchips .bchip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
   #aiOut { font-size:12.5px; }
   #aiOut .v-err { color:#c02626; }
   #aiOut .v-warn { color:#a16207; }
@@ -522,6 +528,14 @@
     <button class="small" data-add="agent" data-i18n="＋Agent" title="Agent 节点（执行一次智能体任务）">＋Agent</button>
     <button class="small" data-add="map" data-i18n="＋Map Agent" title="Map Agent（对列表逐项并行执行）">＋Map Agent</button>
     <button class="small" data-add="cond" data-i18n="＋条件" title="条件节点（是/否 两分支）">＋条件</button>
+    <select id="branchSel" title="判断词" data-i18n-title="判断词：一键生成的分支连线会按这一对标注（是/否、真/假、通过/不通过…）">
+      <option value="yn" data-i18n="是 / 否">是 / 否</option>
+      <option value="tf" data-i18n="真 / 假">真 / 假</option>
+      <option value="pass" data-i18n="通过 / 不通过">通过 / 不通过</option>
+      <option value="ok" data-i18n="成功 / 失败">成功 / 失败</option>
+      <option value="has" data-i18n="有 / 无">有 / 无</option>
+    </select>
+    <button class="small" id="btnBranch" data-i18n="＋判断" data-i18n-title="一键插入判断块：菱形判断节点 + 两条已标注好的分支（按左侧判断词），插在当前内容下方" title="一键插入判断块：菱形判断节点 + 两条已标注好的分支（按左侧判断词），插在当前内容下方">＋判断</button>
     <button class="small" data-add="merge" data-i18n="＋合并" title="合并节点（汇合并行分支）">＋合并</button>
     <button class="small" data-add="output" data-i18n="＋输出" title="输出节点（流程终点/交付）">＋输出</button>
     <button class="small" data-add="link-in" data-i18n="＋左连接" data-i18n-title="左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）" title="左连接符：贴到当前内容最左侧，并把所有入口节点自动接上（左右双连接点，用作上页续接 / 外部汇入）">＋左连接</button>
@@ -771,6 +785,7 @@
   <h3 data-i18n="支持与限制">支持与限制</h3>
   <li data-i18n-html="help-mermaid">mermaid 子集：<code>flowchart TD / LR</code>；节点 <code>A[矩形]</code> <code>A{菱形}</code> <code>A(圆角)</code>；连线 <code>--&gt;</code> / <code>-.-&gt;</code> 与标签 <code>--&gt;|文字|</code>；<code>subgraph</code> 分组</li>
   <li data-i18n-html="help-suffix">标签后缀随 mermaid/JSON/Markdown 携带：<code>⚙IF</code>（八类门）、<code>▸→工作流名</code>（子流程）、<code>◈agent</code>（节点类型：input / agent / map / cond / merge / output / link-in 左连接 / link-out 右连接 / not 非门）</li>
+  <li data-i18n-html="help-branch">＋判断 一键插入「判断节点 + 是/否两条已标注分支」（判断词可选 是/否、真/假、通过/不通过、成功/失败、有/无）；选中连线后属性面板有判断词快捷胶囊，一键改标签</li>
   <li data-i18n-html="help-links">左右连接：每个节点在<b>左右两侧</b>常驻一对连接点（左=输入、右=输出），TD 图里横向相邻的节点也能直接左右连；「＋左连接 / ＋右连接」插入的是<b>连接符节点</b>（小圆），会自动贴到当前内容最左 / 最右，并把现有入口 / 出口节点接上</li>
   <li data-i18n="「＋新建流程框架」一键生成 输入 → Agent → 条件（是/否）→ 合并 → 输出 骨架，含虚线反馈修正环；工具栏六个「＋类型」按钮可随时加节点">「＋新建流程框架」一键生成 输入 → Agent → 条件（是/否）→ 合并 → 输出 骨架，含虚线反馈修正环；工具栏六个「＋类型」按钮可随时加节点</li>
   <li data-i18n="连线：从圆点拖到另一节点新建；拖动连线端点到别的节点 = 改接；红色边 = 反馈环，平行边自动分道；「✨ 一键整理」去重连线并重新排版">连线：从圆点拖到另一节点新建；拖动连线端点到别的节点 = 改接；红色边 = 反馈环，平行边自动分道；「✨ 一键整理」去重连线并重新排版</li>
@@ -850,6 +865,37 @@ function edgeDirFor(dir, a, b){
   // 「同一行」的判据要跟卡片高度走：两个同 y 的卡片，端口 y 差恰好等于卡片高
   const dyMax = Math.max(48, 1.4 * Math.min(a.h || 60, b.h || 60));
   return (dx > 220 && dy < dyMax) ? 'LR' : 'TD';
+}
+
+// ---------- v0.27.5 判断词预设（是否 / 真假 / 通过 / 成功 / 有无）----------
+// 条件节点的两条分支连线该标注什么词。labels 是**写进图里的数据**（边标签），
+// 所以按当前界面语言取（与 flowTemplate 里 yes/no 的做法一致）。
+const BRANCH_PAIRS = [
+  { id:'yn',   zh:'是 / 否',       en:'Yes / No',     zhLabels:['是', '否'],       enLabels:['yes', 'no'] },
+  { id:'tf',   zh:'真 / 假',       en:'True / False', zhLabels:['真', '假'],       enLabels:['true', 'false'] },
+  { id:'pass', zh:'通过 / 不通过', en:'Pass / Fail',  zhLabels:['通过', '不通过'], enLabels:['pass', 'fail'] },
+  { id:'ok',   zh:'成功 / 失败',   en:'OK / Failed',  zhLabels:['成功', '失败'],   enLabels:['ok', 'failed'] },
+  { id:'has',  zh:'有 / 无',       en:'Has / None',   zhLabels:['有', '无'],       enLabels:['has', 'none'] },
+];
+function branchPairOf(id){ return BRANCH_PAIRS.find(p => p.id === id) || BRANCH_PAIRS[0]; }
+function branchLabels(id, en){ const p = branchPairOf(id); return (en ? p.enLabels : p.zhLabels).slice(); }
+// 判断词对的全部候选词（去重，供边属性的快捷胶囊使用）：中英都收，避免切语言后胶囊消失
+function branchWords(){
+  const out = [];
+  BRANCH_PAIRS.forEach(p => p.zhLabels.concat(p.enLabels).forEach(w => { if (out.indexOf(w) < 0) out.push(w); }));
+  return out;
+}
+// 两个标签是否构成某个常用判断对（校验用；顺序无关、大小写与空白无关）
+function isBranchPairLabels(a, b){
+  const nz = s => String(s == null ? '' : s).trim().toLowerCase();
+  const x = nz(a), y = nz(b);
+  if (!x || !y) return false;
+  return BRANCH_PAIRS.some(p => {
+    const zh1 = nz(p.zhLabels[0]), zh2 = nz(p.zhLabels[1]);
+    const en1 = nz(p.enLabels[0]), en2 = nz(p.enLabels[1]);
+    return (x === zh1 && y === zh2) || (x === zh2 && y === zh1)
+        || (x === en1 && y === en2) || (x === en2 && y === en1);
+  });
 }
 // 代码客户端清单（CORE 内共享：分组/协作/神经网络与 UI 都读同一份，避免两处漂移）
 const QA_CLIENTS = { zcode: { label:'ZCode', color:'#2563eb' }, codex: { label:'Codex CLI', color:'#0d9488' }, qoder: { label:'Qoder CLI', color:'#7c3aed' }, gemini: { label:'Gemini (Antigravity)', color:'#ea580c' }, wb: { label:'WorkBuddy', color:'#db2777' }, qwen: { label:'Qwen Code', color:'#ca8a04' }, kimi: { label:'Kimi', color:'#0e7490' } };
@@ -1216,6 +1262,19 @@ function findCycle(g){
   for (const n of g.nodes){ if (!color[n.id]) dfs(n.id, []); if (cyc) break; }
   return cyc;
 }
+// 条件分支的标签体检（v0.27.5，纯函数可单测）：
+//   ① 有分支没标注 → 提示标注判断词；② 两条都标了但**不构成常用判断对** → 提示用一对判断词。
+//   返回值是 validateGraph 的 issue 对象（或 null）。
+function branchLabelIssue(n, g, who){
+  const labs = (g.edges || []).filter(e => e.from === n.id).map(e => String(e.label || ''));
+  if (!labs.length) return null;
+  if (labs.some(l => !l))
+    return { level:'warn', msg: who + '（' + n.id + '）分支建议标注判断词（是/否、真/假、通过/不通过…）', nodeId:n.id };
+  if (labs.length === 2 && !isBranchPairLabels(labs[0], labs[1]))
+    return { level:'warn', msg: who + '（' + n.id + '）两条分支建议用一对判断词（如 是 / 否），当前「' + labs[0] + ' / ' + labs[1] + '」', nodeId:n.id };
+  return null;
+}
+
 function validateGraph(g, knownNames){
   const issues = [];
   const deg = {};
@@ -1240,15 +1299,17 @@ function validateGraph(g, knownNames){
     if (n.gate === 'XOR' && d.out < 2) issues.push({ level:'warn', msg:'XOR（' + n.id + '）建议至少 2 个分支', nodeId:n.id });
     if ((n.gate === 'AND' || n.gate === 'OR') && d.out < 2) issues.push({ level:'warn', msg:GATE_CN[n.gate] + '（' + n.id + '）建议至少 2 个分支', nodeId:n.id });
     if (n.gate === 'IF' && d.out >= 1){
-      const labels = g.edges.filter(e => e.from === n.id).map(e => e.label);
-      if (labels.some(l => !l)) issues.push({ level:'warn', msg:'IF/ELSE（' + n.id + '）分支建议标注「是 / 否」', nodeId:n.id });
+      const bi = branchLabelIssue(n, g, 'IF/ELSE');   // v0.27.5：接受任意一对常用判断词，不再只认「是 / 否」
+      if (bi) issues.push(bi);
     }
     // 节点类型规则（cond 与 IF 门同义，避免重复报错）
     if (n.kind === 'cond' && n.gate !== 'IF'){
       if (d.out > 2) issues.push({ level:'error', msg:'条件节点（' + n.id + '）最多 2 个分支（是/否），当前 ' + d.out, nodeId:n.id });
       else if (d.out < 2) issues.push({ level:'warn', msg:'条件节点（' + n.id + '）应有 2 个分支（是/否），当前 ' + d.out, nodeId:n.id });
-      if (d.out >= 1 && g.edges.filter(e => e.from === n.id).some(e => !e.label))
-        issues.push({ level:'warn', msg:'条件节点（' + n.id + '）分支建议标注「是 / 否」', nodeId:n.id });
+      if (d.out >= 1){
+        const bi2 = branchLabelIssue(n, g, '条件节点');   // v0.27.5：同上，接受任意一对常用判断词
+        if (bi2) issues.push(bi2);
+      }
     }
     if (n.kind === 'input' && d.in > 0) issues.push({ level:'warn', msg:'输入节点（' + n.id + '）不应有输入连线', nodeId:n.id });
     if (n.kind === 'input' && d.out === 0 && g.nodes.length > 1) issues.push({ level:'warn', msg:'输入节点（' + n.id + '）没有输出连线', nodeId:n.id });
@@ -2002,9 +2063,15 @@ function qaLabel(it){
   return pick.replace(/\s+/g, ' ').trim() || '(无提问)';
 }
 
-function newNodeId(g){
+// 生成不冲突的新节点 id。
+// ⚠️ 坑位（v0.27.5 踩过）：连写两次 newNodeId(g) 而中间**没有把节点插入 g** 时会返回同一个 id，
+//    随后两次 upsertNode 会合并成同一个节点（静默少一个）。批量插入请用第二参把已占用的 id 传进来：
+//    const a = newNodeId(g); const b = newNodeId(g, [a]);
+function newNodeId(g, reserved){
+  const taken = new Set(((g && g.nodes) || []).map(n => n.id));
+  (reserved || []).forEach(id => { if (id) taken.add(id); });
   let i = 1;
-  while (g.nodes.some(n => n.id === 'n' + i)) i++;
+  while (taken.has('n' + i)) i++;
   return 'n' + i;
 }
 
@@ -3205,6 +3272,19 @@ if (typeof document !== "undefined") var UI = function(){
     '未找到该会话的问答记录（该客户端可能不落盘问答），无法导入画布': 'No Q&A records found for this session (this client may not persist Q&A); cannot import to canvas',
     '问答画布': 'Q&A canvas',
     // ---- v0.27.0 文字树图神经网络 / 分布式卡片 / 画布卡片 ----
+    // ---- v0.27.5 画布：是否等判断（判断块 + 判断词预设 + 边标签胶囊）----
+    '＋判断': '＋Decision',
+    '是 / 否': 'Yes / No',
+    '真 / 假': 'True / False',
+    '通过 / 不通过': 'Pass / Fail',
+    '成功 / 失败': 'OK / Failed',
+    '有 / 无': 'Has / None',
+    '判断词：一键生成的分支连线会按这一对标注（是/否、真/假、通过/不通过…）': 'Branch words: generated branches are labelled with this pair (yes/no, true/false, pass/fail…)',
+    '一键插入判断块：菱形判断节点 + 两条已标注好的分支（按左侧判断词），插在当前内容下方': 'Insert a decision block in one click: a diamond decision node plus two pre-labelled branches (per the branch-word selector), placed below the current content',
+    '判断词（一键设为标签）': 'Branch word (one click sets the label)',
+    '清空': 'Clear',
+    '已插入判断块：判断?（{0} / {1}）': 'Decision block inserted: Decision? ({0} / {1})',
+    '＋判断 一键插入「判断节点 + 是/否两条已标注分支」（判断词可选 是/否、真/假、通过/不通过、成功/失败、有/无）；选中连线后属性面板有判断词快捷胶囊，一键改标签': '＋Decision inserts a decision node plus two pre-labelled branches (branch words: yes/no, true/false, pass/fail, ok/failed, has/none); selecting an edge shows one-click branch-word chips in the property panel',
     // ---- v0.27.4 神经网络：层级显隐 / 角色分布 / 导出 PNG ----
     '🗂 全部层级': '🗂 All levels',
     '🧩 隐藏项目框': '🧩 Hide project frames',
@@ -3456,6 +3536,7 @@ if (typeof document !== "undefined") var UI = function(){
     'help-mermaid': 'mermaid subset: <code>flowchart TD / LR</code>; nodes <code>A[rect]</code> <code>A{diamond}</code> <code>A(rounded)</code>; edges <code>--&gt;</code> / <code>-.-&gt;</code> with labels <code>--&gt;|text|</code>; <code>subgraph</code> grouping',
     'help-suffix': 'Label suffixes travel through mermaid/JSON/Markdown: <code>⚙IF</code> (8 gates), <code>▸→workflow</code> (subflow), <code>◈agent</code> (kind: input / agent / map / cond / merge / output / link-in / link-out / not)',
     'help-links': 'Left/right connections: every node carries a permanent pair of connection points on its <b>left (input) and right (output)</b> sides, so horizontally adjacent nodes in a TD chart can be wired directly; "+Link in / +Link out" insert <b>connector nodes</b> (small circles) that snap to the far left / far right of the current content and auto-connect the existing entry / exit nodes',
+    'help-branch': '＋Decision inserts a decision node plus <b>two pre-labelled branches</b> (branch words: yes/no, true/false, pass/fail, ok/failed, has/none); selecting an edge shows one-click branch-word chips in the property panel',
   };
   const KIND_EN = { input:'Input', output:'Output', agent:'Agent', map:'Map Agent', cond:'Condition', merge:'Merge',
     'link-in':'Link in', 'link-out':'Link out', not:'NOT gate' };
@@ -4232,10 +4313,21 @@ if (typeof document !== "undefined") var UI = function(){
     } else {
       const e = g.edges[sel.id]; if (!e) return setSel(null);
       const stSel = '<option value="solid"'+(e.style==='solid'?' selected':'')+'>'+escXml(T('实线'))+'</option><option value="dotted"'+(e.style==='dotted'?' selected':'')+'>'+escXml(T('虚线'))+'</option>';
+      // v0.27.5 判断词快捷胶囊：选中连线后一键把标签设成「是 / 否 / 真 / 假 / 通过 / 不通过 …」
+      const curLbl = String(e.label || '');
+      const chip = w => '<button class="bchip'+(curLbl === w ? ' on' : '')+'" data-w="'+escXml(w)+'">'+escXml(w || T('清空'))+'</button>';
+      const chipRow = BRANCH_PAIRS.map(pr => '<span class="bpair">'+chip(pr.zhLabels[0])+chip(pr.zhLabels[1])+'</span>').join('') + chip('');
       p.innerHTML = '<h4>'+escXml(T('连线属性'))+'</h4><label>'+escXml(T('从 → 到'))+'</label><input type="text" value="'+escXml(e.from+' → '+e.to)+'" disabled>' +
         '<label>'+escXml(T('标签'))+'</label><input type="text" id="pLabel" value="'+escXml(e.label||'')+'">' +
+        '<label>'+escXml(T('判断词（一键设为标签）'))+'</label><div class="bchips">'+chipRow+'</div>' +
         '<label>'+escXml(T('线型'))+'</label><select id="pStyle">'+stSel+'</select>' +
         '<p><button id="pDel">'+escXml(T('删除连线'))+'</button></p>';
+      // v0.27.5 判断词快捷胶囊：一键把边标签设成 是 / 否 / 真 / 假 / 通过 / 不通过 …（当前值高亮）
+      p.querySelectorAll('.bchip[data-w]').forEach(btn => btn.addEventListener('click', () => {
+        pushHistory();
+        e.label = btn.getAttribute('data-w') || '';
+        render(); syncCode(); markDirty(); renderPanel();
+      }));
       $('pLabel').addEventListener('focus', pushHistory);
       $('pLabel').addEventListener('input', ev => { e.label = ev.target.value.trim(); render(); syncCode(); markDirty(); });
       $('pStyle').addEventListener('change', () => { pushHistory(); e.style = $('pStyle').value; render(); syncCode(); markDirty(); });
@@ -4603,6 +4695,46 @@ if (typeof document !== "undefined") var UI = function(){
     flashNodes([id]);
   }
   document.querySelectorAll('#cvTools [data-add]').forEach(b => b.addEventListener('click', () => addKindNode(b.dataset.add)));
+
+  // v0.27.5 「＋判断」：一键插入判断块 = 菱形判断节点 + 两条**已标注好的分支**
+  //   判断词取自 #branchSel（是/否、真/假、通过/不通过、成功/失败、有/无）。
+  //   落位：插在当前内容的**下方**居中（空画布则画布中心），三节点呈「上一下二」的 V 形，
+  //   之后可以直接接着往下画，也可以点「✨ 一键整理」重排。
+  function addBranchBlock(){
+    const pairId = ($('branchSel') && $('branchSel').value) || 'yn';
+    const L = branchLabels(pairId, isEn());
+    const suffix = isEn() ? ' branch' : '分支';
+    pushHistory();
+    const idQ = newNodeId(g);
+    const q = upsertNode(g, idQ, isEn() ? 'Decision?' : '判断?', 'diamond', null);
+    q.kind = 'cond'; q.gate = q.gate || 'IF';
+    const idA = newNodeId(g);
+    const a = upsertNode(g, idA, L[0] + suffix, 'round', null);
+    const idB = newNodeId(g, [idA]);   // 双保险：把已分配的 idA 一起传进去，避免 future 改动把它挪到插入之前
+    const b = upsertNode(g, idB, L[1] + suffix, 'round', null);
+    sizeNode(q); sizeNode(a); sizeNode(b);
+    const others = g.nodes.filter(x => x.id !== idQ && x.id !== idA && x.id !== idB);
+    if (others.length){
+      const x1 = Math.min.apply(null, others.map(x => x.x));
+      const x2 = Math.max.apply(null, others.map(x => x.x + x.w));
+      const yb = Math.max.apply(null, others.map(x => x.y + x.h)) + 90;
+      const left = Math.round((x1 + x2) / 2 - q.w / 2);
+      q.x = left; q.y = Math.round(yb);
+      a.x = left - 150; a.y = Math.round(yb + 150);
+      b.x = left + 150; b.y = Math.round(yb + 150);
+    } else {
+      const r = svg.getBoundingClientRect(), w = clientToWorld(r.left + r.width/2, r.top + r.height/2);
+      const left = Math.round(w.x - q.w / 2);
+      q.x = left; q.y = Math.round(w.y - 80);
+      a.x = left - 150; a.y = Math.round(w.y + 70);
+      b.x = left + 150; b.y = Math.round(w.y + 70);
+    }
+    g.edges.push({ from:idQ, to:idA, label:L[0], style:'solid' });
+    g.edges.push({ from:idQ, to:idB, label:L[1], style:'solid' });
+    setSel({type:'node', id:idQ}); syncCode(); markDirty(); flashNodes([idQ, idA, idB]);
+    toast(tx('已插入判断块：判断?（{0} / {1}）', L[0], L[1]));
+  }
+  if ($('btnBranch')) $('btnBranch').addEventListener('click', addBranchBlock);
   function addTplToCanvas(){
     const tpl = normalize(JSON.parse(JSON.stringify(flowTemplate('', isEn()))));
     autoLayout(tpl, 'TD');
@@ -8197,7 +8329,10 @@ if (typeof document !== "undefined") var UI = function(){
     // v0.27.4 测试钩子：显示层级 / 角色分布 / 画布节点类型
     nnLevel: () => nnLevel, setNnLevel: v => { nnLevel = v || 'all'; if ($('nnLevels')) $('nnLevels').value = nnLevel; ntStartLoop(); },
     nnDrawLayers: () => (nnLevel === 'flat' ? ['sess'] : nnLevel === 'noProj' ? ['agent', 'sess'] : ['proj', 'agent', 'sess']),
-    isLinkKind, edgeDirFor, edgeDirOf, sideAnchors, KIND_GATE, KINDS: () => KINDS, KIND_CN: () => KIND_CN };
+    isLinkKind, edgeDirFor, edgeDirOf, sideAnchors, KIND_GATE, KINDS: () => KINDS, KIND_CN: () => KIND_CN,
+    // v0.27.5 测试钩子：判断块 / 判断词 / 属性面板
+    addBranchBlock, BRANCH_PAIRS: () => BRANCH_PAIRS, branchLabels, isBranchPairLabels,
+    setSel, renderPanel, sel: () => sel };
 };
 try { if (typeof document !== "undefined") UI(); } catch(e){ document.title = 'BOOT-ERR: ' + ((e && (e.stack || e.message)) || String(e)); }
 </script>

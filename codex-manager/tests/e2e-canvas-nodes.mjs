@@ -158,6 +158,87 @@ const gateIssues = await page.evaluate(async () => {
 ok(gateIssues && /NOT/.test(gateIssues.out) && /1 个输入/.test(gateIssues.out),
   "非门规则生效：输入数不等于 1 时校验报错（" + ((gateIssues && gateIssues.out) || "").replace(/\s+/g, " ").slice(0, 80) + "）");
 
+// ---------- 5b) v0.27.5 是否等判断：判断块 + 判断词 + 边标签胶囊 + 校验 ----------
+const br = await page.evaluate(async () => {
+  const F = window.__flow, gg = F.g();
+  gg.nodes.length = 0; gg.edges.length = 0; gg.subs.length = 0;
+  F.refresh(true);
+  const sel = document.getElementById("branchSel");
+  const btn = document.getElementById("btnBranch");
+  const opts = sel ? [...sel.options].map(o => ({ v: o.value, t: o.textContent.trim() })) : [];
+  // ① 默认（是/否）插一个判断块
+  sel.value = "yn"; btn.click();
+  const after1 = { nodes: F.g().nodes.map(n => ({ id: n.id, kind: n.kind, shape: n.shape, gate: n.gate, label: n.label })),
+    edges: F.g().edges.map(e => e.from + "->" + e.to + "|" + e.label) };
+  // ② 切到「真/假」再插一个
+  sel.value = "tf"; btn.click();
+  const after2 = { nodes: F.g().nodes.length, edges: F.g().edges.map(e => e.label) };
+  // ③ 复位到 是/否，供后面校验用
+  sel.value = "yn";
+  return { hasSel: !!sel, hasBtn: !!btn, opts, after1, after2,
+    pairLabels: F.branchLabels("yn", false), words: F.BRANCH_PAIRS().length };
+});
+ok(br.hasSel && br.hasBtn, "工具栏新增「判断词」下拉 + 「＋判断」按钮");
+ok(br.opts.length === 5, "判断词下拉有 5 组（是/否、真/假、通过/不通过、成功/失败、有/无）（实际 " + br.opts.length + "）");
+ok(br.opts.map(o => o.v).join(",") === "yn,tf,pass,ok,has", "判断词选项顺序与预设一致：" + br.opts.map(o => o.t).join(" / "));
+ok(br.pairLabels.join("|") === "是|否", "默认判断词是「是 / 否」（实际 " + br.pairLabels.join("|") + "）");
+
+const b1 = br.after1;
+const conds = b1.nodes.filter(n => n.kind === "cond");
+ok(conds.length === 1 && conds[0].shape === "diamond" && conds[0].gate === "IF",
+  "＋判断 插入了 1 个菱形条件节点且自带 IF 门（实际 " + JSON.stringify(conds[0]) + "）");
+ok(b1.nodes.length === 3, "＋判断 一次插入 3 个节点（判断 + 两个分支）（实际 " + b1.nodes.length + "）");
+const b1Edges = b1.edges.map(e => e.split("|")[1]);
+ok(b1Edges.length === 2 && b1Edges.indexOf("是") >= 0 && b1Edges.indexOf("否") >= 0,
+  "两条分支连线已自动标注 是 / 否（实际 " + b1Edges.join(" / ") + "）");
+const froms = b1.edges.map(e => e.split("->")[0].split("|")[0]);
+ok(new Set(froms).size === 1 && froms[0] === conds[0].id, "两条分支都从判断节点射出");
+ok(br.after2.edges.filter(l => l === "真").length === 1 && br.after2.edges.filter(l => l === "假").length === 1,
+  "切到「真 / 假」再插，新分支标注为 真 / 假（全部标签：" + br.after2.edges.join("/") + "）");
+
+// 边属性面板的判断词快捷胶囊：点「通过」→ 该边标签变为「通过」
+const chipRes = await page.evaluate(async () => {
+  const F = window.__flow;
+  F.setSel({ type: "edge", id: 0 });
+  await new Promise(r => setTimeout(r, 120));
+  const box = document.getElementById("props");
+  const chips = [...box.querySelectorAll(".bchip[data-w]")].map(b => b.textContent.trim());
+  const before = F.g().edges[0].label;
+  const target = box.querySelector('.bchip[data-w="通过"]');
+  if (target) target.click();
+  await new Promise(r => setTimeout(r, 120));
+  const after = F.g().edges[0].label;
+  const onNow = [...box.querySelectorAll(".bchip.on")].map(b => b.textContent.trim());
+  return { chips: chips, before: before, after: after, onNow: onNow };
+});
+ok(chipRes.chips.length >= 11, "边属性面板出现判断词快捷胶囊（实际 " + chipRes.chips.length + " 个，含清空）");
+ok(chipRes.chips.indexOf("通过") >= 0 && chipRes.chips.indexOf("不通过") >= 0, "胶囊覆盖「通过 / 不通过」");
+ok(chipRes.before === "是" && chipRes.after === "通过", "点击胶囊即把边标签改成「通过」（" + chipRes.before + " → " + chipRes.after + "）");
+ok(chipRes.onNow.indexOf("通过") >= 0, "当前标签对应的胶囊高亮");
+
+// 校验：把两条分支改成「是 / 真」（不是一对）→ 走真实「校验流程」按钮
+const brIssues = await page.evaluate(async () => {
+  const F = window.__flow, gg = F.g();
+  // 找到第一个判断节点的两条出边
+  const q = gg.nodes.find(n => n.kind === "cond" && n.gate === "IF");
+  const outs = gg.edges.filter(e => e.from === q.id);
+  outs[0].label = "是"; outs[1].label = "真";
+  F.refresh(false);
+  document.getElementById("tabAI").click();
+  document.getElementById("btnValidate").click();
+  await new Promise(r => setTimeout(r, 200));
+  const out = (document.getElementById("aiOut") || {}).textContent || "";
+  // 修回一对，再校验一次应无「一对判断词」提示
+  outs[0].label = "是"; outs[1].label = "否";
+  F.refresh(false);
+  document.getElementById("btnValidate").click();
+  await new Promise(r => setTimeout(r, 200));
+  const out2 = (document.getElementById("aiOut") || {}).textContent || "";
+  return { bad: out, good: out2 };
+});
+ok(/一对判断词/.test(brIssues.bad), "校验能识别「是 / 真」不是一对并提示（" + brIssues.bad.replace(/\s+/g, " ").slice(0, 70) + "）");
+ok(!/一对判断词/.test(brIssues.good), "改回「是 / 否」后不再提示");
+
 // ---------- 6) 神经网络新增：层级显隐 / 角色分布 / 导出按钮 ----------
 const nnNew = await page.evaluate(async () => {
   const F = window.__flow, WF = F.wf(), NOW = Date.now(), H = 3600000;
